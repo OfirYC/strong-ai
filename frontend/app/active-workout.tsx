@@ -262,7 +262,7 @@ export default function ActiveWorkoutScreen() {
                       {fields.includes('weight') && <Text style={styles.setHeaderText}>WEIGHT</Text>}
                       {fields.includes('reps') && <Text style={styles.setHeaderText}>REPS</Text>}
                       {fields.includes('distance') && <Text style={styles.setHeaderText}>DIST (km)</Text>}
-                      {fields.includes('duration') && <Text style={styles.setHeaderText}>TIME (s)</Text>}
+                      {fields.includes('duration') && <Text style={styles.setHeaderText}>TIME</Text>}
                       <View style={{ width: 36 }} />
                     </View>
 
