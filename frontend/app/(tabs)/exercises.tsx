@@ -180,17 +180,20 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   filterChip: {
-    backgroundColor: '#1C1C1E',
+    backgroundColor: '#FFFFFF',
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
     marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#D1D1D6',
   },
   filterChipActive: {
-    backgroundColor: '#4A90E2',
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
   },
   filterChipText: {
-    color: '#8E8E93',
+    color: '#1C1C1E',
     fontSize: 14,
     fontWeight: '600',
   },
