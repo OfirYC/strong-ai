@@ -310,15 +310,12 @@ export default function ActiveWorkoutScreen() {
                         )}
                         
                         {fields.includes('duration') && (
-                          <TextInput
-                            style={styles.setInput}
-                            value={(set.duration || 0).toString()}
-                            onChangeText={(value) =>
-                              updateSet(exerciseIndex, setIndex, 'duration', value)
+                          <DurationInput
+                            value={set.duration || 0}
+                            onChangeValue={(seconds) =>
+                              updateSet(exerciseIndex, setIndex, 'duration', seconds)
                             }
-                            keyboardType="numeric"
-                            placeholder="0"
-                            placeholderTextColor="#999"
+                            style={styles.durationInput}
                           />
                         )}
                         
