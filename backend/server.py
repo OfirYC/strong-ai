@@ -339,12 +339,16 @@ async def check_and_create_prs(user_id: str, workout_id: str):
 
 # ============= SEED DATA =============
 @api_router.post("/seed")
-async def seed_exercises():
+async def seed_exercises(force: bool = False):
     """Seed the database with default exercises"""
     count = await db.exercises.count_documents({"is_custom": False})
     
-    if count > 0:
-        return {"message": f"Database already has {count} exercises"}
+    if count > 0 and not force:
+        return {"message": f"Database already has {count} exercises. Use force=true to reseed"}
+    
+    # Delete existing non-custom exercises if force
+    if force:
+        await db.exercises.delete_many({"is_custom": False})
     
     exercises = []
     for ex_data in EXERCISES:
