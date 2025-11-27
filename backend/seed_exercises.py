@@ -1,17 +1,23 @@
 """Seed exercise data for the workout app"""
 
 EXERCISES = [
-    # Chest
-    {"name": "Barbell Bench Press", "muscle_group": "Chest", "equipment": "Barbell", "category": "Strength", "instructions": "Lie on bench, lower bar to chest, press up"},
-    {"name": "Dumbbell Bench Press", "muscle_group": "Chest", "equipment": "Dumbbell", "category": "Strength", "instructions": "Lie on bench, press dumbbells up from chest"},
-    {"name": "Incline Barbell Bench Press", "muscle_group": "Chest", "equipment": "Barbell", "category": "Strength", "instructions": "Set bench to 30-45 degrees, press bar up"},
-    {"name": "Incline Dumbbell Press", "muscle_group": "Chest", "equipment": "Dumbbell", "category": "Strength", "instructions": "Incline bench, press dumbbells up"},
-    {"name": "Decline Bench Press", "muscle_group": "Chest", "equipment": "Barbell", "category": "Strength", "instructions": "Decline bench, press bar from lower chest"},
-    {"name": "Dumbbell Fly", "muscle_group": "Chest", "equipment": "Dumbbell", "category": "Strength", "instructions": "Lie on bench, arc dumbbells out and up"},
-    {"name": "Cable Fly", "muscle_group": "Chest", "equipment": "Cable", "category": "Strength", "instructions": "Stand between cables, bring handles together"},
-    {"name": "Push-Up", "muscle_group": "Chest", "equipment": "Bodyweight", "category": "Bodyweight", "instructions": "Hands shoulder width, lower chest to ground"},
-    {"name": "Dips (Chest)", "muscle_group": "Chest", "equipment": "Bodyweight", "category": "Bodyweight", "instructions": "Lean forward, lower body between bars"},
-    {"name": "Pec Deck", "muscle_group": "Chest", "equipment": "Machine", "category": "Strength", "instructions": "Sit in machine, bring handles together"},
+    # Chest - Barbell
+    {"name": "Barbell Bench Press", "exercise_kind": "Barbell", "primary_body_parts": ["Chest"], "secondary_body_parts": ["Triceps", "Shoulders"], "category": "Strength", "instructions": "Lie on bench, lower bar to chest, press up"},
+    {"name": "Incline Barbell Bench Press", "exercise_kind": "Barbell", "primary_body_parts": ["Chest"], "secondary_body_parts": ["Shoulders", "Triceps"], "category": "Strength", "instructions": "Set bench to 30-45 degrees, press bar up"},
+    {"name": "Decline Bench Press", "exercise_kind": "Barbell", "primary_body_parts": ["Chest"], "secondary_body_parts": ["Triceps"], "category": "Strength", "instructions": "Decline bench, press bar from lower chest"},
+    
+    # Chest - Dumbbell
+    {"name": "Dumbbell Bench Press", "exercise_kind": "Dumbbell", "primary_body_parts": ["Chest"], "secondary_body_parts": ["Triceps", "Shoulders"], "category": "Strength", "instructions": "Lie on bench, press dumbbells up from chest"},
+    {"name": "Incline Dumbbell Press", "exercise_kind": "Dumbbell", "primary_body_parts": ["Chest"], "secondary_body_parts": ["Shoulders", "Triceps"], "category": "Strength", "instructions": "Incline bench, press dumbbells up"},
+    {"name": "Dumbbell Fly", "exercise_kind": "Dumbbell", "primary_body_parts": ["Chest"], "secondary_body_parts": [], "category": "Strength", "instructions": "Lie on bench, arc dumbbells out and up"},
+    
+    # Chest - Machine
+    {"name": "Cable Fly", "exercise_kind": "Machine/Other", "primary_body_parts": ["Chest"], "secondary_body_parts": [], "category": "Strength", "instructions": "Stand between cables, bring handles together"},
+    {"name": "Pec Deck", "exercise_kind": "Machine/Other", "primary_body_parts": ["Chest"], "secondary_body_parts": [], "category": "Strength", "instructions": "Sit in machine, bring handles together"},
+    
+    # Chest - Reps Only
+    {"name": "Push-Up", "exercise_kind": "Reps Only", "primary_body_parts": ["Chest"], "secondary_body_parts": ["Triceps", "Shoulders"], "category": "Strength", "instructions": "Hands shoulder width, lower chest to ground"},
+    {"name": "Dips (Chest)", "exercise_kind": "Weighted Bodyweight", "primary_body_parts": ["Chest"], "secondary_body_parts": ["Triceps"], "category": "Strength", "instructions": "Lean forward, lower body between bars"},
     
     # Back
     {"name": "Barbell Row", "muscle_group": "Back", "equipment": "Barbell", "category": "Strength", "instructions": "Bent over, pull bar to lower chest"},
