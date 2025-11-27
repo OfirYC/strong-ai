@@ -193,13 +193,15 @@ export default function ActiveWorkoutScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="close" size={28} color="#FFFFFF" />
+          <Ionicons name="close" size={28} color="#1C1C1E" />
         </TouchableOpacity>
         <View style={styles.timerContainer}>
-          <Ionicons name="time" size={20} color="#4A90E2" />
+          <Ionicons name="time" size={20} color="#007AFF" />
           <Text style={styles.timerText}>{formatTime(timer)}</Text>
         </View>
-        <View style={{ width: 28 }} />
+        <TouchableOpacity onPress={handleShowExercisePicker}>
+          <Ionicons name="add-circle" size={28} color="#007AFF" />
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
