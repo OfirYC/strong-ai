@@ -416,4 +416,40 @@ const styles = StyleSheet.create({
   addButton: {
     width: '100%',
   },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2C2C2E',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  exerciseList: {
+    padding: 16,
+  },
+  exerciseOption: {
+    backgroundColor: '#1C1C1E',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  exerciseOptionName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  exerciseOptionDetail: {
+    fontSize: 14,
+    color: '#8E8E93',
+  },
 });
