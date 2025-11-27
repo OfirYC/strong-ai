@@ -107,10 +107,21 @@ class WorkoutTemplate(BaseModel):
 
 # Workout Session Models
 class WorkoutSetItem(BaseModel):
-    reps: int
-    weight: float
+    # Common fields
     is_warmup: bool = False
     completed_at: Optional[datetime] = None
+    
+    # Weight + Reps (Barbell, Dumbbell, Machine, Weighted Bodyweight, Assisted Bodyweight, Reps Only)
+    reps: Optional[int] = None
+    weight: Optional[float] = None
+    
+    # Cardio fields
+    distance: Optional[float] = None  # in km or miles
+    duration: Optional[int] = None  # in seconds
+    calories: Optional[int] = None
+    
+    # Duration only
+    # duration field already covered above
 
 
 class WorkoutExerciseItem(BaseModel):
