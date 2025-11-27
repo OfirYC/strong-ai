@@ -481,6 +481,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#D1D1D6',
   },
+  durationInput: {
+    width: 70,
+    marginHorizontal: 4,
+  },
   removeButton: {
     width: 36,
     alignItems: 'center',
