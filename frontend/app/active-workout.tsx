@@ -185,7 +185,7 @@ export default function ActiveWorkoutScreen() {
             <Text style={styles.emptyText}>No exercises added yet</Text>
             <Button
               title="Add Exercise"
-              onPress={() => {}}
+              onPress={handleShowExercisePicker}
               style={styles.addButton}
             />
           </View>
