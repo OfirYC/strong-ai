@@ -102,14 +102,21 @@ async def login(credentials: UserLogin):
 @api_router.get("/exercises", response_model=List[Exercise])
 async def get_exercises(
     user_id: str = Depends(get_current_user),
-    muscle_group: Optional[str] = None,
+    body_part: Optional[str] = None,
+    exercise_kind: Optional[str] = None,
     search: Optional[str] = None
 ):
     # Build query
     query = {"$or": [{"is_custom": False}, {"user_id": user_id}]}
     
-    if muscle_group:
-        query["muscle_group"] = muscle_group
+    if body_part:
+        query["$or"] = [
+            {"primary_body_parts": body_part},
+            {"secondary_body_parts": body_part}
+        ]
+    
+    if exercise_kind:
+        query["exercise_kind"] = exercise_kind
     
     if search:
         query["name"] = {"$regex": search, "$options": "i"}
