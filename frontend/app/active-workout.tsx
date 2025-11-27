@@ -16,7 +16,7 @@ import { useRouter } from 'expo-router';
 import { useWorkoutStore } from '../store/workoutStore';
 import Button from '../components/Button';
 import api from '../utils/api';
-import { Exercise, WorkoutExercise, WorkoutSet } from '../types';
+import { Exercise, WorkoutExercise, WorkoutSet, getExerciseFields } from '../types';
 
 export default function ActiveWorkoutScreen() {
   const router = useRouter();
