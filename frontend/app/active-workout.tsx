@@ -218,7 +218,7 @@ export default function ActiveWorkoutScreen() {
           </View>
         ) : (
           exercises.map((exercise, exerciseIndex) => (
-            <View key={exerciseIndex} style={styles.exerciseCard}>
+            <View key={`${exercise.exercise_id}-${exerciseIndex}`} style={styles.exerciseCard}>
               <View style={styles.exerciseHeader}>
                 <Text style={styles.exerciseName}>
                   {exerciseDetails[exercise.exercise_id]?.name || 'Exercise'}
