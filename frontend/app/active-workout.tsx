@@ -94,8 +94,12 @@ export default function ActiveWorkoutScreen() {
       sets: defaultSets,
     };
 
-    setExercises([...exercises, newExercise]);
-    setExerciseDetails({ ...exerciseDetails, [exercise.id]: exercise });
+    // Update both states at the same time with new references
+    const updatedExercises = [...exercises, newExercise];
+    const updatedDetails = { ...exerciseDetails, [exercise.id]: exercise };
+    
+    setExercises(updatedExercises);
+    setExerciseDetails(updatedDetails);
     setShowExercisePicker(false);
   };
 
