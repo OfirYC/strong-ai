@@ -339,7 +339,7 @@ export default function ActiveWorkoutScreen() {
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setShowExercisePicker(false)}>
-              <Ionicons name="close" size={28} color="#FFFFFF" />
+              <Ionicons name="close" size={28} color="#1C1C1E" />
             </TouchableOpacity>
             <Text style={styles.modalTitle}>Add Exercise</Text>
             <View style={{ width: 28 }} />
