@@ -147,15 +147,16 @@ export default function ExercisesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: '#F5F5F7',
   },
   header: {
     padding: 16,
+    backgroundColor: '#FFFFFF',
   },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#FFFFFF',
+    color: '#1C1C1E',
     marginBottom: 16,
   },
   searchContainer: {
