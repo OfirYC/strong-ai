@@ -186,6 +186,8 @@ const styles = StyleSheet.create({
     padding: 32,
     margin: 16,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#D1D1D6',
   },
   activeWorkoutText: {
     fontSize: 18,
