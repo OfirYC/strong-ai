@@ -353,7 +353,7 @@ export default function ActiveWorkoutScreen() {
               >
                 <Text style={styles.exerciseOptionName}>{item.name}</Text>
                 <Text style={styles.exerciseOptionDetail}>
-                  {item.muscle_group}
+                  {item.exercise_kind} • {item.primary_body_parts.join(', ')}
                 </Text>
               </TouchableOpacity>
             )}
