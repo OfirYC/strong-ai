@@ -164,6 +164,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#D1D1D6',
   },
   templateInfo: {
     flex: 1,
