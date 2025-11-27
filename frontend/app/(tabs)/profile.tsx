@@ -78,7 +78,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: '#F5F5F7',
   },
   header: {
     padding: 16,
@@ -86,14 +86,14 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#FFFFFF',
+    color: '#1C1C1E',
   },
   content: {
     flex: 1,
     padding: 16,
   },
   profileCard: {
-    backgroundColor: '#1C1C1E',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 24,
     alignItems: 'center',
@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: '#2C2C2E',
+    backgroundColor: '#F5F5F7',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
@@ -111,13 +111,13 @@ const styles = StyleSheet.create({
   email: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#1C1C1E',
   },
   section: {
     marginBottom: 24,
   },
   menuItem: {
-    backgroundColor: '#1C1C1E',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
   },
   menuItemText: {
     fontSize: 16,
-    color: '#FFFFFF',
+    color: '#1C1C1E',
     marginLeft: 16,
   },
   logoutButton: {

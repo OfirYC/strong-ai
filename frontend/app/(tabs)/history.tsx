@@ -132,7 +132,7 @@ export default function HistoryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: '#F5F5F7',
   },
   header: {
     padding: 16,
@@ -140,14 +140,14 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#FFFFFF',
+    color: '#1C1C1E',
   },
   listContent: {
     paddingHorizontal: 16,
     paddingBottom: 16,
   },
   workoutCard: {
-    backgroundColor: '#1C1C1E',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
   workoutDate: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#1C1C1E',
   },
   workoutTime: {
     fontSize: 14,
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#1C1C1E',
     marginTop: 4,
   },
   statLabel: {

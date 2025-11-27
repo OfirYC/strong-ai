@@ -131,7 +131,7 @@ export default function WorkoutScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: '#F5F5F7',
   },
   scrollContent: {
     padding: 16,
@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#FFFFFF',
+    color: '#1C1C1E',
   },
   quickStartButton: {
     marginBottom: 32,
@@ -153,11 +153,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#1C1C1E',
     marginBottom: 16,
   },
   templateCard: {
-    backgroundColor: '#1C1C1E',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
   templateName: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#1C1C1E',
     marginBottom: 4,
   },
   templateDetail: {
@@ -179,7 +179,7 @@ const styles = StyleSheet.create({
     color: '#8E8E93',
   },
   activeWorkoutCard: {
-    backgroundColor: '#1C1C1E',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 32,
     margin: 16,
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
   },
   activeWorkoutText: {
     fontSize: 18,
-    color: '#FFFFFF',
+    color: '#1C1C1E',
     marginTop: 16,
     marginBottom: 24,
   },

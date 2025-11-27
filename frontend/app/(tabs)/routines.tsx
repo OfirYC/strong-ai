@@ -113,7 +113,7 @@ export default function RoutinesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: '#F5F5F7',
   },
   header: {
     padding: 16,
@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#FFFFFF',
+    color: '#1C1C1E',
     marginBottom: 16,
   },
   createButton: {
@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   templateCard: {
-    backgroundColor: '#1C1C1E',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
   templateName: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#1C1C1E',
     marginBottom: 4,
   },
   templateDetail: {
