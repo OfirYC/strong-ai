@@ -17,7 +17,7 @@ from models import (
     PRRecord
 )
 from auth import get_password_hash, verify_password, create_access_token, decode_access_token
-from seed_exercises import EXERCISES
+from seed_exercises_new import EXERCISES
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
