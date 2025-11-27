@@ -99,7 +99,7 @@ async def login(credentials: UserLogin):
 
 
 # ============= EXERCISE ROUTES =============
-@api_router.get("/exercises", response_model=List[Exercise])
+@api_router.get("/exercises")
 async def get_exercises(
     user_id: str = Depends(get_current_user),
     body_part: Optional[str] = None,
@@ -123,7 +123,14 @@ async def get_exercises(
     
     exercises = await db.exercises.find(query).to_list(1000)
     
-    return [Exercise(**{**ex, "_id": str(ex["_id"])}) for ex in exercises]
+    # Convert _id to id for frontend
+    result = []
+    for ex in exercises:
+        ex_dict = dict(ex)
+        ex_dict['id'] = str(ex_dict.pop('_id'))
+        result.append(ex_dict)
+    
+    return result
 
 
 @api_router.post("/exercises", response_model=Exercise)
