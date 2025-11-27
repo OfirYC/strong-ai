@@ -119,7 +119,7 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: '#F5F5F7',
   },
   keyboardView: {
     flex: 1,
@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 36,
     fontWeight: 'bold',
-    color: '#FFFFFF',
+    color: '#1C1C1E',
     marginBottom: 8,
   },
   subtitle: {
@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   linkTextBold: {
-    color: '#4A90E2',
+    color: '#007AFF',
     fontWeight: '600',
   },
 });
