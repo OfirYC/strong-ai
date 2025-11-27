@@ -232,13 +232,21 @@ export default function ActiveWorkoutScreen() {
             />
           </View>
         ) : (
-          exercises.map((exercise, exerciseIndex) => (
-            <View key={`${exercise.exercise_id}-${exerciseIndex}`} style={styles.exerciseCard}>
-              <View style={styles.exerciseHeader}>
-                <Text style={styles.exerciseName}>
-                  {exerciseDetails[exercise.exercise_id]?.name || 'Exercise'}
-                </Text>
-              </View>
+          exercises.map((exercise, exerciseIndex) => {
+            const detail = exerciseDetails[exercise.exercise_id];
+            console.log(`Rendering exercise ${exerciseIndex}:`, {
+              exercise_id: exercise.exercise_id,
+              detail_name: detail?.name,
+              detail_kind: detail?.exercise_kind
+            });
+            
+            return (
+              <View key={`${exercise.exercise_id}-${exerciseIndex}`} style={styles.exerciseCard}>
+                <View style={styles.exerciseHeader}>
+                  <Text style={styles.exerciseName}>
+                    {detail?.name || 'Loading...'}
+                  </Text>
+                </View>
 
               {(() => {
                 const exerciseDetail = exerciseDetails[exercise.exercise_id];
