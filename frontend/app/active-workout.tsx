@@ -199,10 +199,10 @@ export default function ActiveWorkoutScreen() {
               </View>
 
               <View style={styles.setHeader}>
-                <Text style={styles.setHeaderText}>SET</Text>
+                <Text style={[styles.setHeaderText, { width: 32 }]}>SET</Text>
                 <Text style={styles.setHeaderText}>WEIGHT</Text>
                 <Text style={styles.setHeaderText}>REPS</Text>
-                <View style={{ width: 40 }} />
+                <View style={{ width: 36 }} />
               </View>
 
               {exercise.sets.map((set, setIndex) => (
