@@ -123,11 +123,24 @@ export default function ActiveWorkoutScreen() {
   const updateSet = (
     exerciseIndex: number,
     setIndex: number,
-    field: 'reps' | 'weight',
+    field: 'reps' | 'weight' | 'distance' | 'duration' | 'calories',
     value: string
   ) => {
     const newExercises = [...exercises];
-    newExercises[exerciseIndex].sets[setIndex][field] = parseFloat(value) || 0;
+    const numValue = parseFloat(value) || 0;
+    
+    if (field === 'reps') {
+      newExercises[exerciseIndex].sets[setIndex].reps = Math.round(numValue);
+    } else if (field === 'weight') {
+      newExercises[exerciseIndex].sets[setIndex].weight = numValue;
+    } else if (field === 'distance') {
+      newExercises[exerciseIndex].sets[setIndex].distance = numValue;
+    } else if (field === 'duration') {
+      newExercises[exerciseIndex].sets[setIndex].duration = Math.round(numValue);
+    } else if (field === 'calories') {
+      newExercises[exerciseIndex].sets[setIndex].calories = Math.round(numValue);
+    }
+    
     setExercises(newExercises);
   };
 
