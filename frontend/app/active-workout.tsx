@@ -478,7 +478,8 @@ const styles = StyleSheet.create({
   footer: {
     padding: 16,
     borderTopWidth: 1,
-    borderTopColor: '#2C2C2E',
+    borderTopColor: '#D1D1D6',
+    backgroundColor: '#FFFFFF',
   },
   emptyState: {
     alignItems: 'center',
@@ -494,7 +495,7 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: '#F5F5F7',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -502,30 +503,33 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#2C2C2E',
+    borderBottomColor: '#D1D1D6',
+    backgroundColor: '#FFFFFF',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#1C1C1E',
   },
   exerciseList: {
     padding: 16,
   },
   exerciseOption: {
-    backgroundColor: '#1C1C1E',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#D1D1D6',
   },
   exerciseOptionName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#1C1C1E',
     marginBottom: 4,
   },
   exerciseOptionDetail: {
     fontSize: 14,
-    color: '#8E8E93',
+    color: '#6E6E73',
   },
 });
