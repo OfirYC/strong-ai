@@ -140,10 +140,10 @@ export default function ActiveWorkoutScreen() {
     exerciseIndex: number,
     setIndex: number,
     field: 'reps' | 'weight' | 'distance' | 'duration' | 'calories',
-    value: string
+    value: string | number
   ) => {
     const newExercises = [...exercises];
-    const numValue = parseFloat(value) || 0;
+    const numValue = typeof value === 'number' ? value : (parseFloat(value) || 0);
     
     if (field === 'reps') {
       newExercises[exerciseIndex].sets[setIndex].reps = Math.round(numValue);
