@@ -257,6 +257,39 @@ export default function ActiveWorkoutScreen() {
           disabled={exercises.length === 0}
         />
       </View>
+
+      <Modal
+        visible={showExercisePicker}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowExercisePicker(false)}>
+              <Ionicons name="close" size={28} color="#FFFFFF" />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Add Exercise</Text>
+            <View style={{ width: 28 }} />
+          </View>
+
+          <FlatList
+            data={availableExercises}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.exerciseOption}
+                onPress={() => handleAddExerciseToWorkout(item)}
+              >
+                <Text style={styles.exerciseOptionName}>{item.name}</Text>
+                <Text style={styles.exerciseOptionDetail}>
+                  {item.muscle_group}
+                </Text>
+              </TouchableOpacity>
+            )}
+            contentContainerStyle={styles.exerciseList}
+          />
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
