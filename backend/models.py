@@ -51,8 +51,9 @@ class UserResponse(BaseModel):
 # Exercise Models
 class ExerciseCreate(BaseModel):
     name: str
-    muscle_group: str
-    equipment: Optional[str] = None
+    exercise_kind: str  # Barbell, Dumbbell, Machine/Other, Weighted Bodyweight, Assisted Bodyweight, Reps Only, Cardio, Duration
+    primary_body_parts: List[str]
+    secondary_body_parts: Optional[List[str]] = []
     category: Optional[str] = "Strength"
     is_custom: bool = False
     instructions: Optional[str] = None
@@ -61,8 +62,9 @@ class ExerciseCreate(BaseModel):
 class Exercise(BaseModel):
     id: Optional[str] = Field(alias="_id", default=None)
     name: str
-    muscle_group: str
-    equipment: Optional[str] = None
+    exercise_kind: str
+    primary_body_parts: List[str]
+    secondary_body_parts: Optional[List[str]] = []
     category: Optional[str] = "Strength"
     is_custom: bool = False
     user_id: Optional[str] = None
