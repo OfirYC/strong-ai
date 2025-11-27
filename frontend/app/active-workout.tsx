@@ -223,44 +223,90 @@ export default function ActiveWorkoutScreen() {
                 </Text>
               </View>
 
-              <View style={styles.setHeader}>
-                <Text style={[styles.setHeaderText, { width: 32 }]}>SET</Text>
-                <Text style={styles.setHeaderText}>WEIGHT</Text>
-                <Text style={styles.setHeaderText}>REPS</Text>
-                <View style={{ width: 36 }} />
-              </View>
+              {(() => {
+                const exerciseDetail = exerciseDetails[exercise.exercise_id];
+                if (!exerciseDetail) return null;
+                
+                const fields = getExerciseFields(exerciseDetail.exercise_kind);
+                
+                return (
+                  <>
+                    <View style={styles.setHeader}>
+                      <Text style={[styles.setHeaderText, { width: 32 }]}>SET</Text>
+                      {fields.includes('weight') && <Text style={styles.setHeaderText}>WEIGHT</Text>}
+                      {fields.includes('reps') && <Text style={styles.setHeaderText}>REPS</Text>}
+                      {fields.includes('distance') && <Text style={styles.setHeaderText}>DIST (km)</Text>}
+                      {fields.includes('duration') && <Text style={styles.setHeaderText}>TIME (s)</Text>}
+                      <View style={{ width: 36 }} />
+                    </View>
 
-              {exercise.sets.map((set, setIndex) => (
-                <View key={setIndex} style={styles.setRow}>
-                  <Text style={styles.setNumber}>{setIndex + 1}</Text>
-                  <TextInput
-                    style={styles.setInput}
-                    value={set.weight.toString()}
-                    onChangeText={(value) =>
-                      updateSet(exerciseIndex, setIndex, 'weight', value)
-                    }
-                    keyboardType="numeric"
-                    placeholder="0"
-                    placeholderTextColor="#636366"
-                  />
-                  <TextInput
-                    style={styles.setInput}
-                    value={set.reps.toString()}
-                    onChangeText={(value) =>
-                      updateSet(exerciseIndex, setIndex, 'reps', value)
-                    }
-                    keyboardType="numeric"
-                    placeholder="0"
-                    placeholderTextColor="#636366"
-                  />
-                  <TouchableOpacity
-                    onPress={() => removeSet(exerciseIndex, setIndex)}
-                    style={styles.removeButton}
-                  >
-                    <Ionicons name="close-circle" size={24} color="#FF453A" />
-                  </TouchableOpacity>
-                </View>
-              ))}
+                    {exercise.sets.map((set, setIndex) => (
+                      <View key={setIndex} style={styles.setRow}>
+                        <Text style={styles.setNumber}>{setIndex + 1}</Text>
+                        
+                        {fields.includes('weight') && (
+                          <TextInput
+                            style={styles.setInput}
+                            value={(set.weight || 0).toString()}
+                            onChangeText={(value) =>
+                              updateSet(exerciseIndex, setIndex, 'weight', value)
+                            }
+                            keyboardType="numeric"
+                            placeholder="0"
+                            placeholderTextColor="#999"
+                          />
+                        )}
+                        
+                        {fields.includes('reps') && (
+                          <TextInput
+                            style={styles.setInput}
+                            value={(set.reps || 0).toString()}
+                            onChangeText={(value) =>
+                              updateSet(exerciseIndex, setIndex, 'reps', value)
+                            }
+                            keyboardType="numeric"
+                            placeholder="0"
+                            placeholderTextColor="#999"
+                          />
+                        )}
+                        
+                        {fields.includes('distance') && (
+                          <TextInput
+                            style={styles.setInput}
+                            value={(set.distance || 0).toString()}
+                            onChangeText={(value) =>
+                              updateSet(exerciseIndex, setIndex, 'distance', value)
+                            }
+                            keyboardType="numeric"
+                            placeholder="0"
+                            placeholderTextColor="#999"
+                          />
+                        )}
+                        
+                        {fields.includes('duration') && (
+                          <TextInput
+                            style={styles.setInput}
+                            value={(set.duration || 0).toString()}
+                            onChangeText={(value) =>
+                              updateSet(exerciseIndex, setIndex, 'duration', value)
+                            }
+                            keyboardType="numeric"
+                            placeholder="0"
+                            placeholderTextColor="#999"
+                          />
+                        )}
+                        
+                        <TouchableOpacity
+                          onPress={() => removeSet(exerciseIndex, setIndex)}
+                          style={styles.removeButton}
+                        >
+                          <Ionicons name="close-circle" size={24} color="#FF3B30" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </>
+                );
+              })()}
 
               <TouchableOpacity
                 style={styles.addSetButton}
