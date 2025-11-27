@@ -205,18 +205,20 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   exerciseCard: {
-    backgroundColor: '#1C1C1E',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#D1D1D6',
   },
   exerciseIcon: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#2C2C2E',
+    backgroundColor: '#F5F5F7',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
@@ -227,12 +229,12 @@ const styles = StyleSheet.create({
   exerciseName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#1C1C1E',
     marginBottom: 4,
   },
   exerciseDetail: {
     fontSize: 14,
-    color: '#8E8E93',
+    color: '#6E6E73',
   },
   emptyState: {
     alignItems: 'center',
