@@ -62,6 +62,36 @@ export default function ActiveWorkoutScreen() {
     setExerciseDetails(details);
   };
 
+  const loadAvailableExercises = async () => {
+    try {
+      const response = await api.get('/exercises');
+      setAvailableExercises(response.data);
+    } catch (error) {
+      console.error('Failed to load exercises:', error);
+    }
+  };
+
+  const handleAddExerciseToWorkout = async (exercise: Exercise) => {
+    const newExercise: WorkoutExercise = {
+      exercise_id: exercise.id,
+      order: exercises.length,
+      sets: [
+        { reps: 10, weight: 0, is_warmup: false },
+        { reps: 10, weight: 0, is_warmup: false },
+        { reps: 10, weight: 0, is_warmup: false },
+      ],
+    };
+
+    setExercises([...exercises, newExercise]);
+    setExerciseDetails({ ...exerciseDetails, [exercise.id]: exercise });
+    setShowExercisePicker(false);
+  };
+
+  const handleShowExercisePicker = () => {
+    loadAvailableExercises();
+    setShowExercisePicker(true);
+  };
+
   const addSet = (exerciseIndex: number) => {
     const newExercises = [...exercises];
     const lastSet =
