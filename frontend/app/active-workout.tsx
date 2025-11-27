@@ -337,11 +337,12 @@ export default function ActiveWorkoutScreen() {
                 style={styles.addSetButton}
                 onPress={() => addSet(exerciseIndex)}
               >
-                <Ionicons name="add" size={20} color="#4A90E2" />
+                <Ionicons name="add" size={20} color="#007AFF" />
                 <Text style={styles.addSetText}>Add Set</Text>
               </TouchableOpacity>
             </View>
-          ))
+            );
+          })
         )}
       </ScrollView>
 
