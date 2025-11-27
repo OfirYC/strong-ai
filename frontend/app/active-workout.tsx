@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useWorkoutStore } from '../store/workoutStore';
 import Button from '../components/Button';
+import DurationInput from '../components/DurationInput';
 import api from '../utils/api';
 import { Exercise, WorkoutExercise, WorkoutSet, getExerciseFields } from '../types';
 
