@@ -160,18 +160,20 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   searchContainer: {
-    backgroundColor: '#1C1C1E',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#D1D1D6',
   },
   searchInput: {
     flex: 1,
     paddingVertical: 12,
     paddingLeft: 12,
     fontSize: 16,
-    color: '#FFFFFF',
+    color: '#1C1C1E',
   },
   filterContainer: {
     paddingLeft: 16,
