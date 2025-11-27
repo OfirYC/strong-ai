@@ -4,22 +4,63 @@ export interface User {
   token: string;
 }
 
+export const EXERCISE_KINDS = [
+  'Barbell',
+  'Dumbbell',
+  'Machine/Other',
+  'Weighted Bodyweight',
+  'Assisted Bodyweight',
+  'Reps Only',
+  'Cardio',
+  'Duration',
+] as const;
+
+export type ExerciseKind = typeof EXERCISE_KINDS[number];
+
 export interface Exercise {
   id: string;
   name: string;
-  muscle_group: string;
-  equipment?: string;
-  category?: string;
+  exercise_kind: ExerciseKind;
+  primary_body_parts: string[];
+  secondary_body_parts?: string[];
+  category: string;
   is_custom: boolean;
   user_id?: string;
   instructions?: string;
 }
 
 export interface WorkoutSet {
-  reps: number;
-  weight: number;
+  // Weight + Reps (for strength exercises)
+  reps?: number;
+  weight?: number;
+  
+  // Cardio fields
+  distance?: number;  // in km
+  duration?: number;  // in seconds
+  calories?: number;
+  
   is_warmup?: boolean;
   completed_at?: string;
+}
+
+// Helper function to determine what fields an exercise needs
+export function getExerciseFields(kind: ExerciseKind): string[] {
+  switch (kind) {
+    case 'Barbell':
+    case 'Dumbbell':
+    case 'Machine/Other':
+    case 'Weighted Bodyweight':
+    case 'Assisted Bodyweight':
+      return ['weight', 'reps'];
+    case 'Reps Only':
+      return ['reps'];
+    case 'Cardio':
+      return ['distance', 'duration'];
+    case 'Duration':
+      return ['duration'];
+    default:
+      return ['weight', 'reps'];
+  }
 }
 
 export interface WorkoutExercise {
