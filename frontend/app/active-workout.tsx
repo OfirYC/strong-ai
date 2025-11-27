@@ -72,6 +72,8 @@ export default function ActiveWorkoutScreen() {
   };
 
   const handleAddExerciseToWorkout = async (exercise: Exercise) => {
+    console.log('Adding exercise:', exercise.id, exercise.name);
+    
     // Create default sets based on exercise kind
     const fields = getExerciseFields(exercise.exercise_kind);
     const defaultSets: WorkoutSet[] = [];
@@ -94,12 +96,21 @@ export default function ActiveWorkoutScreen() {
       sets: defaultSets,
     };
 
-    // Update both states at the same time with new references
-    const updatedExercises = [...exercises, newExercise];
-    const updatedDetails = { ...exerciseDetails, [exercise.id]: exercise };
+    console.log('New exercise object:', newExercise);
+
+    // Use functional state updates to ensure latest state
+    setExercises(prevExercises => {
+      const updated = [...prevExercises, newExercise];
+      console.log('Updated exercises:', updated.map(e => e.exercise_id));
+      return updated;
+    });
     
-    setExercises(updatedExercises);
-    setExerciseDetails(updatedDetails);
+    setExerciseDetails(prevDetails => {
+      const updated = { ...prevDetails, [exercise.id]: exercise };
+      console.log('Updated exercise details keys:', Object.keys(updated));
+      return updated;
+    });
+    
     setShowExercisePicker(false);
   };
 
