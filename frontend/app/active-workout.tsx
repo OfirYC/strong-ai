@@ -263,9 +263,18 @@ export default function ActiveWorkoutScreen() {
             return (
               <View key={`${exercise.exercise_id}-${exerciseIndex}`} style={styles.exerciseCard}>
                 <View style={styles.exerciseHeader}>
-                  <Text style={styles.exerciseName}>
-                    {detail?.name || 'Loading...'}
-                  </Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (detail) {
+                        setSelectedExercise(detail);
+                        setShowExerciseDetail(true);
+                      }
+                    }}
+                  >
+                    <Text style={styles.exerciseNameClickable}>
+                      {detail?.name || 'Loading...'}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
 
               {(() => {
