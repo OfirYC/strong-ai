@@ -107,7 +107,7 @@ export default function CreateExerciseModal({
         primary_body_parts: [selectedBodyPart],
         category: selectedCategory,
         is_custom: true,
-        image: imageUrl.trim() || null,
+        image: imageBase64 || null,
         instructions: instructions.trim() || null,
       });
 
