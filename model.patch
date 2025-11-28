@@ -1,23 +1,169 @@
-diff --git a/frontend/app/(tabs)/exercises.tsx b/frontend/app/(tabs)/exercises.tsx
-index 17c0fa5..b96bf00 100644
---- a/frontend/app/(tabs)/exercises.tsx
-+++ b/frontend/app/(tabs)/exercises.tsx
-@@ -147,15 +147,16 @@ export default function ExercisesScreen() {
- const styles = StyleSheet.create({
-   container: {
-     flex: 1,
--    backgroundColor: '#000000',
-+    backgroundColor: '#F5F5F7',
-   },
-   header: {
-     padding: 16,
-+    backgroundColor: '#FFFFFF',
-   },
-   title: {
-     fontSize: 32,
-     fontWeight: 'bold',
--    color: '#FFFFFF',
-+    color: '#1C1C1E',
-     marginBottom: 16,
-   },
-   searchContainer: {
+diff --git a/backend/server.py b/backend/server.py
+index 6031a5c..fe9ee28 100644
+--- a/backend/server.py
++++ b/backend/server.py
+@@ -424,136 +424,6 @@ async def update_workout(
+     return WorkoutSession(**{**workout, "id": str(workout["_id"])})
+ 
+ 
+-# ============= WORKOUT HISTORY/SUMMARY ROUTES =============
+-@api_router.get("/workouts/history", response_model=List[WorkoutSummary])
+-async def get_workout_history(
+-    user_id: str = Depends(get_current_user),
+-    limit: int = 50
+-):
+-    """Get workout history with computed summary statistics"""
+-    workouts = await db.workouts.find({"user_id": user_id, "ended_at": {"$ne": None}}).sort("started_at", -1).limit(limit).to_list(limit)
+-    
+-    # Get all exercise IDs we need
+-    exercise_ids = set()
+-    for workout in workouts:
+-        for ex in workout.get("exercises", []):
+-            exercise_ids.add(ex["exercise_id"])
+-    
+-    # Fetch all exercises in one query
+-    exercises_map = {}
+-    if exercise_ids:
+-        exercises = await db.exercises.find({"_id": {"$in": [ObjectId(eid) for eid in exercise_ids if ObjectId.is_valid(eid)]}}).to_list(len(exercise_ids))
+-        for ex in exercises:
+-            exercises_map[str(ex["_id"])] = ex
+-    
+-    # Count PRs per workout
+-    workout_ids = [str(w["_id"]) for w in workouts]
+-    pr_counts = {}
+-    if workout_ids:
+-        prs = await db.prs.find({"workout_id": {"$in": workout_ids}}).to_list(1000)
+-        for pr in prs:
+-            wid = pr.get("workout_id")
+-            if wid:
+-                pr_counts[wid] = pr_counts.get(wid, 0) + 1
+-    
+-    summaries = []
+-    for workout in workouts:
+-        workout_id = str(workout["_id"])
+-        started_at = workout.get("started_at", datetime.utcnow())
+-        ended_at = workout.get("ended_at")
+-        
+-        duration_seconds = 0
+-        if ended_at and started_at:
+-            duration_seconds = int((ended_at - started_at).total_seconds())
+-        
+-        exercise_count = len(workout.get("exercises", []))
+-        set_count = 0
+-        total_volume_kg = 0.0
+-        exercise_summaries = []
+-        
+-        for ex_item in workout.get("exercises", []):
+-            exercise_id = ex_item["exercise_id"]
+-            sets = ex_item.get("sets", [])
+-            set_count += len(sets)
+-            
+-            ex_data = exercises_map.get(exercise_id, {})
+-            ex_name = ex_data.get("name", "Unknown Exercise")
+-            ex_kind = ex_data.get("exercise_kind", "Barbell")
+-            
+-            # Calculate best set and volume
+-            best_weight = 0
+-            best_reps = 0
+-            best_duration = 0
+-            best_set_display = ""
+-            estimated_1rm = None
+-            
+-            for s in sets:
+-                if s.get("is_warmup", False):
+-                    continue
+-                    
+-                weight = s.get("weight") or 0
+-                reps = s.get("reps") or 0
+-                duration = s.get("duration") or 0
+-                
+-                # Calculate volume for weight-based exercises
+-                if weight > 0 and reps > 0:
+-                    total_volume_kg += weight * reps
+-                    
+-                    # Calculate 1RM for comparison
+-                    set_1rm = weight * (36 / (37 - reps)) if reps < 37 else weight
+-                    
+-                    if set_1rm > (estimated_1rm or 0):
+-                        estimated_1rm = set_1rm
+-                        best_weight = weight
+-                        best_reps = reps
+-                
+-                # Track best duration for duration-based exercises
+-                if duration > best_duration:
+-                    best_duration = duration
+-            
+-            # Format best set display based on exercise kind
+-            if ex_kind in ['Cardio', 'Duration']:
+-                if best_duration > 0:
+-                    mins = best_duration // 60
+-                    secs = best_duration % 60
+-                    best_set_display = f"{mins}:{secs:02d}"
+-                else:
+-                    best_set_display = "0:00"
+-            elif ex_kind == 'Reps Only':
+-                best_set_display = f"{best_reps} reps" if best_reps > 0 else "-"
+-            else:
+-                if best_weight > 0 and best_reps > 0:
+-                    best_set_display = f"{best_weight}kg × {best_reps}"
+-                elif best_reps > 0:
+-                    best_set_display = f"{best_reps} reps"
+-                else:
+-                    best_set_display = "-"
+-            
+-            exercise_summaries.append(WorkoutExerciseSummary(
+-                exercise_id=exercise_id,
+-                name=ex_name,
+-                exercise_kind=ex_kind,
+-                set_count=len(sets),
+-                best_set_display=best_set_display,
+-                estimated_1rm=estimated_1rm
+-            ))
+-        
+-        summaries.append(WorkoutSummary(
+-            id=workout_id,
+-            name=workout.get("name"),
+-            started_at=started_at,
+-            ended_at=ended_at,
+-            duration_seconds=duration_seconds,
+-            exercise_count=exercise_count,
+-            set_count=set_count,
+-            total_volume_kg=total_volume_kg,
+-            pr_count=pr_counts.get(workout_id, 0),
+-            exercises=exercise_summaries
+-        ))
+-    
+-    return summaries
+-
+-
+ @api_router.get("/workouts/{workout_id}/detail", response_model=WorkoutSummary)
+ async def get_workout_detail(
+     workout_id: str,
+diff --git a/model.patch b/model.patch
+index 021fb26..3b237bd 100644
+--- a/model.patch
++++ b/model.patch
+@@ -1,23 +0,0 @@
+-diff --git a/frontend/app/(tabs)/exercises.tsx b/frontend/app/(tabs)/exercises.tsx
+-index 17c0fa5..b96bf00 100644
+---- a/frontend/app/(tabs)/exercises.tsx
+-+++ b/frontend/app/(tabs)/exercises.tsx
+-@@ -147,15 +147,16 @@ export default function ExercisesScreen() {
+- const styles = StyleSheet.create({
+-   container: {
+-     flex: 1,
+--    backgroundColor: '#000000',
+-+    backgroundColor: '#F5F5F7',
+-   },
+-   header: {
+-     padding: 16,
+-+    backgroundColor: '#FFFFFF',
+-   },
+-   title: {
+-     fontSize: 32,
+-     fontWeight: 'bold',
+--    color: '#FFFFFF',
+-+    color: '#1C1C1E',
+-     marginBottom: 16,
+-   },
+-   searchContainer: {
