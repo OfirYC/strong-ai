@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   TextInput,
   StyleSheet,
   TouchableOpacity,
+  Platform,
 } from 'react-native';
 
 interface DurationInputProps {
@@ -28,6 +29,7 @@ export default function DurationInput({ value, onChangeValue, style }: DurationI
   // Store the raw digits entered by user
   const [rawDigits, setRawDigits] = useState<string>('');
   const [isFocused, setIsFocused] = useState(false);
+  const inputRef = useRef<TextInput>(null);
 
   // Initialize rawDigits from value prop when component mounts or value changes externally
   useEffect(() => {
