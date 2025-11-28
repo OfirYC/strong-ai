@@ -57,6 +57,7 @@ class ExerciseCreate(BaseModel):
     category: Optional[str] = "Strength"
     is_custom: bool = False
     instructions: Optional[str] = None
+    image: Optional[str] = None  # URL to exercise image
 
 
 class Exercise(BaseModel):
@@ -69,11 +70,17 @@ class Exercise(BaseModel):
     is_custom: bool = False
     user_id: Optional[str] = None
     instructions: Optional[str] = None
+    image: Optional[str] = None  # URL to exercise image
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     class Config:
         populate_by_name = True
         json_encoders = {ObjectId: str}
+
+
+class ExerciseUpdate(BaseModel):
+    instructions: Optional[str] = None
+    image: Optional[str] = None
 
 
 # Workout Template Models
