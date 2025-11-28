@@ -290,6 +290,242 @@ async def update_workout(
     return WorkoutSession(**{**workout, "id": str(workout["_id"])})
 
 
+# ============= WORKOUT HISTORY/SUMMARY ROUTES =============
+@api_router.get("/workouts/history", response_model=List[WorkoutSummary])
+async def get_workout_history(
+    user_id: str = Depends(get_current_user),
+    limit: int = 50
+):
+    """Get workout history with computed summary statistics"""
+    workouts = await db.workouts.find({"user_id": user_id, "ended_at": {"$ne": None}}).sort("started_at", -1).limit(limit).to_list(limit)
+    
+    # Get all exercise IDs we need
+    exercise_ids = set()
+    for workout in workouts:
+        for ex in workout.get("exercises", []):
+            exercise_ids.add(ex["exercise_id"])
+    
+    # Fetch all exercises in one query
+    exercises_map = {}
+    if exercise_ids:
+        exercises = await db.exercises.find({"_id": {"$in": [ObjectId(eid) for eid in exercise_ids if ObjectId.is_valid(eid)]}}).to_list(len(exercise_ids))
+        for ex in exercises:
+            exercises_map[str(ex["_id"])] = ex
+    
+    # Count PRs per workout
+    workout_ids = [str(w["_id"]) for w in workouts]
+    pr_counts = {}
+    if workout_ids:
+        prs = await db.prs.find({"workout_id": {"$in": workout_ids}}).to_list(1000)
+        for pr in prs:
+            wid = pr.get("workout_id")
+            if wid:
+                pr_counts[wid] = pr_counts.get(wid, 0) + 1
+    
+    summaries = []
+    for workout in workouts:
+        workout_id = str(workout["_id"])
+        started_at = workout.get("started_at", datetime.utcnow())
+        ended_at = workout.get("ended_at")
+        
+        duration_seconds = 0
+        if ended_at and started_at:
+            duration_seconds = int((ended_at - started_at).total_seconds())
+        
+        exercise_count = len(workout.get("exercises", []))
+        set_count = 0
+        total_volume_kg = 0.0
+        exercise_summaries = []
+        
+        for ex_item in workout.get("exercises", []):
+            exercise_id = ex_item["exercise_id"]
+            sets = ex_item.get("sets", [])
+            set_count += len(sets)
+            
+            ex_data = exercises_map.get(exercise_id, {})
+            ex_name = ex_data.get("name", "Unknown Exercise")
+            ex_kind = ex_data.get("exercise_kind", "Barbell")
+            
+            # Calculate best set and volume
+            best_weight = 0
+            best_reps = 0
+            best_duration = 0
+            best_set_display = ""
+            estimated_1rm = None
+            
+            for s in sets:
+                if s.get("is_warmup", False):
+                    continue
+                    
+                weight = s.get("weight") or 0
+                reps = s.get("reps") or 0
+                duration = s.get("duration") or 0
+                
+                # Calculate volume for weight-based exercises
+                if weight > 0 and reps > 0:
+                    total_volume_kg += weight * reps
+                    
+                    # Calculate 1RM for comparison
+                    set_1rm = weight * (36 / (37 - reps)) if reps < 37 else weight
+                    
+                    if set_1rm > (estimated_1rm or 0):
+                        estimated_1rm = set_1rm
+                        best_weight = weight
+                        best_reps = reps
+                
+                # Track best duration for duration-based exercises
+                if duration > best_duration:
+                    best_duration = duration
+            
+            # Format best set display based on exercise kind
+            if ex_kind in ['Cardio', 'Duration']:
+                if best_duration > 0:
+                    mins = best_duration // 60
+                    secs = best_duration % 60
+                    best_set_display = f"{mins}:{secs:02d}"
+                else:
+                    best_set_display = "0:00"
+            elif ex_kind == 'Reps Only':
+                best_set_display = f"{best_reps} reps" if best_reps > 0 else "-"
+            else:
+                if best_weight > 0 and best_reps > 0:
+                    best_set_display = f"{best_weight}kg × {best_reps}"
+                elif best_reps > 0:
+                    best_set_display = f"{best_reps} reps"
+                else:
+                    best_set_display = "-"
+            
+            exercise_summaries.append(WorkoutExerciseSummary(
+                exercise_id=exercise_id,
+                name=ex_name,
+                exercise_kind=ex_kind,
+                set_count=len(sets),
+                best_set_display=best_set_display,
+                estimated_1rm=estimated_1rm
+            ))
+        
+        summaries.append(WorkoutSummary(
+            id=workout_id,
+            name=workout.get("name"),
+            started_at=started_at,
+            ended_at=ended_at,
+            duration_seconds=duration_seconds,
+            exercise_count=exercise_count,
+            set_count=set_count,
+            total_volume_kg=total_volume_kg,
+            pr_count=pr_counts.get(workout_id, 0),
+            exercises=exercise_summaries
+        ))
+    
+    return summaries
+
+
+@api_router.get("/workouts/{workout_id}/detail", response_model=WorkoutSummary)
+async def get_workout_detail(
+    workout_id: str,
+    user_id: str = Depends(get_current_user)
+):
+    """Get detailed workout summary with exercise breakdown"""
+    workout = await db.workouts.find_one({"_id": ObjectId(workout_id), "user_id": user_id})
+    if not workout:
+        raise HTTPException(status_code=404, detail="Workout not found")
+    
+    # Get all exercise details
+    exercise_ids = [ex["exercise_id"] for ex in workout.get("exercises", [])]
+    exercises_map = {}
+    if exercise_ids:
+        exercises = await db.exercises.find({"_id": {"$in": [ObjectId(eid) for eid in exercise_ids if ObjectId.is_valid(eid)]}}).to_list(len(exercise_ids))
+        for ex in exercises:
+            exercises_map[str(ex["_id"])] = ex
+    
+    # Count PRs for this workout
+    prs = await db.prs.find({"workout_id": workout_id}).to_list(100)
+    pr_count = len(prs)
+    
+    started_at = workout.get("started_at", datetime.utcnow())
+    ended_at = workout.get("ended_at")
+    
+    duration_seconds = 0
+    if ended_at and started_at:
+        duration_seconds = int((ended_at - started_at).total_seconds())
+    
+    exercise_count = len(workout.get("exercises", []))
+    set_count = 0
+    total_volume_kg = 0.0
+    exercise_summaries = []
+    
+    for ex_item in workout.get("exercises", []):
+        exercise_id = ex_item["exercise_id"]
+        sets = ex_item.get("sets", [])
+        set_count += len(sets)
+        
+        ex_data = exercises_map.get(exercise_id, {})
+        ex_name = ex_data.get("name", "Unknown Exercise")
+        ex_kind = ex_data.get("exercise_kind", "Barbell")
+        
+        # Calculate best set and volume
+        best_weight = 0
+        best_reps = 0
+        best_duration = 0
+        estimated_1rm = None
+        
+        for s in sets:
+            if s.get("is_warmup", False):
+                continue
+                
+            weight = s.get("weight") or 0
+            reps = s.get("reps") or 0
+            duration = s.get("duration") or 0
+            
+            if weight > 0 and reps > 0:
+                total_volume_kg += weight * reps
+                set_1rm = weight * (36 / (37 - reps)) if reps < 37 else weight
+                if set_1rm > (estimated_1rm or 0):
+                    estimated_1rm = set_1rm
+                    best_weight = weight
+                    best_reps = reps
+            
+            if duration > best_duration:
+                best_duration = duration
+        
+        # Format best set display
+        if ex_kind in ['Cardio', 'Duration']:
+            mins = best_duration // 60
+            secs = best_duration % 60
+            best_set_display = f"{mins}:{secs:02d}" if best_duration > 0 else "0:00"
+        elif ex_kind == 'Reps Only':
+            best_set_display = f"{best_reps} reps" if best_reps > 0 else "-"
+        else:
+            if best_weight > 0 and best_reps > 0:
+                best_set_display = f"{best_weight}kg × {best_reps}"
+            elif best_reps > 0:
+                best_set_display = f"{best_reps} reps"
+            else:
+                best_set_display = "-"
+        
+        exercise_summaries.append(WorkoutExerciseSummary(
+            exercise_id=exercise_id,
+            name=ex_name,
+            exercise_kind=ex_kind,
+            set_count=len(sets),
+            best_set_display=best_set_display,
+            estimated_1rm=estimated_1rm
+        ))
+    
+    return WorkoutSummary(
+        id=str(workout["_id"]),
+        name=workout.get("name"),
+        started_at=started_at,
+        ended_at=ended_at,
+        duration_seconds=duration_seconds,
+        exercise_count=exercise_count,
+        set_count=set_count,
+        total_volume_kg=total_volume_kg,
+        pr_count=pr_count,
+        exercises=exercise_summaries
+    )
+
+
 # ============= PR ROUTES =============
 @api_router.get("/prs", response_model=List[PRRecord])
 async def get_prs(
@@ -305,43 +541,155 @@ async def get_prs(
 
 
 async def check_and_create_prs(user_id: str, workout_id: str):
-    """Check workout for PRs and create PR records"""
+    """Check workout for PRs and create PR records with detailed PR types"""
     workout = await db.workouts.find_one({"_id": ObjectId(workout_id)})
     if not workout:
         return
     
-    for exercise in workout.get("exercises", []):
+    pr_flags_updates = []
+    
+    for ex_idx, exercise in enumerate(workout.get("exercises", [])):
         exercise_id = exercise["exercise_id"]
         
-        for set_data in exercise.get("sets", []):
+        # Get exercise details to determine type
+        ex_data = await db.exercises.find_one({"_id": ObjectId(exercise_id)}) if ObjectId.is_valid(exercise_id) else None
+        ex_kind = ex_data.get("exercise_kind", "Barbell") if ex_data else "Barbell"
+        is_duration_based = ex_kind in ['Cardio', 'Duration']
+        
+        # Get all previous PRs for this exercise
+        existing_prs = await db.prs.find({
+            "user_id": user_id,
+            "exercise_id": exercise_id
+        }).to_list(100)
+        
+        # Extract max values from existing PRs
+        max_weight = max([pr.get("weight", 0) for pr in existing_prs], default=0)
+        max_reps = max([pr.get("reps", 0) for pr in existing_prs], default=0)
+        max_volume = max([pr.get("volume", 0) for pr in existing_prs], default=0)
+        max_duration = max([pr.get("duration", 0) for pr in existing_prs], default=0)
+        max_1rm = max([pr.get("estimated_1rm", 0) for pr in existing_prs], default=0)
+        
+        for set_idx, set_data in enumerate(exercise.get("sets", [])):
             if set_data.get("is_warmup", False):
                 continue
             
-            weight = set_data.get("weight", 0)
-            reps = set_data.get("reps", 0)
-            
-            if weight <= 0 or reps <= 0:
-                continue
+            weight = set_data.get("weight") or 0
+            reps = set_data.get("reps") or 0
+            duration = set_data.get("duration") or 0
+            volume = weight * reps if weight > 0 and reps > 0 else 0
             
             # Calculate estimated 1RM using Brzycki formula
-            estimated_1rm = weight * (36 / (37 - reps)) if reps < 37 else weight
+            estimated_1rm = weight * (36 / (37 - reps)) if reps > 0 and reps < 37 and weight > 0 else weight
             
-            # Check if this is a PR
-            existing_pr = await db.prs.find_one({
-                "user_id": user_id,
-                "exercise_id": exercise_id,
-                "estimated_1rm": {"$gte": estimated_1rm}
-            })
+            # Initialize PR flags
+            is_weight_pr = False
+            is_reps_pr = False
+            is_volume_pr = False
+            is_duration_pr = False
+            is_1rm_pr = False
             
-            if not existing_pr:
+            # Check for various PR types
+            if not is_duration_based:
+                if weight > max_weight and weight > 0:
+                    is_weight_pr = True
+                    max_weight = weight
+                    
+                if reps > max_reps and reps > 0:
+                    is_reps_pr = True
+                    max_reps = reps
+                    
+                if volume > max_volume and volume > 0:
+                    is_volume_pr = True
+                    max_volume = volume
+                    
+                if estimated_1rm > max_1rm and estimated_1rm > 0:
+                    is_1rm_pr = True
+                    max_1rm = estimated_1rm
+            else:
+                if duration > max_duration and duration > 0:
+                    is_duration_pr = True
+                    max_duration = duration
+            
+            # Create PR records for each type of PR
+            if is_weight_pr:
                 pr = PRRecord(
                     user_id=user_id,
                     exercise_id=exercise_id,
+                    workout_id=workout_id,
+                    pr_type="weight",
+                    weight=weight,
+                    reps=reps
+                )
+                await db.prs.insert_one(pr.dict(by_alias=True, exclude={"id"}))
+            
+            if is_reps_pr:
+                pr = PRRecord(
+                    user_id=user_id,
+                    exercise_id=exercise_id,
+                    workout_id=workout_id,
+                    pr_type="reps",
+                    weight=weight,
+                    reps=reps
+                )
+                await db.prs.insert_one(pr.dict(by_alias=True, exclude={"id"}))
+            
+            if is_volume_pr:
+                pr = PRRecord(
+                    user_id=user_id,
+                    exercise_id=exercise_id,
+                    workout_id=workout_id,
+                    pr_type="volume",
+                    weight=weight,
+                    reps=reps,
+                    volume=volume
+                )
+                await db.prs.insert_one(pr.dict(by_alias=True, exclude={"id"}))
+            
+            if is_1rm_pr:
+                pr = PRRecord(
+                    user_id=user_id,
+                    exercise_id=exercise_id,
+                    workout_id=workout_id,
+                    pr_type="1rm",
                     weight=weight,
                     reps=reps,
                     estimated_1rm=estimated_1rm
                 )
                 await db.prs.insert_one(pr.dict(by_alias=True, exclude={"id"}))
+            
+            if is_duration_pr:
+                pr = PRRecord(
+                    user_id=user_id,
+                    exercise_id=exercise_id,
+                    workout_id=workout_id,
+                    pr_type="duration",
+                    duration=duration
+                )
+                await db.prs.insert_one(pr.dict(by_alias=True, exclude={"id"}))
+            
+            # Update set with PR flags in the workout document
+            if is_weight_pr or is_reps_pr or is_volume_pr or is_duration_pr:
+                pr_flags_updates.append({
+                    "ex_idx": ex_idx,
+                    "set_idx": set_idx,
+                    "is_weight_pr": is_weight_pr,
+                    "is_reps_pr": is_reps_pr,
+                    "is_volume_pr": is_volume_pr,
+                    "is_duration_pr": is_duration_pr
+                })
+    
+    # Update workout with PR flags
+    if pr_flags_updates:
+        for update in pr_flags_updates:
+            await db.workouts.update_one(
+                {"_id": ObjectId(workout_id)},
+                {"$set": {
+                    f"exercises.{update['ex_idx']}.sets.{update['set_idx']}.is_weight_pr": update['is_weight_pr'],
+                    f"exercises.{update['ex_idx']}.sets.{update['set_idx']}.is_reps_pr": update['is_reps_pr'],
+                    f"exercises.{update['ex_idx']}.sets.{update['set_idx']}.is_volume_pr": update['is_volume_pr'],
+                    f"exercises.{update['ex_idx']}.sets.{update['set_idx']}.is_duration_pr": update['is_duration_pr']
+                }}
+            )
 
 
 # ============= SEED DATA =============
