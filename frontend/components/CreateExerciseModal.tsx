@@ -208,18 +208,22 @@ export default function CreateExerciseModal({
             </View>
           </View>
 
-          {/* Optional: Image URL */}
+          {/* Optional: Image Upload */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Image URL (Optional)</Text>
-            <TextInput
-              style={styles.textInput}
-              placeholder="https://example.com/image.jpg"
-              placeholderTextColor="#8E8E93"
-              value={imageUrl}
-              onChangeText={setImageUrl}
-              keyboardType="url"
-              autoCapitalize="none"
-            />
+            <Text style={styles.sectionTitle}>Image (Optional)</Text>
+            {imageBase64 ? (
+              <View style={styles.imagePreviewContainer}>
+                <Image source={{ uri: imageBase64 }} style={styles.imagePreview} />
+                <TouchableOpacity style={styles.removeImageButton} onPress={removeImage}>
+                  <Ionicons name="close-circle" size={28} color="#FF3B30" />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity style={styles.uploadButton} onPress={pickImage}>
+                <Ionicons name="camera-outline" size={32} color="#007AFF" />
+                <Text style={styles.uploadButtonText}>Upload Image</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Optional: Instructions */}
