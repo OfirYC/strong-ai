@@ -379,6 +379,28 @@ export default function ActiveWorkoutScreen() {
           variant="outline"
           style={styles.addExerciseButton}
         />
+        <TouchableOpacity 
+          style={styles.cancelButton}
+          onPress={() => {
+            Alert.alert(
+              'Cancel Workout',
+              'Are you sure you want to cancel this workout? All progress will be lost.',
+              [
+                { text: 'Keep Workout', style: 'cancel' },
+                { 
+                  text: 'Cancel Workout', 
+                  style: 'destructive',
+                  onPress: () => {
+                    endWorkout();
+                    router.replace('/(tabs)/workout');
+                  }
+                },
+              ]
+            );
+          }}
+        >
+          <Text style={styles.cancelButtonText}>Cancel Workout</Text>
+        </TouchableOpacity>
       </View>
 
       <Modal
