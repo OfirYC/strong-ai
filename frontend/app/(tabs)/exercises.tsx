@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../../utils/api';
 import { Exercise } from '../../types';
+import CreateExerciseModal from '../../components/CreateExerciseModal';
 
 const MUSCLE_GROUPS = [
   'All',
@@ -29,6 +30,7 @@ export default function ExercisesScreen() {
   const [selectedMuscleGroup, setSelectedMuscleGroup] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
     loadExercises();
