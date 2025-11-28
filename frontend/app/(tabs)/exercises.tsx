@@ -6,12 +6,16 @@ import {
   FlatList,
   TouchableOpacity,
   TextInput,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../../utils/api';
 import { Exercise } from '../../types';
 import CreateExerciseModal from '../../components/CreateExerciseModal';
+import ExerciseDetailModal from '../../components/ExerciseDetailModal';
+
+const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=100&h=100&fit=crop';
 
 const MUSCLE_GROUPS = [
   'All',
@@ -31,6 +35,8 @@ export default function ExercisesScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
   useEffect(() => {
     loadExercises();
