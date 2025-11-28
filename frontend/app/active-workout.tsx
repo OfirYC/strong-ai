@@ -578,7 +578,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   addExerciseButton: {
-    marginBottom: 0,
+    marginBottom: 12,
+  },
+  cancelButton: {
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FF3B30',
   },
   emptyState: {
     alignItems: 'center',
