@@ -92,7 +92,7 @@ class WorkoutTemplateCreate(BaseModel):
 
 
 class WorkoutTemplate(BaseModel):
-    id: Optional[str] = Field(alias="_id", default=None)
+    id: Optional[str] = Field(default=None)
     user_id: str
     name: str
     notes: Optional[str] = None
