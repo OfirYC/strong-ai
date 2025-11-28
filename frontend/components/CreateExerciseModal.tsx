@@ -44,7 +44,7 @@ export default function CreateExerciseModal({
   const [name, setName] = useState('');
   const [selectedBodyPart, setSelectedBodyPart] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<ExerciseKind | null>(null);
-  const [imageUrl, setImageUrl] = useState('');
+  const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [instructions, setInstructions] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -52,8 +52,32 @@ export default function CreateExerciseModal({
     setName('');
     setSelectedBodyPart(null);
     setSelectedCategory(null);
-    setImageUrl('');
+    setImageBase64(null);
     setInstructions('');
+  };
+
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Please grant camera roll permissions to upload images');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.7,
+      base64: true,
+    });
+
+    if (!result.canceled && result.assets[0].base64) {
+      setImageBase64(`data:image/jpeg;base64,${result.assets[0].base64}`);
+    }
+  };
+
+  const removeImage = () => {
+    setImageBase64(null);
   };
 
   const handleClose = () => {
