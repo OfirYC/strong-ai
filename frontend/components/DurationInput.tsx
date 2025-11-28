@@ -114,11 +114,16 @@ export default function DurationInput({ value, onChangeValue, style }: DurationI
     setIsFocused(false);
   };
 
+  const handlePress = () => {
+    inputRef.current?.focus();
+  };
+
   const displayValue = formatDigitsToTime(rawDigits);
 
   return (
     <View style={[styles.container, style]}>
       <TextInput
+        ref={inputRef}
         style={styles.hiddenInput}
         value={rawDigits}
         onChangeText={handleTextChange}
@@ -127,13 +132,16 @@ export default function DurationInput({ value, onChangeValue, style }: DurationI
         keyboardType="number-pad"
         maxLength={6}
         caretHidden={true}
+        autoCorrect={false}
+        autoCapitalize="none"
       />
       <TouchableOpacity 
         style={[
           styles.displayContainer,
           isFocused && styles.displayContainerFocused
         ]}
-        activeOpacity={1}
+        onPress={handlePress}
+        activeOpacity={0.7}
       >
         <Text style={styles.displayText}>{displayValue}</Text>
       </TouchableOpacity>
