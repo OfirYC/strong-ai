@@ -135,6 +135,22 @@ export default function ExerciseDetailModal({
                   <Ionicons name="fitness" size={48} color="#FFFFFF" />
                 </View>
               )}
+              <TouchableOpacity 
+                style={styles.uploadImageButton}
+                onPress={handleUploadImage}
+                disabled={uploadingImage}
+              >
+                {uploadingImage ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="camera" size={18} color="#FFFFFF" />
+                    <Text style={styles.uploadImageText}>
+                      {exercise.image ? 'Change' : 'Add Photo'}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
             </View>
 
             {/* Exercise Info */}
