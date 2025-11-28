@@ -38,6 +38,7 @@ export default function ExerciseDetailModal({
   const [isEditing, setIsEditing] = useState(false);
   const [instructions, setInstructions] = useState('');
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const handleStartEditing = () => {
     setInstructions(exercise?.instructions || '');
@@ -65,6 +66,39 @@ export default function ExerciseDetailModal({
   const handleCancelEditing = () => {
     setIsEditing(false);
     setInstructions('');
+  };
+
+  const handleUploadImage = async () => {
+    if (!exercise) return;
+
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Please grant camera roll permissions to upload images');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.7,
+      base64: true,
+    });
+
+    if (!result.canceled && result.assets[0].base64) {
+      try {
+        setUploadingImage(true);
+        await api.patch(`/exercises/${exercise.id}`, {
+          image: `data:image/jpeg;base64,${result.assets[0].base64}`,
+        });
+        onExerciseUpdated();
+        Alert.alert('Success', 'Image uploaded!');
+      } catch (error: any) {
+        Alert.alert('Error', error.response?.data?.detail || 'Failed to upload image');
+      } finally {
+        setUploadingImage(false);
+      }
+    }
   };
 
   if (!exercise) return null;
