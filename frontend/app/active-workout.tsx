@@ -17,6 +17,7 @@ import { useRouter } from 'expo-router';
 import { useWorkoutStore } from '../store/workoutStore';
 import Button from '../components/Button';
 import DurationInput from '../components/DurationInput';
+import CreateExerciseModal from '../components/CreateExerciseModal';
 import api from '../utils/api';
 import { Exercise, WorkoutExercise, WorkoutSet, getExerciseFields } from '../types';
 
