@@ -569,7 +569,9 @@ const styles = StyleSheet.create({
     color: '#1C1C1E',
   },
   exerciseList: {
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 24,
   },
   exerciseOption: {
     backgroundColor: '#FFFFFF',
