@@ -374,10 +374,10 @@ export default function ActiveWorkoutScreen() {
 
       <View style={styles.footer}>
         <Button
-          title="Finish Workout"
-          onPress={handleSaveAndFinish}
-          loading={saving}
-          disabled={exercises.length === 0}
+          title="Add Exercise"
+          onPress={handleShowExercisePicker}
+          variant="outline"
+          style={styles.addExerciseButton}
         />
       </View>
 
