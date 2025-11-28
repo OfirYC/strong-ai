@@ -48,8 +48,8 @@ export default function CreateRoutineScreen() {
     const newExercise: TemplateExercise = {
       exercise_id: exercise.id,
       order: selectedExercises.length,
-      default_sets: 3,
-      default_reps: 10,
+      default_sets: 0,
+      default_reps: 0,
       default_weight: 0,
     };
     setSelectedExercises([...selectedExercises, newExercise]);
