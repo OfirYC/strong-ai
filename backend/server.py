@@ -138,11 +138,11 @@ async def create_exercise(
     exercise_data: ExerciseCreate,
     user_id: str = Depends(get_current_user)
 ):
-    exercise = Exercise(
-        **exercise_data.dict(),
-        user_id=user_id,
-        is_custom=True
-    )
+    exercise_dict = exercise_data.dict()
+    exercise_dict['is_custom'] = True  # Always mark user-created exercises as custom
+    exercise_dict['user_id'] = user_id
+    
+    exercise = Exercise(**exercise_dict)
     
     result = await db.exercises.insert_one(exercise.dict(by_alias=True, exclude={"id"}))
     exercise.id = str(result.inserted_id)
