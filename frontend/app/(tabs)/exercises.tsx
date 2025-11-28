@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
     color: '#1C1C1E',
   },
   filterContainer: {
-    paddingLeft: 16,
+    paddingLeft: 20,
     marginBottom: 16,
   },
   filterChip: {
