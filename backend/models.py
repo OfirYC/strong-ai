@@ -159,7 +159,7 @@ class WorkoutSession(BaseModel):
 
 # PR Record Models
 class PRRecord(BaseModel):
-    id: Optional[str] = Field(alias="_id", default=None)
+    id: Optional[str] = Field(default=None)
     user_id: str
     exercise_id: str
     weight: float
