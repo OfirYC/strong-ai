@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
     color: '#1C1C1E',
   },
   listContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingBottom: 100,
   },
   sectionHeader: {
