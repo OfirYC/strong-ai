@@ -418,10 +418,21 @@ export default function ActiveWorkoutScreen() {
                 style={styles.exerciseOption}
                 onPress={() => handleAddExerciseToWorkout(item)}
               >
-                <Text style={styles.exerciseOptionName}>{item.name}</Text>
-                <Text style={styles.exerciseOptionDetail}>
-                  {item.exercise_kind} • {item.primary_body_parts.join(', ')}
-                </Text>
+                <View style={styles.exerciseOptionImageContainer}>
+                  {item.image ? (
+                    <Image source={{ uri: item.image }} style={styles.exerciseOptionImage} />
+                  ) : (
+                    <View style={styles.exerciseOptionPlaceholder}>
+                      <Ionicons name="barbell" size={20} color="#8E8E93" />
+                    </View>
+                  )}
+                </View>
+                <View style={styles.exerciseOptionInfo}>
+                  <Text style={styles.exerciseOptionName}>{item.name}</Text>
+                  <Text style={styles.exerciseOptionDetail}>
+                    {item.exercise_kind} • {item.primary_body_parts.join(', ')}
+                  </Text>
+                </View>
               </TouchableOpacity>
             )}
             contentContainerStyle={styles.exerciseList}
