@@ -251,7 +251,7 @@ async def get_workouts(
     limit: int = 50
 ):
     workouts = await db.workouts.find({"user_id": user_id}).sort("started_at", -1).limit(limit).to_list(limit)
-    return [WorkoutSession(**{**w, "_id": str(w["_id"])}) for w in workouts]
+    return [WorkoutSession(**{**w, "id": str(w["_id"])}) for w in workouts]
 
 
 @api_router.get("/workouts/{workout_id}", response_model=WorkoutSession)
@@ -263,7 +263,7 @@ async def get_workout(
     if not workout:
         raise HTTPException(status_code=404, detail="Workout not found")
     
-    return WorkoutSession(**{**workout, "_id": str(workout["_id"])})
+    return WorkoutSession(**{**workout, "id": str(workout["_id"])})
 
 
 @api_router.put("/workouts/{workout_id}", response_model=WorkoutSession)
@@ -287,7 +287,7 @@ async def update_workout(
         await check_and_create_prs(user_id, workout_id)
     
     workout = await db.workouts.find_one({"_id": ObjectId(workout_id)})
-    return WorkoutSession(**{**workout, "_id": str(workout["_id"])})
+    return WorkoutSession(**{**workout, "id": str(workout["_id"])})
 
 
 # ============= PR ROUTES =============
