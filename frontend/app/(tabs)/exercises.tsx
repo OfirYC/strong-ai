@@ -184,6 +184,16 @@ export default function ExercisesScreen() {
         onClose={() => setShowCreateModal(false)}
         onExerciseCreated={loadExercises}
       />
+
+      <ExerciseDetailModal
+        visible={showDetailModal}
+        exercise={selectedExercise}
+        onClose={() => {
+          setShowDetailModal(false);
+          setSelectedExercise(null);
+        }}
+        onExerciseUpdated={handleExerciseUpdated}
+      />
     </SafeAreaView>
   );
 }
