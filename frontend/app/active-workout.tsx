@@ -36,6 +36,8 @@ export default function ActiveWorkoutScreen() {
   const [saving, setSaving] = useState(false);
   const [showExercisePicker, setShowExercisePicker] = useState(false);
   const [showCreateExercise, setShowCreateExercise] = useState(false);
+  const [showExerciseDetail, setShowExerciseDetail] = useState(false);
+  const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
   const [availableExercises, setAvailableExercises] = useState<Exercise[]>([]);
 
   useEffect(() => {
