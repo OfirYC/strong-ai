@@ -150,6 +150,12 @@ export default function ExercisesScreen() {
           </View>
         }
       />
+
+      <CreateExerciseModal
+        visible={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onExerciseCreated={loadExercises}
+      />
     </SafeAreaView>
   );
 }
