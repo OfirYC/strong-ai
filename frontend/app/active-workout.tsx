@@ -435,7 +435,7 @@ export default function ActiveWorkoutScreen() {
           />
         </SafeAreaView>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
