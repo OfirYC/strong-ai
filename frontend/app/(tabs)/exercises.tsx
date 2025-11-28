@@ -76,15 +76,37 @@ export default function ExercisesScreen() {
     setFilteredExercises(filtered);
   };
 
+  const handleExercisePress = (exercise: Exercise) => {
+    setSelectedExercise(exercise);
+    setShowDetailModal(true);
+  };
+
+  const handleExerciseUpdated = () => {
+    loadExercises();
+  };
+
   const renderExercise = ({ item }: { item: Exercise }) => (
-    <TouchableOpacity style={styles.exerciseCard}>
-      <View style={styles.exerciseIcon}>
-        <Ionicons name="barbell" size={24} color="#4A90E2" />
+    <TouchableOpacity 
+      style={styles.exerciseCard}
+      onPress={() => handleExercisePress(item)}
+    >
+      <View style={styles.exerciseImageContainer}>
+        {item.image ? (
+          <Image 
+            source={{ uri: item.image }} 
+            style={styles.exerciseImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={styles.exercisePlaceholder}>
+            <Ionicons name="barbell" size={24} color="#8E8E93" />
+          </View>
+        )}
       </View>
       <View style={styles.exerciseInfo}>
         <Text style={styles.exerciseName}>{item.name}</Text>
         <Text style={styles.exerciseDetail}>
-          {item.muscle_group} {item.equipment && `• ${item.equipment}`}
+          {item.exercise_kind} • {item.primary_body_parts.join(', ')}
         </Text>
       </View>
       <Ionicons name="chevron-forward" size={24} color="#8E8E93" />
