@@ -120,8 +120,11 @@ class WorkoutSetItem(BaseModel):
     duration: Optional[int] = None  # in seconds
     calories: Optional[int] = None
     
-    # Duration only
-    # duration field already covered above
+    # PR flags (computed when workout is completed)
+    is_volume_pr: bool = False
+    is_weight_pr: bool = False
+    is_reps_pr: bool = False
+    is_duration_pr: bool = False
 
 
 class WorkoutExerciseItem(BaseModel):
@@ -134,18 +137,21 @@ class WorkoutExerciseItem(BaseModel):
 class WorkoutSessionCreate(BaseModel):
     template_id: Optional[str] = None
     notes: Optional[str] = None
+    name: Optional[str] = None  # Allow custom workout name
 
 
 class WorkoutSessionUpdate(BaseModel):
     exercises: List[WorkoutExerciseItem]
     notes: Optional[str] = None
     ended_at: Optional[datetime] = None
+    name: Optional[str] = None
 
 
 class WorkoutSession(BaseModel):
     id: Optional[str] = Field(default=None)
     user_id: str
     template_id: Optional[str] = None
+    name: Optional[str] = None  # Workout name
     started_at: datetime = Field(default_factory=datetime.utcnow)
     ended_at: Optional[datetime] = None
     notes: Optional[str] = None
@@ -157,14 +163,41 @@ class WorkoutSession(BaseModel):
         json_encoders = {ObjectId: str}
 
 
+# Workout Summary DTOs (for history view)
+class WorkoutExerciseSummary(BaseModel):
+    exercise_id: str
+    name: str
+    exercise_kind: str
+    set_count: int
+    best_set_display: str  # e.g. "60kg × 10" or "0:30"
+    estimated_1rm: Optional[float] = None
+
+
+class WorkoutSummary(BaseModel):
+    id: str
+    name: Optional[str] = None
+    started_at: datetime
+    ended_at: Optional[datetime] = None
+    duration_seconds: int = 0
+    exercise_count: int = 0
+    set_count: int = 0
+    total_volume_kg: float = 0.0
+    pr_count: int = 0
+    exercises: List[WorkoutExerciseSummary] = []
+
+
 # PR Record Models
 class PRRecord(BaseModel):
     id: Optional[str] = Field(default=None)
     user_id: str
     exercise_id: str
-    weight: float
-    reps: int
-    estimated_1rm: float
+    workout_id: Optional[str] = None
+    pr_type: str = "1rm"  # "1rm", "weight", "reps", "volume", "duration"
+    weight: Optional[float] = None
+    reps: Optional[int] = None
+    duration: Optional[int] = None  # in seconds
+    volume: Optional[float] = None  # weight * reps
+    estimated_1rm: Optional[float] = None
     date: datetime = Field(default_factory=datetime.utcnow)
 
     class Config:
