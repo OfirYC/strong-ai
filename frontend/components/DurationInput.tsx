@@ -4,8 +4,7 @@ import {
   Text,
   TextInput,
   StyleSheet,
-  TouchableOpacity,
-  Platform,
+  Pressable,
 } from 'react-native';
 
 interface DurationInputProps {
@@ -121,7 +120,15 @@ export default function DurationInput({ value, onChangeValue, style }: DurationI
   const displayValue = formatDigitsToTime(rawDigits);
 
   return (
-    <View style={[styles.container, style]}>
+    <Pressable 
+      style={[
+        styles.container, 
+        style,
+        isFocused && styles.containerFocused
+      ]}
+      onPress={handlePress}
+    >
+      <Text style={styles.displayText}>{displayValue}</Text>
       <TextInput
         ref={inputRef}
         style={styles.hiddenInput}
@@ -134,36 +141,14 @@ export default function DurationInput({ value, onChangeValue, style }: DurationI
         caretHidden={true}
         autoCorrect={false}
         autoCapitalize="none"
+        selectTextOnFocus={false}
       />
-      <TouchableOpacity 
-        style={[
-          styles.displayContainer,
-          isFocused && styles.displayContainerFocused
-        ]}
-        onPress={handlePress}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.displayText}>{displayValue}</Text>
-      </TouchableOpacity>
-    </View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    position: 'relative',
-  },
-  hiddenInput: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    opacity: 0,
-    width: '100%',
-    height: '100%',
-  },
-  displayContainer: {
     backgroundColor: '#F5F5F7',
     borderRadius: 8,
     paddingVertical: 10,
@@ -173,8 +158,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minWidth: 70,
+    position: 'relative',
+    overflow: 'hidden',
   },
-  displayContainerFocused: {
+  containerFocused: {
     borderColor: '#007AFF',
     borderWidth: 2,
   },
@@ -183,5 +170,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1C1C1E',
     textAlign: 'center',
+  },
+  hiddenInput: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    opacity: 0,
+    fontSize: 16,
   },
 });
