@@ -159,14 +159,14 @@ async def get_exercise(
     if not exercise:
         raise HTTPException(status_code=404, detail="Exercise not found")
     
-    return Exercise(**{**exercise, "_id": str(exercise["_id"])})
+    return Exercise(**{**exercise, "id": str(exercise["_id"])})
 
 
 # ============= TEMPLATE ROUTES =============
 @api_router.get("/templates", response_model=List[WorkoutTemplate])
 async def get_templates(user_id: str = Depends(get_current_user)):
     templates = await db.templates.find({"user_id": user_id}).to_list(1000)
-    return [WorkoutTemplate(**{**t, "_id": str(t["_id"])}) for t in templates]
+    return [WorkoutTemplate(**{**t, "id": str(t["_id"])}) for t in templates]
 
 
 @api_router.post("/templates", response_model=WorkoutTemplate)
@@ -194,7 +194,7 @@ async def get_template(
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
     
-    return WorkoutTemplate(**{**template, "_id": str(template["_id"])})
+    return WorkoutTemplate(**{**template, "id": str(template["_id"])})
 
 
 @api_router.put("/templates/{template_id}", response_model=WorkoutTemplate)
@@ -212,7 +212,7 @@ async def update_template(
         raise HTTPException(status_code=404, detail="Template not found")
     
     template = await db.templates.find_one({"_id": ObjectId(template_id)})
-    return WorkoutTemplate(**{**template, "_id": str(template["_id"])})
+    return WorkoutTemplate(**{**template, "id": str(template["_id"])})
 
 
 @api_router.delete("/templates/{template_id}")
@@ -301,7 +301,7 @@ async def get_prs(
         query["exercise_id"] = exercise_id
     
     prs = await db.prs.find(query).sort("date", -1).to_list(100)
-    return [PRRecord(**{**pr, "_id": str(pr["_id"])}) for pr in prs]
+    return [PRRecord(**{**pr, "id": str(pr["_id"])}) for pr in prs]
 
 
 async def check_and_create_prs(user_id: str, workout_id: str):
