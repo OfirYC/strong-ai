@@ -130,8 +130,8 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   listContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingHorizontal: 20,
+    paddingBottom: 24,
   },
   templateCard: {
     backgroundColor: '#FFFFFF',
