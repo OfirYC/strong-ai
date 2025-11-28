@@ -555,6 +555,9 @@ const styles = StyleSheet.create({
     borderTopColor: '#D1D1D6',
     backgroundColor: '#FFFFFF',
   },
+  addExerciseButton: {
+    marginBottom: 0,
+  },
   emptyState: {
     alignItems: 'center',
     padding: 32,
@@ -562,7 +565,6 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     color: '#8E8E93',
-    marginBottom: 24,
   },
   addButton: {
     width: '100%',
