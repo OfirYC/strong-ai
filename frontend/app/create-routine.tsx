@@ -169,10 +169,12 @@ export default function CreateRoutineScreen() {
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setShowExercisePicker(false)}>
-              <Ionicons name="close" size={28} color="#FFFFFF" />
+              <Ionicons name="close" size={28} color="#1C1C1E" />
             </TouchableOpacity>
             <Text style={styles.modalTitle}>Select Exercise</Text>
-            <View style={{ width: 28 }} />
+            <TouchableOpacity onPress={() => setShowCreateExercise(true)}>
+              <Text style={styles.newExerciseText}>+ New</Text>
+            </TouchableOpacity>
           </View>
 
           <FlatList
@@ -193,6 +195,12 @@ export default function CreateRoutineScreen() {
           />
         </SafeAreaView>
       </Modal>
+
+      <CreateExerciseModal
+        visible={showCreateExercise}
+        onClose={() => setShowCreateExercise(false)}
+        onExerciseCreated={loadExercises}
+      />
     </SafeAreaView>
   );
 }
