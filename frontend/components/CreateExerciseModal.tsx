@@ -81,6 +81,8 @@ export default function CreateExerciseModal({
         primary_body_parts: [selectedBodyPart],
         category: selectedCategory,
         is_custom: true,
+        image: imageUrl.trim() || null,
+        instructions: instructions.trim() || null,
       });
 
       resetForm();
