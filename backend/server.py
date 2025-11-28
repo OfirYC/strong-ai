@@ -5,7 +5,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import datetime
 from bson import ObjectId
 
@@ -14,7 +14,7 @@ from models import (
     Exercise, ExerciseCreate,
     WorkoutTemplate, WorkoutTemplateCreate,
     WorkoutSession, WorkoutSessionCreate, WorkoutSessionUpdate,
-    PRRecord
+    PRRecord, WorkoutSummary, WorkoutExerciseSummary
 )
 from auth import get_password_hash, verify_password, create_access_token, decode_access_token
 from seed_exercises_new import EXERCISES
