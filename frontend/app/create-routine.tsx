@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import Input from '../components/Input';
 import Button from '../components/Button';
+import CreateExerciseModal from '../components/CreateExerciseModal';
 import api from '../utils/api';
 import { Exercise, TemplateExercise } from '../types';
 
@@ -25,6 +26,7 @@ export default function CreateRoutineScreen() {
     TemplateExercise[]
   >([]);
   const [showExercisePicker, setShowExercisePicker] = useState(false);
+  const [showCreateExercise, setShowCreateExercise] = useState(false);
   const [availableExercises, setAvailableExercises] = useState<Exercise[]>([]);
   const [saving, setSaving] = useState(false);
 
