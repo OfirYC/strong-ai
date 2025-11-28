@@ -88,7 +88,15 @@ export default function ExercisesScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Exercises</Text>
+        <View style={styles.headerTop}>
+          <Text style={styles.title}>Exercises</Text>
+          <TouchableOpacity 
+            style={styles.newButton}
+            onPress={() => setShowCreateModal(true)}
+          >
+            <Text style={styles.newButtonText}>+ New</Text>
+          </TouchableOpacity>
+        </View>
         <View style={styles.searchContainer}>
           <Ionicons name="search" size={20} color="#8E8E93" />
           <TextInput
