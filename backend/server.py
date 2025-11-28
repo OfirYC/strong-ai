@@ -11,7 +11,7 @@ from bson import ObjectId
 
 from models import (
     User, UserCreate, UserLogin, UserResponse,
-    Exercise, ExerciseCreate,
+    Exercise, ExerciseCreate, ExerciseUpdate,
     WorkoutTemplate, WorkoutTemplateCreate,
     WorkoutSession, WorkoutSessionCreate, WorkoutSessionUpdate,
     PRRecord, WorkoutSummary, WorkoutExerciseSummary
