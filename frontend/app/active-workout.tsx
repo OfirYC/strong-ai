@@ -10,6 +10,7 @@ import {
   Modal,
   FlatList,
   Platform,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +19,7 @@ import { useWorkoutStore } from '../store/workoutStore';
 import Button from '../components/Button';
 import DurationInput from '../components/DurationInput';
 import CreateExerciseModal from '../components/CreateExerciseModal';
+import ExerciseDetailModal from '../components/ExerciseDetailModal';
 import api from '../utils/api';
 import { Exercise, WorkoutExercise, WorkoutSet, getExerciseFields } from '../types';
 
