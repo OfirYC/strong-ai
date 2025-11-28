@@ -1,20 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
+  SectionList,
   TouchableOpacity,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { format } from 'date-fns';
+import { format, parseISO, isToday, isYesterday } from 'date-fns';
+import { useRouter } from 'expo-router';
 import api from '../../utils/api';
-import { WorkoutSession } from '../../types';
+import { WorkoutSummary } from '../../types';
+
+interface GroupedWorkouts {
+  title: string;
+  date: string;
+  data: WorkoutSummary[];
+}
 
 export default function HistoryScreen() {
-  const [workouts, setWorkouts] = useState<WorkoutSession[]>([]);
+  const router = useRouter();
+  const [workouts, setWorkouts] = useState<WorkoutSummary[]>([]);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     loadWorkouts();
@@ -23,7 +33,7 @@ export default function HistoryScreen() {
   const loadWorkouts = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/workouts');
+      const response = await api.get('/workouts/history');
       setWorkouts(response.data);
     } catch (error) {
       console.error('Failed to load workouts:', error);
@@ -32,98 +42,133 @@ export default function HistoryScreen() {
     }
   };
 
-  const calculateWorkoutStats = (workout: WorkoutSession) => {
-    let totalSets = 0;
-    let totalVolume = 0;
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadWorkouts();
+    setRefreshing(false);
+  }, []);
 
-    workout.exercises.forEach((exercise) => {
-      totalSets += exercise.sets.length;
-      exercise.sets.forEach((set) => {
-        if (!set.is_warmup) {
-          totalVolume += set.weight * set.reps;
-        }
-      });
+  // Group workouts by date
+  const groupedWorkouts = React.useMemo((): GroupedWorkouts[] => {
+    const groups: { [key: string]: WorkoutSummary[] } = {};
+    
+    workouts.forEach((workout) => {
+      const date = format(parseISO(workout.started_at), 'yyyy-MM-dd');
+      if (!groups[date]) {
+        groups[date] = [];
+      }
+      groups[date].push(workout);
     });
 
-    return { totalSets, totalVolume };
+    return Object.entries(groups).map(([date, data]) => {
+      const parsedDate = parseISO(date);
+      let title: string;
+      
+      if (isToday(parsedDate)) {
+        title = 'Today';
+      } else if (isYesterday(parsedDate)) {
+        title = 'Yesterday';
+      } else {
+        title = format(parsedDate, 'EEEE, MMM d, yyyy');
+      }
+      
+      return { title, date, data };
+    });
+  }, [workouts]);
+
+  const formatDuration = (seconds: number): string => {
+    const mins = Math.round(seconds / 60);
+    return `${mins} mins`;
   };
 
-  const renderWorkout = ({ item }: { item: WorkoutSession }) => {
-    const stats = calculateWorkoutStats(item);
-    const duration = item.ended_at
-      ? Math.round(
-          (new Date(item.ended_at).getTime() -
-            new Date(item.started_at).getTime()) /
-            60000
-        )
-      : null;
+  const formatVolume = (kg: number): string => {
+    if (kg >= 1000) {
+      return `${(kg / 1000).toFixed(1)}k`;
+    }
+    return `${Math.round(kg)}`;
+  };
 
+  const handleWorkoutPress = (workout: WorkoutSummary) => {
+    router.push({
+      pathname: '/workout-detail',
+      params: { workoutId: workout.id }
+    });
+  };
+
+  const renderWorkoutCard = ({ item }: { item: WorkoutSummary }) => {
+    const startTime = format(parseISO(item.started_at), 'h:mm a');
+    
     return (
-      <TouchableOpacity style={styles.workoutCard}>
-        <View style={styles.workoutHeader}>
-          <Text style={styles.workoutDate}>
-            {format(new Date(item.started_at), 'MMM d, yyyy')}
-          </Text>
-          <Text style={styles.workoutTime}>
-            {format(new Date(item.started_at), 'h:mm a')}
-          </Text>
+      <TouchableOpacity 
+        style={styles.workoutCard}
+        onPress={() => handleWorkoutPress(item)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.cardHeader}>
+          <View style={styles.cardTitleContainer}>
+            <Text style={styles.workoutName} numberOfLines={1}>
+              {item.name || 'Workout'}
+            </Text>
+          </View>
+          <Text style={styles.workoutTime}>{startTime}</Text>
         </View>
 
-        <View style={styles.workoutStats}>
+        <View style={styles.statsRow}>
           <View style={styles.statItem}>
-            <Ionicons name="barbell" size={20} color="#4A90E2" />
-            <Text style={styles.statValue}>{item.exercises.length}</Text>
-            <Text style={styles.statLabel}>exercises</Text>
+            <Ionicons name="barbell-outline" size={16} color="#007AFF" />
+            <Text style={styles.statText}>{item.exercise_count} exercises</Text>
           </View>
 
           <View style={styles.statItem}>
-            <Ionicons name="list" size={20} color="#4A90E2" />
-            <Text style={styles.statValue}>{stats.totalSets}</Text>
-            <Text style={styles.statLabel}>sets</Text>
+            <Ionicons name="layers-outline" size={16} color="#007AFF" />
+            <Text style={styles.statText}>{item.set_count} sets</Text>
           </View>
 
           <View style={styles.statItem}>
-            <Ionicons name="fitness" size={20} color="#4A90E2" />
-            <Text style={styles.statValue}>
-              {(stats.totalVolume / 1000).toFixed(1)}k
-            </Text>
-            <Text style={styles.statLabel}>volume</Text>
+            <Ionicons name="fitness-outline" size={16} color="#007AFF" />
+            <Text style={styles.statText}>{formatVolume(item.total_volume_kg)} vol</Text>
           </View>
 
-          {duration && (
-            <View style={styles.statItem}>
-              <Ionicons name="time" size={20} color="#4A90E2" />
-              <Text style={styles.statValue}>{duration}</Text>
-              <Text style={styles.statLabel}>mins</Text>
-            </View>
-          )}
+          <View style={styles.statItem}>
+            <Ionicons name="time-outline" size={16} color="#007AFF" />
+            <Text style={styles.statText}>{formatDuration(item.duration_seconds)}</Text>
+          </View>
         </View>
       </TouchableOpacity>
     );
   };
 
+  const renderSectionHeader = ({ section }: { section: GroupedWorkouts }) => (
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionTitle}>{section.title}</Text>
+    </View>
+  );
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>History</Text>
       </View>
 
-      <FlatList
-        data={workouts}
+      <SectionList
+        sections={groupedWorkouts}
         keyExtractor={(item) => item.id}
-        renderItem={renderWorkout}
+        renderItem={renderWorkoutCard}
+        renderSectionHeader={renderSectionHeader}
         contentContainerStyle={styles.listContent}
-        refreshing={loading}
-        onRefresh={loadWorkouts}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Ionicons name="time-outline" size={64} color="#3A3A3C" />
+            <Ionicons name="time-outline" size={64} color="#C7C7CC" />
             <Text style={styles.emptyText}>No workouts yet</Text>
             <Text style={styles.emptySubtext}>
-              Start your first workout to see it here
+              Complete your first workout to see it here
             </Text>
           </View>
         }
+        stickySectionHeadersEnabled={false}
       />
     </SafeAreaView>
   );
@@ -135,7 +180,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F7',
   },
   header: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 16,
   },
   title: {
     fontSize: 32,
@@ -144,45 +191,58 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingBottom: 100,
+  },
+  sectionHeader: {
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#6E6E73',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   workoutCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
   },
-  workoutHeader: {
+  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  workoutDate: {
-    fontSize: 18,
+  cardTitleContainer: {
+    flex: 1,
+    marginRight: 12,
+  },
+  workoutName: {
+    fontSize: 17,
     fontWeight: '600',
     color: '#1C1C1E',
   },
   workoutTime: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#8E8E93',
   },
-  workoutStats: {
+  statsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
   },
   statItem: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
   },
-  statValue: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1C1C1E',
-    marginTop: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#8E8E93',
-    marginTop: 2,
+  statText: {
+    fontSize: 13,
+    color: '#6E6E73',
   },
   emptyState: {
     alignItems: 'center',
@@ -196,7 +256,8 @@ const styles = StyleSheet.create({
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#636366',
+    color: '#AEAEB2',
     marginTop: 8,
+    textAlign: 'center',
   },
 });
