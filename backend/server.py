@@ -106,8 +106,8 @@ async def get_exercises(
     exercise_kind: Optional[str] = None,
     search: Optional[str] = None
 ):
-    # Build query
-    query = {"$or": [{"is_custom": False}, {"user_id": user_id}]}
+    # Build query - show all exercises (default + custom from all users)
+    query = {}
     
     if body_part:
         query["$or"] = [
