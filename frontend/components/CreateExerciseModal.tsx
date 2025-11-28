@@ -42,12 +42,16 @@ export default function CreateExerciseModal({
   const [name, setName] = useState('');
   const [selectedBodyPart, setSelectedBodyPart] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<ExerciseKind | null>(null);
+  const [imageUrl, setImageUrl] = useState('');
+  const [instructions, setInstructions] = useState('');
   const [saving, setSaving] = useState(false);
 
   const resetForm = () => {
     setName('');
     setSelectedBodyPart(null);
     setSelectedCategory(null);
+    setImageUrl('');
+    setInstructions('');
   };
 
   const handleClose = () => {
