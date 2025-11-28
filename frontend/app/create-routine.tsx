@@ -304,6 +304,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1C1C1E',
   },
+  newExerciseText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#007AFF',
+  },
   exerciseList: {
     padding: 16,
   },
