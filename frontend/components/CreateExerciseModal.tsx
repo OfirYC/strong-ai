@@ -181,6 +181,37 @@ export default function CreateExerciseModal({
               ))}
             </View>
           </View>
+
+          {/* Optional: Image URL */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Image URL (Optional)</Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder="https://example.com/image.jpg"
+              placeholderTextColor="#8E8E93"
+              value={imageUrl}
+              onChangeText={setImageUrl}
+              keyboardType="url"
+              autoCapitalize="none"
+            />
+          </View>
+
+          {/* Optional: Instructions */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Instructions (Optional)</Text>
+            <TextInput
+              style={[styles.textInput, styles.textArea]}
+              placeholder="How to perform this exercise..."
+              placeholderTextColor="#8E8E93"
+              value={instructions}
+              onChangeText={setInstructions}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
+          </View>
+
+          <View style={styles.bottomSpacer} />
         </ScrollView>
       </SafeAreaView>
     </Modal>
