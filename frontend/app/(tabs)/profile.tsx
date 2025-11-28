@@ -92,7 +92,8 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingBottom: 24,
   },
   profileCard: {
     backgroundColor: '#FFFFFF',
