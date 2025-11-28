@@ -531,7 +531,8 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   footer: {
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     borderTopWidth: 1,
     borderTopColor: '#D1D1D6',
     backgroundColor: '#FFFFFF',
