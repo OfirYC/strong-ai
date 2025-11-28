@@ -172,22 +172,37 @@ export default function ActiveWorkoutScreen() {
 
     try {
       setSaving(true);
+      console.log('Saving workout with id:', activeWorkout.id);
+      
       await api.put(`/workouts/${activeWorkout.id}`, {
         exercises,
         ended_at: new Date().toISOString(),
       });
 
-      Alert.alert('Success', 'Workout completed!', [
-        {
-          text: 'OK',
-          onPress: () => {
-            endWorkout();
-            router.replace('/(tabs)/history');
+      console.log('Workout saved successfully');
+      
+      // On web, Alert.alert callback doesn't work well, so handle differently
+      if (Platform.OS === 'web') {
+        endWorkout();
+        router.replace('/(tabs)/history');
+      } else {
+        Alert.alert('Success', 'Workout completed!', [
+          {
+            text: 'OK',
+            onPress: () => {
+              endWorkout();
+              router.replace('/(tabs)/history');
+            },
           },
-        },
-      ]);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to save workout');
+        ]);
+      }
+    } catch (error: any) {
+      console.error('Failed to save workout:', error);
+      if (Platform.OS === 'web') {
+        alert('Failed to save workout: ' + (error.message || 'Unknown error'));
+      } else {
+        Alert.alert('Error', 'Failed to save workout');
+      }
     } finally {
       setSaving(false);
     }
