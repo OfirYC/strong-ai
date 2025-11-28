@@ -203,8 +203,8 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   listContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingHorizontal: 20,
+    paddingBottom: 24,
   },
   exerciseCard: {
     backgroundColor: '#FFFFFF',
