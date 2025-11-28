@@ -279,21 +279,30 @@ const styles = StyleSheet.create({
   exerciseCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 16,
+    padding: 12,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#D1D1D6',
+    borderColor: '#E5E5EA',
   },
-  exerciseIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  exerciseImageContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginRight: 12,
+  },
+  exerciseImage: {
+    width: '100%',
+    height: '100%',
+  },
+  exercisePlaceholder: {
+    width: '100%',
+    height: '100%',
     backgroundColor: '#F5F5F7',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
   },
   exerciseInfo: {
     flex: 1,
