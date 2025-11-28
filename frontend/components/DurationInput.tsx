@@ -1,10 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  View,
-  Text,
   TextInput,
   StyleSheet,
-  Pressable,
 } from 'react-native';
 
 interface DurationInputProps {
@@ -28,7 +25,6 @@ export default function DurationInput({ value, onChangeValue, style }: DurationI
   // Store the raw digits entered by user
   const [rawDigits, setRawDigits] = useState<string>('');
   const [isFocused, setIsFocused] = useState(false);
-  const inputRef = useRef<TextInput>(null);
 
   // Initialize rawDigits from value prop when component mounts or value changes externally
   useEffect(() => {
@@ -89,7 +85,7 @@ export default function DurationInput({ value, onChangeValue, style }: DurationI
   };
 
   const handleTextChange = (text: string) => {
-    // Only allow numeric input
+    // Only allow numeric input - strip any non-digits
     const numericOnly = text.replace(/[^0-9]/g, '');
     
     // Limit to 6 digits (max 99:59:59)
@@ -113,71 +109,44 @@ export default function DurationInput({ value, onChangeValue, style }: DurationI
     setIsFocused(false);
   };
 
-  const handlePress = () => {
-    inputRef.current?.focus();
-  };
-
   const displayValue = formatDigitsToTime(rawDigits);
 
   return (
-    <Pressable 
+    <TextInput
       style={[
-        styles.container, 
-        style,
-        isFocused && styles.containerFocused
+        styles.input,
+        isFocused && styles.inputFocused,
+        style
       ]}
-      onPress={handlePress}
-    >
-      <Text style={styles.displayText}>{displayValue}</Text>
-      <TextInput
-        ref={inputRef}
-        style={styles.hiddenInput}
-        value={rawDigits}
-        onChangeText={handleTextChange}
-        onFocus={handleFocus}
-        onBlur={handleBlur}
-        keyboardType="number-pad"
-        maxLength={6}
-        caretHidden={true}
-        autoCorrect={false}
-        autoCapitalize="none"
-        selectTextOnFocus={false}
-      />
-    </Pressable>
+      value={displayValue}
+      onChangeText={handleTextChange}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      keyboardType="number-pad"
+      maxLength={10}
+      placeholder="0:00"
+      placeholderTextColor="#999"
+      selectTextOnFocus={true}
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  input: {
     backgroundColor: '#F5F5F7',
     borderRadius: 8,
     paddingVertical: 10,
     paddingHorizontal: 8,
     borderWidth: 1,
     borderColor: '#D1D1D6',
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 70,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  containerFocused: {
-    borderColor: '#007AFF',
-    borderWidth: 2,
-  },
-  displayText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1C1C1E',
     textAlign: 'center',
+    minWidth: 70,
   },
-  hiddenInput: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    opacity: 0,
-    fontSize: 16,
+  inputFocused: {
+    borderColor: '#007AFF',
+    borderWidth: 2,
   },
 });
