@@ -442,7 +442,9 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   scrollContent: {
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 24,
   },
   title: {
     fontSize: 24,
