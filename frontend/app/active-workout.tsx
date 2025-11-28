@@ -667,10 +667,33 @@ const styles = StyleSheet.create({
   exerciseOption: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 16,
+    padding: 12,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#D1D1D6',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  exerciseOptionImageContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 10,
+    overflow: 'hidden',
+    marginRight: 12,
+  },
+  exerciseOptionImage: {
+    width: '100%',
+    height: '100%',
+  },
+  exerciseOptionPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#F5F5F7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  exerciseOptionInfo: {
+    flex: 1,
   },
   exerciseOptionName: {
     fontSize: 16,
