@@ -174,9 +174,17 @@ export default function ActiveWorkoutScreen() {
       setSaving(true);
       console.log('Saving workout with id:', activeWorkout.id);
       
+      // Generate workout name based on exercises
+      const exerciseNames = exercises
+        .slice(0, 3)
+        .map(ex => exerciseDetails[ex.exercise_id]?.name || 'Exercise')
+        .join(', ');
+      const workoutName = exerciseNames + (exercises.length > 3 ? '...' : '');
+      
       await api.put(`/workouts/${activeWorkout.id}`, {
         exercises,
         ended_at: new Date().toISOString(),
+        name: workoutName || 'Workout',
       });
 
       console.log('Workout saved successfully');
