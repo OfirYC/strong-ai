@@ -60,7 +60,7 @@ class ExerciseCreate(BaseModel):
 
 
 class Exercise(BaseModel):
-    id: Optional[str] = Field(alias="_id", default=None)
+    id: Optional[str] = Field(default=None)
     name: str
     exercise_kind: str
     primary_body_parts: List[str]
