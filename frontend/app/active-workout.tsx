@@ -416,7 +416,9 @@ export default function ActiveWorkoutScreen() {
               <Ionicons name="close" size={28} color="#1C1C1E" />
             </TouchableOpacity>
             <Text style={styles.modalTitle}>Add Exercise</Text>
-            <View style={{ width: 28 }} />
+            <TouchableOpacity onPress={() => setShowCreateExercise(true)}>
+              <Text style={styles.newExerciseText}>+ New</Text>
+            </TouchableOpacity>
           </View>
 
           <FlatList
@@ -437,6 +439,12 @@ export default function ActiveWorkoutScreen() {
           />
         </SafeAreaView>
       </Modal>
+
+      <CreateExerciseModal
+        visible={showCreateExercise}
+        onClose={() => setShowCreateExercise(false)}
+        onExerciseCreated={loadAvailableExercises}
+      />
     </View>
   );
 }
