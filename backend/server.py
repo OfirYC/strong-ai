@@ -162,6 +162,33 @@ async def get_exercise(
     return Exercise(**{**exercise, "id": str(exercise["_id"])})
 
 
+@api_router.patch("/exercises/{exercise_id}", response_model=Exercise)
+async def update_exercise(
+    exercise_id: str,
+    update_data: ExerciseUpdate,
+    user_id: str = Depends(get_current_user)
+):
+    exercise = await db.exercises.find_one({"_id": ObjectId(exercise_id)})
+    if not exercise:
+        raise HTTPException(status_code=404, detail="Exercise not found")
+    
+    # Build update dict with only provided fields
+    update_dict = {}
+    if update_data.instructions is not None:
+        update_dict["instructions"] = update_data.instructions
+    if update_data.image is not None:
+        update_dict["image"] = update_data.image
+    
+    if update_dict:
+        await db.exercises.update_one(
+            {"_id": ObjectId(exercise_id)},
+            {"$set": update_dict}
+        )
+    
+    updated_exercise = await db.exercises.find_one({"_id": ObjectId(exercise_id)})
+    return Exercise(**{**updated_exercise, "id": str(updated_exercise["_id"])})
+
+
 # ============= TEMPLATE ROUTES =============
 @api_router.get("/templates", response_model=List[WorkoutTemplate])
 async def get_templates(user_id: str = Depends(get_current_user)):
