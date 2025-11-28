@@ -89,7 +89,7 @@ export default function WorkoutScreen() {
         </View>
 
         <Button
-          title="Penis Start"
+          title="Quick Start"
           onPress={handleStartEmptyWorkout}
           loading={loading}
           style={styles.quickStartButton}
