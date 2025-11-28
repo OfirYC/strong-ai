@@ -239,8 +239,17 @@ export default function ActiveWorkoutScreen() {
           <Ionicons name="time" size={20} color="#007AFF" />
           <Text style={styles.timerText}>{formatTime(timer)}</Text>
         </View>
-        <TouchableOpacity onPress={handleShowExercisePicker}>
-          <Ionicons name="add-circle" size={28} color="#007AFF" />
+        <TouchableOpacity 
+          style={styles.finishHeaderButton}
+          onPress={handleSaveAndFinish}
+          disabled={saving || exercises.length === 0}
+        >
+          <Text style={[
+            styles.finishHeaderText,
+            (saving || exercises.length === 0) && styles.finishHeaderTextDisabled
+          ]}>
+            {saving ? 'Saving...' : 'Finish'}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -250,11 +259,6 @@ export default function ActiveWorkoutScreen() {
         {exercises.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>No exercises added yet</Text>
-            <Button
-              title="Add Exercise"
-              onPress={handleShowExercisePicker}
-              style={styles.addButton}
-            />
           </View>
         ) : (
           exercises.map((exercise, exerciseIndex) => {
