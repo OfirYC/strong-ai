@@ -82,26 +82,11 @@ export default function ActiveWorkoutScreen() {
   const handleAddExerciseToWorkout = async (exercise: Exercise) => {
     console.log('Adding exercise:', exercise.id, exercise.name);
     
-    // Create default sets based on exercise kind
-    const fields = getExerciseFields(exercise.exercise_kind);
-    const defaultSets: WorkoutSet[] = [];
-    
-    for (let i = 0; i < 3; i++) {
-      const set: WorkoutSet = { is_warmup: false };
-      
-      if (fields.includes('weight')) set.weight = 0;
-      if (fields.includes('reps')) set.reps = 10;
-      if (fields.includes('distance')) set.distance = 0;
-      if (fields.includes('duration')) set.duration = 0;
-      if (fields.includes('calories')) set.calories = 0;
-      
-      defaultSets.push(set);
-    }
-
+    // No default sets - user will add them manually
     const newExercise: WorkoutExercise = {
       exercise_id: exercise.id,
       order: exercises.length,
-      sets: defaultSets,
+      sets: [],
     };
 
     console.log('New exercise object:', newExercise);
