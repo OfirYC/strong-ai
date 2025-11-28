@@ -27,6 +27,7 @@ export interface Exercise {
   is_custom: boolean;
   user_id?: string;
   instructions?: string;
+  image?: string;
 }
 
 export interface WorkoutSet {
