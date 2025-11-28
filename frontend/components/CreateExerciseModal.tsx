@@ -296,4 +296,11 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '600',
   },
+  textArea: {
+    minHeight: 100,
+    paddingTop: 14,
+  },
+  bottomSpacer: {
+    height: 40,
+  },
 });
