@@ -41,6 +41,12 @@ export interface WorkoutSet {
   
   is_warmup?: boolean;
   completed_at?: string;
+  
+  // PR flags
+  is_volume_pr?: boolean;
+  is_weight_pr?: boolean;
+  is_reps_pr?: boolean;
+  is_duration_pr?: boolean;
 }
 
 // Helper function to determine what fields an exercise needs
@@ -61,6 +67,16 @@ export function getExerciseFields(kind: ExerciseKind): string[] {
     default:
       return ['weight', 'reps'];
   }
+}
+
+// Helper to check if exercise is duration-based
+export function isDurationBased(kind: ExerciseKind): boolean {
+  return kind === 'Cardio' || kind === 'Duration';
+}
+
+// Helper to check if exercise uses weight
+export function usesWeight(kind: ExerciseKind): boolean {
+  return ['Barbell', 'Dumbbell', 'Machine/Other', 'Weighted Bodyweight', 'Assisted Bodyweight'].includes(kind);
 }
 
 export interface WorkoutExercise {
@@ -92,18 +108,59 @@ export interface WorkoutSession {
   id: string;
   user_id: string;
   template_id?: string;
+  name?: string;
   started_at: string;
   ended_at?: string;
   notes?: string;
   exercises: WorkoutExercise[];
 }
 
+// Workout Summary types for history view
+export interface WorkoutExerciseSummary {
+  exercise_id: string;
+  name: string;
+  exercise_kind: ExerciseKind;
+  set_count: number;
+  best_set_display: string;
+  estimated_1rm?: number;
+}
+
+export interface WorkoutSummary {
+  id: string;
+  name?: string;
+  started_at: string;
+  ended_at?: string;
+  duration_seconds: number;
+  exercise_count: number;
+  set_count: number;
+  total_volume_kg: number;
+  pr_count: number;
+  exercises: WorkoutExerciseSummary[];
+}
+
 export interface PRRecord {
   id: string;
   user_id: string;
   exercise_id: string;
-  weight: number;
-  reps: number;
-  estimated_1rm: number;
+  workout_id?: string;
+  pr_type: string;
+  weight?: number;
+  reps?: number;
+  duration?: number;
+  volume?: number;
+  estimated_1rm?: number;
   date: string;
+}
+
+// Helper to format duration in mm:ss
+export function formatDuration(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+// Helper to format duration in minutes (e.g., "12m")
+export function formatDurationMinutes(seconds: number): string {
+  const mins = Math.round(seconds / 60);
+  return `${mins}m`;
 }
