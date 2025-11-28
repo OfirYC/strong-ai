@@ -537,6 +537,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1C1C1E',
   },
+  exerciseNameClickable: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#007AFF',
+    textDecorationLine: 'underline',
+  },
   setHeader: {
     flexDirection: 'row',
     alignItems: 'center',
