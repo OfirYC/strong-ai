@@ -143,7 +143,7 @@ class WorkoutSessionUpdate(BaseModel):
 
 
 class WorkoutSession(BaseModel):
-    id: Optional[str] = Field(alias="_id", default=None)
+    id: Optional[str] = Field(default=None)
     user_id: str
     template_id: Optional[str] = None
     started_at: datetime = Field(default_factory=datetime.utcnow)
