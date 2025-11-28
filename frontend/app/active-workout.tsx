@@ -445,6 +445,16 @@ export default function ActiveWorkoutScreen() {
         onClose={() => setShowCreateExercise(false)}
         onExerciseCreated={loadAvailableExercises}
       />
+
+      <ExerciseDetailModal
+        visible={showExerciseDetail}
+        exercise={selectedExercise}
+        onClose={() => {
+          setShowExerciseDetail(false);
+          setSelectedExercise(null);
+        }}
+        onExerciseUpdated={loadExerciseDetails}
+      />
     </View>
   );
 }
