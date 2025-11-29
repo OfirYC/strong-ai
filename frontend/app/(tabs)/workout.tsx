@@ -100,6 +100,8 @@ export default function WorkoutScreen() {
       setLoading(true);
       const response = await api.post('/workouts', { template_id: templateId });
       startWorkout(response.data);
+      setJustStarted(true);
+      setTimeout(() => setJustStarted(false), 1000);
     } catch (error: any) {
       Alert.alert('Error', 'Failed to start workout');
     } finally {
