@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import {
   Dimensions,
   PanResponder,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useWorkoutStore } from '../store/workoutStore';
 import Button from './Button';
@@ -25,16 +25,19 @@ import api from '../utils/api';
 import { Exercise, WorkoutExercise, WorkoutSet, getExerciseFields } from '../types';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const COLLAPSED_HEIGHT = 70;
-const EXPANDED_HEIGHT = SCREEN_HEIGHT * 0.9;
+const COLLAPSED_HEIGHT = 80;
 
 interface ActiveWorkoutSheetProps {
   onFinishWorkout: () => void;
+  initialExpanded?: boolean;
 }
 
-export default function ActiveWorkoutSheet({ onFinishWorkout }: ActiveWorkoutSheetProps) {
+export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = false }: ActiveWorkoutSheetProps) {
+  const insets = useSafeAreaInsets();
+  const EXPANDED_HEIGHT = SCREEN_HEIGHT - insets.top - 50; // Account for safe area and tab bar
+  
   const { activeWorkout, updateWorkout, endWorkout, workoutStartTime } = useWorkoutStore();
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(initialExpanded);
   const [exerciseDetails, setExerciseDetails] = useState<{ [key: string]: Exercise }>({});
   const [timer, setTimer] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -44,11 +47,62 @@ export default function ActiveWorkoutSheet({ onFinishWorkout }: ActiveWorkoutShe
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
   const [availableExercises, setAvailableExercises] = useState<Exercise[]>([]);
   
-  const animatedHeight = useRef(new Animated.Value(COLLAPSED_HEIGHT)).current;
+  const animatedHeight = useRef(new Animated.Value(initialExpanded ? EXPANDED_HEIGHT : COLLAPSED_HEIGHT)).current;
 
   const exercises = activeWorkout?.exercises || [];
 
-  // Timer effect
+  // Pan responder for drag gesture
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dy) > 10;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (!isExpanded && gestureState.dy < -20) {
+          // Dragging up from collapsed
+          expand();
+        } else if (isExpanded && gestureState.dy > 20) {
+          // Dragging down from expanded
+          collapse();
+        }
+      },
+      onPanResponderRelease: () => {},
+    })
+  ).current;
+
+  const expand = () => {
+    Animated.spring(animatedHeight, {
+      toValue: EXPANDED_HEIGHT,
+      useNativeDriver: false,
+      friction: 10,
+    }).start();
+    setIsExpanded(true);
+  };
+
+  const collapse = () => {
+    Animated.spring(animatedHeight, {
+      toValue: COLLAPSED_HEIGHT,
+      useNativeDriver: false,
+      friction: 10,
+    }).start();
+    setIsExpanded(false);
+  };
+
+  const toggleExpand = () => {
+    if (isExpanded) {
+      collapse();
+    } else {
+      expand();
+    }
+  };
+
+  // Update height when initialExpanded changes
+  useEffect(() => {
+    if (initialExpanded) {
+      expand();
+    }
+  }, [initialExpanded]);
   useEffect(() => {
     if (!workoutStartTime) return;
 
