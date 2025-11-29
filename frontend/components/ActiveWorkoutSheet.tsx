@@ -34,8 +34,6 @@ interface ActiveWorkoutSheetProps {
 
 export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = false }: ActiveWorkoutSheetProps) {
   const insets = useSafeAreaInsets();
-  // More conservative height - leave room for top safe area, status bar, and some padding
-  const EXPANDED_HEIGHT = SCREEN_HEIGHT - insets.top - insets.bottom - 120;
   
   const { activeWorkout, updateWorkout, endWorkout, workoutStartTime } = useWorkoutStore();
   const [isExpanded, setIsExpanded] = useState(initialExpanded);
@@ -48,7 +46,8 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
   const [availableExercises, setAvailableExercises] = useState<Exercise[]>([]);
   
-  const animatedHeight = useRef(new Animated.Value(initialExpanded ? EXPANDED_HEIGHT : COLLAPSED_HEIGHT)).current;
+  // Use animated value for the top position (0 = expanded, large value = collapsed)
+  const animatedTop = useRef(new Animated.Value(initialExpanded ? insets.top : SCREEN_HEIGHT - COLLAPSED_HEIGHT - insets.bottom)).current;
 
   const exercises = activeWorkout?.exercises || [];
 
@@ -73,8 +72,8 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
   ).current;
 
   const expand = () => {
-    Animated.spring(animatedHeight, {
-      toValue: EXPANDED_HEIGHT,
+    Animated.spring(animatedTop, {
+      toValue: insets.top, // Expand to just below status bar
       useNativeDriver: false,
       friction: 10,
     }).start();
@@ -82,8 +81,8 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
   };
 
   const collapse = () => {
-    Animated.spring(animatedHeight, {
-      toValue: COLLAPSED_HEIGHT,
+    Animated.spring(animatedTop, {
+      toValue: SCREEN_HEIGHT - COLLAPSED_HEIGHT - insets.bottom, // Collapse to bottom
       useNativeDriver: false,
       friction: 10,
     }).start();
@@ -98,7 +97,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
     }
   };
 
-  // Update height when initialExpanded changes
+  // Update position when initialExpanded changes
   useEffect(() => {
     if (initialExpanded) {
       expand();
