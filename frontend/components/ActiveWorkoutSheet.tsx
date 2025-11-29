@@ -270,7 +270,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
 
   return (
     <>
-      <Animated.View style={[styles.container, { height: animatedHeight }]}>
+      <Animated.View style={[styles.container, { top: animatedTop }]}>
         {/* Collapsed Header - always visible, supports drag */}
         <View {...panResponder.panHandlers}>
           <TouchableOpacity style={styles.collapsedHeader} onPress={toggleExpand} activeOpacity={0.9}>
