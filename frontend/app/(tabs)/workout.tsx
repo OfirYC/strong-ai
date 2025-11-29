@@ -165,7 +165,10 @@ export default function WorkoutScreen() {
       </SafeAreaView>
 
       {activeWorkout && (
-        <ActiveWorkoutSheet onFinishWorkout={handleFinishWorkout} />
+        <ActiveWorkoutSheet 
+          onFinishWorkout={handleFinishWorkout}
+          initialExpanded={justStarted}
+        />
       )}
     </View>
   );
