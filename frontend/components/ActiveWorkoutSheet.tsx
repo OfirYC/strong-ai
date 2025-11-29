@@ -34,7 +34,8 @@ interface ActiveWorkoutSheetProps {
 
 export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = false }: ActiveWorkoutSheetProps) {
   const insets = useSafeAreaInsets();
-  const EXPANDED_HEIGHT = SCREEN_HEIGHT - insets.top - 50; // Account for safe area and tab bar
+  // More conservative height - leave room for top safe area, status bar, and some padding
+  const EXPANDED_HEIGHT = SCREEN_HEIGHT - insets.top - insets.bottom - 120;
   
   const { activeWorkout, updateWorkout, endWorkout, workoutStartTime } = useWorkoutStore();
   const [isExpanded, setIsExpanded] = useState(initialExpanded);
