@@ -281,27 +281,29 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
   return (
     <>
       <Animated.View style={[styles.container, { height: animatedHeight }]}>
-        {/* Collapsed Header - always visible */}
-        <TouchableOpacity style={styles.collapsedHeader} onPress={toggleExpand} activeOpacity={0.9}>
-          <View style={styles.dragHandle} />
-          <View style={styles.collapsedContent}>
-            <View style={styles.collapsedLeft}>
-              <Ionicons name="barbell" size={24} color="#007AFF" />
-              <Text style={styles.collapsedTitle}>Active Workout</Text>
-            </View>
-            <View style={styles.collapsedRight}>
-              <View style={styles.timerBadge}>
-                <Ionicons name="time" size={16} color="#007AFF" />
-                <Text style={styles.timerText}>{formatTime(timer)}</Text>
+        {/* Collapsed Header - always visible, supports drag */}
+        <View {...panResponder.panHandlers}>
+          <TouchableOpacity style={styles.collapsedHeader} onPress={toggleExpand} activeOpacity={0.9}>
+            <View style={styles.dragHandle} />
+            <View style={styles.collapsedContent}>
+              <View style={styles.collapsedLeft}>
+                <Ionicons name="barbell" size={24} color="#007AFF" />
+                <Text style={styles.collapsedTitle}>Active Workout</Text>
               </View>
-              <Ionicons 
-                name={isExpanded ? "chevron-down" : "chevron-up"} 
-                size={24} 
-                color="#8E8E93" 
-              />
+              <View style={styles.collapsedRight}>
+                <View style={styles.timerBadge}>
+                  <Ionicons name="time" size={16} color="#007AFF" />
+                  <Text style={styles.timerText}>{formatTime(timer)}</Text>
+                </View>
+                <Ionicons 
+                  name={isExpanded ? "chevron-down" : "chevron-up"} 
+                  size={24} 
+                  color="#8E8E93" 
+                />
+              </View>
             </View>
-          </View>
-        </TouchableOpacity>
+          </TouchableOpacity>
+        </View>
 
         {/* Expanded Content */}
         {isExpanded && (
