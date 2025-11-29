@@ -220,16 +220,18 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
 
     try {
       setSaving(true);
-      await api.patch(`/workouts/${activeWorkout.id}`, {
+      // Use PUT instead of PATCH - backend requires PUT
+      await api.put(`/workouts/${activeWorkout.id}`, {
         exercises: exercises,
         status: 'completed',
-        end_time: new Date().toISOString(),
+        ended_at: new Date().toISOString(),
         duration: timer,
       });
       endWorkout();
-      setIsExpanded(false);
+      collapse();
       onFinishWorkout();
     } catch (error: any) {
+      console.error('Save error:', error.response?.data || error);
       Alert.alert('Error', error.response?.data?.detail || 'Failed to save workout');
     } finally {
       setSaving(false);
@@ -247,7 +249,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
           style: 'destructive',
           onPress: () => {
             endWorkout();
-            setIsExpanded(false);
+            collapse();
           }
         },
       ]
