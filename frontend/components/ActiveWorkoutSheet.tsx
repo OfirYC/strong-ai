@@ -256,16 +256,6 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
     );
   };
 
-  const toggleExpand = () => {
-    const toValue = isExpanded ? COLLAPSED_HEIGHT : EXPANDED_HEIGHT;
-    Animated.spring(animatedHeight, {
-      toValue,
-      useNativeDriver: false,
-      friction: 10,
-    }).start();
-    setIsExpanded(!isExpanded);
-  };
-
   const formatTime = (seconds: number) => {
     const hrs = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
