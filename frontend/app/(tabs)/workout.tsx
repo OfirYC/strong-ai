@@ -21,6 +21,7 @@ export default function WorkoutScreen() {
   const { activeWorkout, startWorkout, endWorkout } = useWorkoutStore();
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([]);
   const [loading, setLoading] = useState(false);
+  const [justStarted, setJustStarted] = useState(false);
 
   useEffect(() => {
     loadTemplates();
