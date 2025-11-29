@@ -63,6 +63,9 @@ export default function WorkoutScreen() {
       setLoading(true);
       const response = await api.post('/workouts', { notes: '' });
       startWorkout(response.data);
+      setJustStarted(true);
+      // Reset justStarted after a moment so it won't expand on subsequent re-renders
+      setTimeout(() => setJustStarted(false), 1000);
     } catch (error: any) {
       Alert.alert('Error', 'Failed to start workout');
     } finally {
