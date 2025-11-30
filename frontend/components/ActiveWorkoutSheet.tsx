@@ -230,6 +230,8 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
       // Use PUT instead of PATCH - backend requires PUT
       await api.put(`/workouts/${activeWorkout.id}`, {
         exercises: exercises,
+        name: activeWorkout.name,
+        notes: activeWorkout.notes,
         status: 'completed',
         ended_at: new Date().toISOString(),
         duration: timer,
@@ -243,6 +245,18 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleToggleDescription = () => {
+    if (showDescription) {
+      // Remove description
+      updateWorkoutNotes(undefined);
+      setShowDescription(false);
+    } else {
+      // Add description
+      setShowDescription(true);
+    }
+    setShowMenu(false);
   };
 
   const handleCancelWorkout = () => {
