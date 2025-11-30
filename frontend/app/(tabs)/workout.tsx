@@ -102,22 +102,17 @@ export default function WorkoutScreen() {
     }
   };
 
-  const handleFinishWorkout = () => {
-    loadTemplates();
-  };
-
   return (
-    <View style={styles.wrapper}>
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <ScrollView 
-          contentContainerStyle={[
-            styles.scrollContent,
-            activeWorkout && styles.scrollContentWithSheet
-          ]}
-        >
-          <View style={styles.header}>
-            <Text style={styles.title}>Start Workout</Text>
-          </View>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <ScrollView 
+        contentContainerStyle={[
+          styles.scrollContent,
+          activeWorkout && styles.scrollContentWithSheet
+        ]}
+      >
+        <View style={styles.header}>
+          <Text style={styles.title}>Start Workout</Text>
+        </View>
 
           <Button
             title="Penis Start"
