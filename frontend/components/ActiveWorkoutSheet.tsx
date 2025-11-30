@@ -35,10 +35,6 @@ interface ActiveWorkoutSheetProps {
 export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = false }: ActiveWorkoutSheetProps) {
   const insets = useSafeAreaInsets();
   
-  // Calculate expanded height: full screen minus top safe area and bottom tab bar area
-  const TAB_BAR_HEIGHT = 80; // Standard tab bar height
-  const EXPANDED_HEIGHT = SCREEN_HEIGHT - insets.top - TAB_BAR_HEIGHT;
-  
   const { activeWorkout, updateWorkout, endWorkout, workoutStartTime } = useWorkoutStore();
   const [isExpanded, setIsExpanded] = useState(initialExpanded);
   const [exerciseDetails, setExerciseDetails] = useState<{ [key: string]: Exercise }>({});
@@ -50,7 +46,11 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
   const [availableExercises, setAvailableExercises] = useState<Exercise[]>([]);
   
-  const animatedHeight = useRef(new Animated.Value(initialExpanded ? EXPANDED_HEIGHT : COLLAPSED_HEIGHT)).current;
+  // Calculate the maximum height for expanded state
+  // Screen height minus top safe area minus tab bar (60px) minus bottom safe area
+  const maxExpandedHeight = SCREEN_HEIGHT - insets.top - 60 - insets.bottom;
+  
+  const animatedHeight = useRef(new Animated.Value(initialExpanded ? maxExpandedHeight : COLLAPSED_HEIGHT)).current;
 
   const exercises = activeWorkout?.exercises || [];
 
@@ -74,7 +74,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
 
   const expand = () => {
     Animated.spring(animatedHeight, {
-      toValue: EXPANDED_HEIGHT,
+      toValue: maxExpandedHeight,
       useNativeDriver: false,
       friction: 10,
     }).start();
