@@ -657,37 +657,40 @@ const styles = StyleSheet.create({
   expandedContent: {
     flex: 1,
   },
-  nameHeader: {
+  nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
+    paddingTop: 8,
   },
   nameBarbell: {
     marginRight: 12,
   },
   workoutNameInput: {
     flex: 1,
-    fontSize: 20,
+    fontSize: 28,
     fontWeight: '700',
     color: '#1C1C1E',
     padding: 0,
   },
-  nameHeaderRight: {
+  dateRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    paddingHorizontal: 20,
+    paddingTop: 6,
+    gap: 8,
   },
-  timerBadgeLarge: {
+  dateText: {
+    fontSize: 15,
+    color: '#8E8E93',
+  },
+  timerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F5F7',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 6,
+    paddingHorizontal: 20,
+    paddingTop: 6,
+    paddingBottom: 12,
+    gap: 8,
   },
   timerTextLarge: {
     fontSize: 16,
