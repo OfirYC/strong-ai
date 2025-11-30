@@ -341,8 +341,8 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
         {/* Expanded Content */}
         {isExpanded && (
           <View style={styles.expandedContent}>
-            {/* Editable Name Header with barbell icon */}
-            <View style={styles.nameHeader}>
+            {/* Row 1: Workout Name + Menu */}
+            <View style={styles.nameRow}>
               <Ionicons name="barbell" size={24} color="#007AFF" style={styles.nameBarbell} />
               <TextInput
                 style={styles.workoutNameInput}
@@ -351,18 +351,30 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
                 placeholder="Workout Name"
                 placeholderTextColor="#8E8E93"
               />
-              <View style={styles.nameHeaderRight}>
-                <View style={styles.timerBadgeLarge}>
-                  <Ionicons name="time" size={18} color="#007AFF" />
-                  <Text style={styles.timerTextLarge}>{formatTime(timer)}</Text>
-                </View>
-                <TouchableOpacity 
-                  style={styles.menuButton}
-                  onPress={() => setShowMenu(!showMenu)}
-                >
-                  <Ionicons name="ellipsis-horizontal" size={24} color="#1C1C1E" />
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity 
+                style={styles.menuButton}
+                onPress={() => setShowMenu(!showMenu)}
+              >
+                <Ionicons name="ellipsis-horizontal" size={24} color="#1C1C1E" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Row 2: Date */}
+            <View style={styles.dateRow}>
+              <Ionicons name="calendar-outline" size={18} color="#8E8E93" />
+              <Text style={styles.dateText}>
+                {new Date(workoutStartTime || Date.now()).toLocaleDateString('en-US', {
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric'
+                })}
+              </Text>
+            </View>
+
+            {/* Row 3: Timer */}
+            <View style={styles.timerRow}>
+              <Ionicons name="time-outline" size={18} color="#007AFF" />
+              <Text style={styles.timerTextLarge}>{formatTime(timer)}</Text>
             </View>
 
             {/* Dropdown Menu */}
