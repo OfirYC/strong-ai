@@ -330,7 +330,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
                     styles.finishButtonText,
                     (saving || exercises.length === 0) && styles.finishButtonTextDisabled
                   ]}>
-                    {saving ? 'Saving...' : 'Finish'}
+                    {saving ? 'Saving...' : 'Penis'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -469,7 +469,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
                               {fields.includes('duration') && (
                                 <DurationInput
                                   value={set.duration || 0}
-                                  onChange={(value) => updateSet(exerciseIndex, setIndex, 'duration', value)}
+                                  onChangeValue={(value) => updateSet(exerciseIndex, setIndex, 'duration', value)}
                                   style={styles.durationInput}
                                 />
                               )}
