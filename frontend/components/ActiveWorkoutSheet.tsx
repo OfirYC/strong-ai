@@ -292,37 +292,58 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
   return (
     <>
       <Animated.View style={[styles.container, { height: animatedHeight }]}>
-        {/* Header with drag handle - always visible */}
+        {/* Top Header with drag handle - different content for collapsed vs expanded */}
         <View {...panResponder.panHandlers}>
-          <TouchableOpacity style={styles.collapsedHeader} onPress={toggleExpand} activeOpacity={0.9}>
+          <TouchableOpacity 
+            style={styles.collapsedHeader} 
+            onPress={toggleExpand} 
+            activeOpacity={0.9}
+            disabled={isExpanded}
+          >
             <View style={styles.dragHandle} />
-            <View style={styles.collapsedContent}>
-              <View style={styles.collapsedLeft}>
-                <Ionicons name="barbell" size={24} color="#007AFF" />
-                <Text style={styles.collapsedTitle} numberOfLines={1}>
-                  {activeWorkout?.name || 'Workout'}
-                </Text>
-              </View>
-              <View style={styles.collapsedRight}>
-                <View style={styles.timerBadge}>
-                  <Ionicons name="time" size={16} color="#007AFF" />
-                  <Text style={styles.timerText}>{formatTime(timer)}</Text>
+            {!isExpanded ? (
+              // Collapsed: show name and timer
+              <View style={styles.collapsedContent}>
+                <View style={styles.collapsedLeft}>
+                  <Ionicons name="barbell" size={24} color="#007AFF" />
+                  <Text style={styles.collapsedTitle} numberOfLines={1}>
+                    {activeWorkout?.name || 'Workout'}
+                  </Text>
                 </View>
-                <Ionicons 
-                  name={isExpanded ? "chevron-down" : "chevron-up"} 
-                  size={24} 
-                  color="#8E8E93" 
-                />
+                <View style={styles.collapsedRight}>
+                  <View style={styles.timerBadge}>
+                    <Ionicons name="time" size={16} color="#007AFF" />
+                    <Text style={styles.timerText}>{formatTime(timer)}</Text>
+                  </View>
+                </View>
               </View>
-            </View>
+            ) : (
+              // Expanded: just show Finish button
+              <View style={styles.expandedTopBar}>
+                <View style={{flex: 1}} />
+                <TouchableOpacity 
+                  style={styles.finishButton}
+                  onPress={handleSaveAndFinish}
+                  disabled={saving || exercises.length === 0}
+                >
+                  <Text style={[
+                    styles.finishButtonText,
+                    (saving || exercises.length === 0) && styles.finishButtonTextDisabled
+                  ]}>
+                    {saving ? 'Saving...' : 'Finish'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
 
         {/* Expanded Content */}
         {isExpanded && (
           <View style={styles.expandedContent}>
-            {/* Editable Name Header */}
+            {/* Editable Name Header with barbell icon */}
             <View style={styles.nameHeader}>
+              <Ionicons name="barbell" size={24} color="#007AFF" style={styles.nameBarbell} />
               <TextInput
                 style={styles.workoutNameInput}
                 value={activeWorkout?.name || ''}
@@ -374,26 +395,6 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
                 />
               </View>
             )}
-
-            {/* Action Buttons */}
-            <View style={styles.expandedHeader}>
-              <TouchableOpacity onPress={collapse} style={styles.collapseButton}>
-                <Ionicons name="chevron-down" size={24} color="#007AFF" />
-                <Text style={styles.collapseText}>Minimize</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.finishButton}
-                onPress={handleSaveAndFinish}
-                disabled={saving || exercises.length === 0}
-              >
-                <Text style={[
-                  styles.finishButtonText,
-                  (saving || exercises.length === 0) && styles.finishButtonTextDisabled
-                ]}>
-                  {saving ? 'Saving...' : 'Finish'}
-                </Text>
-              </TouchableOpacity>
-            </View>
 
             <ScrollView style={styles.exercisesList} showsVerticalScrollIndicator={false}>
               {exercises.length === 0 ? (
