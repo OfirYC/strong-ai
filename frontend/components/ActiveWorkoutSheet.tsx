@@ -722,25 +722,6 @@ const styles = StyleSheet.create({
     padding: 0,
     minHeight: 40,
   },
-  expandedHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
-  },
-  collapseButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  collapseText: {
-    fontSize: 16,
-    color: '#007AFF',
-    fontWeight: '500',
-  },
   finishButton: {
     backgroundColor: '#007AFF',
     paddingHorizontal: 20,
