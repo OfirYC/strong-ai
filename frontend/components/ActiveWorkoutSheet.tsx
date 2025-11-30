@@ -35,9 +35,11 @@ interface ActiveWorkoutSheetProps {
 export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = false }: ActiveWorkoutSheetProps) {
   const insets = useSafeAreaInsets();
   
-  const { activeWorkout, updateWorkout, endWorkout, workoutStartTime } = useWorkoutStore();
+  const { activeWorkout, updateWorkout, updateWorkoutName, updateWorkoutNotes, endWorkout, workoutStartTime } = useWorkoutStore();
   const [isExpanded, setIsExpanded] = useState(initialExpanded);
   const isExpandedRef = useRef(initialExpanded); // Ref to track current expanded state
+  const [showMenu, setShowMenu] = useState(false);
+  const [showDescription, setShowDescription] = useState(!!activeWorkout?.notes);
   const [exerciseDetails, setExerciseDetails] = useState<{ [key: string]: Exercise }>({});
   const [timer, setTimer] = useState(0);
   const [saving, setSaving] = useState(false);
