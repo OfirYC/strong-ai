@@ -299,7 +299,9 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
             <View style={styles.collapsedContent}>
               <View style={styles.collapsedLeft}>
                 <Ionicons name="barbell" size={24} color="#007AFF" />
-                <Text style={styles.collapsedTitle}>Active Workout</Text>
+                <Text style={styles.collapsedTitle} numberOfLines={1}>
+                  {activeWorkout?.name || 'Workout'}
+                </Text>
               </View>
               <View style={styles.collapsedRight}>
                 <View style={styles.timerBadge}>
@@ -319,8 +321,62 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
         {/* Expanded Content */}
         {isExpanded && (
           <View style={styles.expandedContent}>
+            {/* Editable Name Header */}
+            <View style={styles.nameHeader}>
+              <TextInput
+                style={styles.workoutNameInput}
+                value={activeWorkout?.name || ''}
+                onChangeText={updateWorkoutName}
+                placeholder="Workout Name"
+                placeholderTextColor="#8E8E93"
+              />
+              <View style={styles.nameHeaderRight}>
+                <View style={styles.timerBadgeLarge}>
+                  <Ionicons name="time" size={18} color="#007AFF" />
+                  <Text style={styles.timerTextLarge}>{formatTime(timer)}</Text>
+                </View>
+                <TouchableOpacity 
+                  style={styles.menuButton}
+                  onPress={() => setShowMenu(!showMenu)}
+                >
+                  <Ionicons name="ellipsis-horizontal" size={24} color="#1C1C1E" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Dropdown Menu */}
+            {showMenu && (
+              <View style={styles.menuDropdown}>
+                <TouchableOpacity style={styles.menuItem} onPress={handleToggleDescription}>
+                  <Ionicons 
+                    name={showDescription ? "remove-circle-outline" : "add-circle-outline"} 
+                    size={20} 
+                    color="#1C1C1E" 
+                  />
+                  <Text style={styles.menuItemText}>
+                    {showDescription ? 'Remove Description' : 'Add Description'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Description Input */}
+            {showDescription && (
+              <View style={styles.descriptionContainer}>
+                <TextInput
+                  style={styles.descriptionInput}
+                  value={activeWorkout?.notes || ''}
+                  onChangeText={updateWorkoutNotes}
+                  placeholder="Add workout description..."
+                  placeholderTextColor="#8E8E93"
+                  multiline
+                  numberOfLines={2}
+                />
+              </View>
+            )}
+
+            {/* Action Buttons */}
             <View style={styles.expandedHeader}>
-              <View style={{width: 70}} />
               <TouchableOpacity onPress={collapse} style={styles.collapseButton}>
                 <Ionicons name="chevron-down" size={24} color="#007AFF" />
                 <Text style={styles.collapseText}>Minimize</Text>
