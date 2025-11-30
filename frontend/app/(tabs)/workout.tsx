@@ -35,8 +35,8 @@ export default function WorkoutScreen() {
   const handleStartEmptyWorkout = async () => {
     if (activeWorkout) {
       Alert.alert(
-        'Penis Workout',
-        'You already have an Penis Workout. Do you want to discard it and start a new one?',
+        'Active Workout',
+        'You already have an Active Workout. Do you want to discard it and start a new one?',
         [
           { text: 'Cancel', style: 'cancel' },
           { 
@@ -69,8 +69,8 @@ export default function WorkoutScreen() {
   const handleStartTemplate = async (templateId: string) => {
     if (activeWorkout) {
       Alert.alert(
-        'Penis Workout',
-        'You already have an Penis Workout. Do you want to discard it and start a new one?',
+        'Active Workout',
+        'You already have an Active Workout. Do you want to discard it and start a new one?',
         [
           { text: 'Cancel', style: 'cancel' },
           { 

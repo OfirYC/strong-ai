@@ -283,7 +283,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
             <View style={styles.collapsedContent}>
               <View style={styles.collapsedLeft}>
                 <Ionicons name="barbell" size={24} color="#007AFF" />
-                <Text style={styles.collapsedTitle}>Penis Workout</Text>
+                <Text style={styles.collapsedTitle}>Active Workout</Text>
               </View>
               <View style={styles.collapsedRight}>
                 <View style={styles.timerBadge}>
