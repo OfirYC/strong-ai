@@ -330,7 +330,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
                     styles.finishButtonText,
                     (saving || exercises.length === 0) && styles.finishButtonTextDisabled
                   ]}>
-                    {saving ? 'Saving...' : 'Penis'}
+                    {saving ? 'Saving...' : 'Finish'}
                   </Text>
                 </TouchableOpacity>
               </View>
