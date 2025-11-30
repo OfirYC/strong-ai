@@ -638,17 +638,23 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#007AFF',
   },
+  expandedTopBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   expandedContent: {
     flex: 1,
   },
   nameHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5EA',
+  },
+  nameBarbell: {
+    marginRight: 12,
   },
   workoutNameInput: {
     flex: 1,
