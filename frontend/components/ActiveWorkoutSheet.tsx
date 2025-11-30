@@ -48,7 +48,8 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
   
   // Calculate the maximum height for expanded state
   // Screen height minus top safe area minus tab bar (60px) minus bottom safe area
-  const maxExpandedHeight = SCREEN_HEIGHT - insets.top - 200 - insets.bottom;
+  // Extra 40px at top to avoid system gesture conflicts
+  const maxExpandedHeight = SCREEN_HEIGHT - insets.top - 100 - insets.bottom;
   
   const animatedHeight = useRef(new Animated.Value(initialExpanded ? maxExpandedHeight : COLLAPSED_HEIGHT)).current;
 
