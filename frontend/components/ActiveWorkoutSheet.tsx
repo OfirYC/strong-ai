@@ -35,6 +35,10 @@ interface ActiveWorkoutSheetProps {
 export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = false }: ActiveWorkoutSheetProps) {
   const insets = useSafeAreaInsets();
   
+  // Calculate expanded height: full screen minus top safe area and bottom tab bar area
+  const TAB_BAR_HEIGHT = 80; // Standard tab bar height
+  const EXPANDED_HEIGHT = SCREEN_HEIGHT - insets.top - TAB_BAR_HEIGHT;
+  
   const { activeWorkout, updateWorkout, endWorkout, workoutStartTime } = useWorkoutStore();
   const [isExpanded, setIsExpanded] = useState(initialExpanded);
   const [exerciseDetails, setExerciseDetails] = useState<{ [key: string]: Exercise }>({});
@@ -46,8 +50,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
   const [availableExercises, setAvailableExercises] = useState<Exercise[]>([]);
   
-  // Use animated value for the top position (0 = expanded, large value = collapsed)
-  const animatedTop = useRef(new Animated.Value(initialExpanded ? insets.top : SCREEN_HEIGHT - COLLAPSED_HEIGHT - insets.bottom)).current;
+  const animatedHeight = useRef(new Animated.Value(initialExpanded ? EXPANDED_HEIGHT : COLLAPSED_HEIGHT)).current;
 
   const exercises = activeWorkout?.exercises || [];
 
@@ -60,10 +63,8 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
       },
       onPanResponderMove: (_, gestureState) => {
         if (!isExpanded && gestureState.dy < -20) {
-          // Dragging up from collapsed
           expand();
         } else if (isExpanded && gestureState.dy > 20) {
-          // Dragging down from expanded
           collapse();
         }
       },
@@ -72,8 +73,8 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
   ).current;
 
   const expand = () => {
-    Animated.spring(animatedTop, {
-      toValue: insets.top, // Expand to just below status bar
+    Animated.spring(animatedHeight, {
+      toValue: EXPANDED_HEIGHT,
       useNativeDriver: false,
       friction: 10,
     }).start();
@@ -81,8 +82,8 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
   };
 
   const collapse = () => {
-    Animated.spring(animatedTop, {
-      toValue: SCREEN_HEIGHT - COLLAPSED_HEIGHT - insets.bottom, // Collapse to bottom
+    Animated.spring(animatedHeight, {
+      toValue: COLLAPSED_HEIGHT,
       useNativeDriver: false,
       friction: 10,
     }).start();
@@ -97,7 +98,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
     }
   };
 
-  // Update position when initialExpanded changes
+  // Update height when initialExpanded changes
   useEffect(() => {
     if (initialExpanded) {
       expand();
