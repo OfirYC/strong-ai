@@ -11,7 +11,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import Button from '../../components/Button';
-import ActiveWorkoutSheet from '../../components/ActiveWorkoutSheet';
 import api from '../../utils/api';
 import { useWorkoutStore } from '../../store/workoutStore';
 import { WorkoutTemplate } from '../../types';
@@ -21,7 +20,6 @@ export default function WorkoutScreen() {
   const { activeWorkout, startWorkout, endWorkout } = useWorkoutStore();
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([]);
   const [loading, setLoading] = useState(false);
-  const [justStarted, setJustStarted] = useState(false);
 
   useEffect(() => {
     loadTemplates();
