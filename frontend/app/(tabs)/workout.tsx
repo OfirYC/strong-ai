@@ -155,10 +155,6 @@ export default function WorkoutScreen() {
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
-    flex: 1,
-    backgroundColor: '#F5F5F7',
-  },
   container: {
     flex: 1,
     backgroundColor: '#F5F5F7',
@@ -169,7 +165,7 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   scrollContentWithSheet: {
-    paddingBottom: 90,
+    paddingBottom: 100,
   },
   header: {
     marginBottom: 24,
