@@ -37,6 +37,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
   
   const { activeWorkout, updateWorkout, endWorkout, workoutStartTime } = useWorkoutStore();
   const [isExpanded, setIsExpanded] = useState(initialExpanded);
+  const isExpandedRef = useRef(initialExpanded); // Ref to track current expanded state
   const [exerciseDetails, setExerciseDetails] = useState<{ [key: string]: Exercise }>({});
   const [timer, setTimer] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -55,7 +56,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
 
   const exercises = activeWorkout?.exercises || [];
 
-  // Pan responder for drag gesture
+  // Pan responder for drag gesture - use ref for isExpanded to avoid stale closure
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -63,9 +64,9 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
         return Math.abs(gestureState.dy) > 10;
       },
       onPanResponderMove: (_, gestureState) => {
-        if (!isExpanded && gestureState.dy < -20) {
+        if (!isExpandedRef.current && gestureState.dy < -20) {
           expand();
-        } else if (isExpanded && gestureState.dy > 20) {
+        } else if (isExpandedRef.current && gestureState.dy > 20) {
           collapse();
         }
       },
@@ -80,6 +81,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
       friction: 10,
     }).start();
     setIsExpanded(true);
+    isExpandedRef.current = true;
   };
 
   const collapse = () => {
@@ -89,6 +91,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
       friction: 10,
     }).start();
     setIsExpanded(false);
+    isExpandedRef.current = false;
   };
 
   const toggleExpand = () => {
