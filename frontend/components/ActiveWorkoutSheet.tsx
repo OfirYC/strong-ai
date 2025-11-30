@@ -272,7 +272,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
   return (
     <>
       <Animated.View style={[styles.container, { height: animatedHeight }]}>
-        {/* Collapsed Header - always visible, supports drag */}
+        {/* Header with drag handle - always visible */}
         <View {...panResponder.panHandlers}>
           <TouchableOpacity style={styles.collapsedHeader} onPress={toggleExpand} activeOpacity={0.9}>
             <View style={styles.dragHandle} />
@@ -300,6 +300,11 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
         {isExpanded && (
           <View style={styles.expandedContent}>
             <View style={styles.expandedHeader}>
+              <View style={{width: 70}} />
+              <TouchableOpacity onPress={collapse} style={styles.collapseButton}>
+                <Ionicons name="chevron-down" size={24} color="#007AFF" />
+                <Text style={styles.collapseText}>Minimize</Text>
+              </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.finishButton}
                 onPress={handleSaveAndFinish}
