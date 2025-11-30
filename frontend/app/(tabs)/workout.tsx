@@ -15,7 +15,6 @@ import { useWorkoutStore } from '../../store/workoutStore';
 import { WorkoutTemplate } from '../../types';
 
 export default function WorkoutScreen() {
-  const router = useRouter();
   const { activeWorkout, startWorkout, endWorkout } = useWorkoutStore();
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([]);
   const [loading, setLoading] = useState(false);
