@@ -1,442 +1,447 @@
-diff --git a/frontend/components/ActiveWorkoutSheet.tsx b/frontend/components/ActiveWorkoutSheet.tsx
-index 22e6b2b..a95a04f 100644
---- a/frontend/components/ActiveWorkoutSheet.tsx
-+++ b/frontend/components/ActiveWorkoutSheet.tsx
-@@ -37,6 +37,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
-   
-   const { activeWorkout, updateWorkout, endWorkout, workoutStartTime } = useWorkoutStore();
-   const [isExpanded, setIsExpanded] = useState(initialExpanded);
-+  const isExpandedRef = useRef(initialExpanded); // Ref to track current expanded state
-   const [exerciseDetails, setExerciseDetails] = useState<{ [key: string]: Exercise }>({});
-   const [timer, setTimer] = useState(0);
-   const [saving, setSaving] = useState(false);
-@@ -55,7 +56,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
- 
-   const exercises = activeWorkout?.exercises || [];
- 
--  // Pan responder for drag gesture
-+  // Pan responder for drag gesture - use ref for isExpanded to avoid stale closure
-   const panResponder = useRef(
-     PanResponder.create({
-       onStartShouldSetPanResponder: () => true,
-@@ -63,9 +64,9 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
-         return Math.abs(gestureState.dy) > 10;
-       },
-       onPanResponderMove: (_, gestureState) => {
--        if (!isExpanded && gestureState.dy < -20) {
-+        if (!isExpandedRef.current && gestureState.dy < -20) {
-           expand();
--        } else if (isExpanded && gestureState.dy > 20) {
-+        } else if (isExpandedRef.current && gestureState.dy > 20) {
-           collapse();
-         }
-       },
-@@ -80,6 +81,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
-       friction: 10,
-     }).start();
-     setIsExpanded(true);
-+    isExpandedRef.current = true;
-   };
- 
-   const collapse = () => {
-@@ -89,6 +91,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
-       friction: 10,
-     }).start();
-     setIsExpanded(false);
-+    isExpandedRef.current = false;
-   };
- 
-   const toggleExpand = () => {
 diff --git a/model.patch b/model.patch
-index 059edcc..e69de29 100644
+index 2547424..e69de29 100644
 --- a/model.patch
 +++ b/model.patch
-@@ -1,388 +0,0 @@
+@@ -1,442 +0,0 @@
 -diff --git a/frontend/components/ActiveWorkoutSheet.tsx b/frontend/components/ActiveWorkoutSheet.tsx
--index 2fca641..22e6b2b 100644
+-index 22e6b2b..a95a04f 100644
 ---- a/frontend/components/ActiveWorkoutSheet.tsx
 -+++ b/frontend/components/ActiveWorkoutSheet.tsx
--@@ -48,7 +48,8 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
+-@@ -37,6 +37,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
 -   
--   // Calculate the maximum height for expanded state
--   // Screen height minus top safe area minus tab bar (60px) minus bottom safe area
---  const maxExpandedHeight = SCREEN_HEIGHT - insets.top - 200 - insets.bottom;
--+  // Extra 40px at top to avoid system gesture conflicts
--+  const maxExpandedHeight = SCREEN_HEIGHT - insets.top - 100 - insets.bottom;
--   
--   const animatedHeight = useRef(new Animated.Value(initialExpanded ? maxExpandedHeight : COLLAPSED_HEIGHT)).current;
+-   const { activeWorkout, updateWorkout, endWorkout, workoutStartTime } = useWorkoutStore();
+-   const [isExpanded, setIsExpanded] = useState(initialExpanded);
+-+  const isExpandedRef = useRef(initialExpanded); // Ref to track current expanded state
+-   const [exerciseDetails, setExerciseDetails] = useState<{ [key: string]: Exercise }>({});
+-   const [timer, setTimer] = useState(0);
+-   const [saving, setSaving] = useState(false);
+-@@ -55,7 +56,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
 - 
+-   const exercises = activeWorkout?.exercises || [];
+- 
+--  // Pan responder for drag gesture
+-+  // Pan responder for drag gesture - use ref for isExpanded to avoid stale closure
+-   const panResponder = useRef(
+-     PanResponder.create({
+-       onStartShouldSetPanResponder: () => true,
+-@@ -63,9 +64,9 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
+-         return Math.abs(gestureState.dy) > 10;
+-       },
+-       onPanResponderMove: (_, gestureState) => {
+--        if (!isExpanded && gestureState.dy < -20) {
+-+        if (!isExpandedRef.current && gestureState.dy < -20) {
+-           expand();
+--        } else if (isExpanded && gestureState.dy > 20) {
+-+        } else if (isExpandedRef.current && gestureState.dy > 20) {
+-           collapse();
+-         }
+-       },
+-@@ -80,6 +81,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
+-       friction: 10,
+-     }).start();
+-     setIsExpanded(true);
+-+    isExpandedRef.current = true;
+-   };
+- 
+-   const collapse = () => {
+-@@ -89,6 +91,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
+-       friction: 10,
+-     }).start();
+-     setIsExpanded(false);
+-+    isExpandedRef.current = false;
+-   };
+- 
+-   const toggleExpand = () => {
 -diff --git a/model.patch b/model.patch
--index e654505..e69de29 100644
+-index 059edcc..e69de29 100644
 ---- a/model.patch
 -+++ b/model.patch
--@@ -1,369 +0,0 @@
+-@@ -1,388 +0,0 @@
 --diff --git a/frontend/components/ActiveWorkoutSheet.tsx b/frontend/components/ActiveWorkoutSheet.tsx
---index 10f6dea..602c46e 100644
+--index 2fca641..22e6b2b 100644
 ----- a/frontend/components/ActiveWorkoutSheet.tsx
 --+++ b/frontend/components/ActiveWorkoutSheet.tsx
---@@ -35,6 +35,10 @@ interface ActiveWorkoutSheetProps {
--- export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = false }: ActiveWorkoutSheetProps) {
---   const insets = useSafeAreaInsets();
+--@@ -48,7 +48,8 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
 --   
---+  // Calculate expanded height: full screen minus top safe area and bottom tab bar area
---+  const TAB_BAR_HEIGHT = 80; // Standard tab bar height
---+  const EXPANDED_HEIGHT = SCREEN_HEIGHT - insets.top - TAB_BAR_HEIGHT;
---+  
---   const { activeWorkout, updateWorkout, endWorkout, workoutStartTime } = useWorkoutStore();
---   const [isExpanded, setIsExpanded] = useState(initialExpanded);
---   const [exerciseDetails, setExerciseDetails] = useState<{ [key: string]: Exercise }>({});
---@@ -46,8 +50,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
---   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
---   const [availableExercises, setAvailableExercises] = useState<Exercise[]>([]);
+--   // Calculate the maximum height for expanded state
+--   // Screen height minus top safe area minus tab bar (60px) minus bottom safe area
+---  const maxExpandedHeight = SCREEN_HEIGHT - insets.top - 200 - insets.bottom;
+--+  // Extra 40px at top to avoid system gesture conflicts
+--+  const maxExpandedHeight = SCREEN_HEIGHT - insets.top - 100 - insets.bottom;
 --   
----  // Use animated value for the top position (0 = expanded, large value = collapsed)
----  const animatedTop = useRef(new Animated.Value(initialExpanded ? insets.top : SCREEN_HEIGHT - COLLAPSED_HEIGHT - insets.bottom)).current;
---+  const animatedHeight = useRef(new Animated.Value(initialExpanded ? EXPANDED_HEIGHT : COLLAPSED_HEIGHT)).current;
+--   const animatedHeight = useRef(new Animated.Value(initialExpanded ? maxExpandedHeight : COLLAPSED_HEIGHT)).current;
 -- 
---   const exercises = activeWorkout?.exercises || [];
--- 
---@@ -60,10 +63,8 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
---       },
---       onPanResponderMove: (_, gestureState) => {
---         if (!isExpanded && gestureState.dy < -20) {
----          // Dragging up from collapsed
---           expand();
---         } else if (isExpanded && gestureState.dy > 20) {
----          // Dragging down from expanded
---           collapse();
---         }
---       },
---@@ -72,8 +73,8 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
---   ).current;
--- 
---   const expand = () => {
----    Animated.spring(animatedTop, {
----      toValue: insets.top, // Expand to just below status bar
---+    Animated.spring(animatedHeight, {
---+      toValue: EXPANDED_HEIGHT,
---       useNativeDriver: false,
---       friction: 10,
---     }).start();
---@@ -81,8 +82,8 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
---   };
--- 
---   const collapse = () => {
----    Animated.spring(animatedTop, {
----      toValue: SCREEN_HEIGHT - COLLAPSED_HEIGHT - insets.bottom, // Collapse to bottom
---+    Animated.spring(animatedHeight, {
---+      toValue: COLLAPSED_HEIGHT,
---       useNativeDriver: false,
---       friction: 10,
---     }).start();
---@@ -97,7 +98,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
---     }
---   };
--- 
----  // Update position when initialExpanded changes
---+  // Update height when initialExpanded changes
---   useEffect(() => {
---     if (initialExpanded) {
---       expand();
---@@ -270,7 +271,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
--- 
---   return (
---     <>
----      <Animated.View style={[styles.container, { top: animatedTop }]}>
---+      <Animated.View style={[styles.container, { height: animatedHeight }]}>
---         {/* Collapsed Header - always visible, supports drag */}
---         <View {...panResponder.panHandlers}>
---           <TouchableOpacity style={styles.collapsedHeader} onPress={toggleExpand} activeOpacity={0.9}>
 --diff --git a/model.patch b/model.patch
---index 1fe0077..e69de29 100644
+--index e654505..e69de29 100644
 ----- a/model.patch
 --+++ b/model.patch
---@@ -1,288 +0,0 @@
+--@@ -1,369 +0,0 @@
 ---diff --git a/frontend/components/ActiveWorkoutSheet.tsx b/frontend/components/ActiveWorkoutSheet.tsx
----index a3a6ca0..10f6dea 100644
+---index 10f6dea..602c46e 100644
 ------ a/frontend/components/ActiveWorkoutSheet.tsx
 ---+++ b/frontend/components/ActiveWorkoutSheet.tsx
----@@ -34,8 +34,6 @@ interface ActiveWorkoutSheetProps {
---- 
+---@@ -35,6 +35,10 @@ interface ActiveWorkoutSheetProps {
 --- export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = false }: ActiveWorkoutSheetProps) {
 ---   const insets = useSafeAreaInsets();
-----  // More conservative height - leave room for top safe area, status bar, and some padding
-----  const EXPANDED_HEIGHT = SCREEN_HEIGHT - insets.top - insets.bottom - 120;
 ---   
+---+  // Calculate expanded height: full screen minus top safe area and bottom tab bar area
+---+  const TAB_BAR_HEIGHT = 80; // Standard tab bar height
+---+  const EXPANDED_HEIGHT = SCREEN_HEIGHT - insets.top - TAB_BAR_HEIGHT;
+---+  
 ---   const { activeWorkout, updateWorkout, endWorkout, workoutStartTime } = useWorkoutStore();
 ---   const [isExpanded, setIsExpanded] = useState(initialExpanded);
----@@ -48,7 +46,8 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
+---   const [exerciseDetails, setExerciseDetails] = useState<{ [key: string]: Exercise }>({});
+---@@ -46,8 +50,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
 ---   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
 ---   const [availableExercises, setAvailableExercises] = useState<Exercise[]>([]);
 ---   
-----  const animatedHeight = useRef(new Animated.Value(initialExpanded ? EXPANDED_HEIGHT : COLLAPSED_HEIGHT)).current;
----+  // Use animated value for the top position (0 = expanded, large value = collapsed)
----+  const animatedTop = useRef(new Animated.Value(initialExpanded ? insets.top : SCREEN_HEIGHT - COLLAPSED_HEIGHT - insets.bottom)).current;
+----  // Use animated value for the top position (0 = expanded, large value = collapsed)
+----  const animatedTop = useRef(new Animated.Value(initialExpanded ? insets.top : SCREEN_HEIGHT - COLLAPSED_HEIGHT - insets.bottom)).current;
+---+  const animatedHeight = useRef(new Animated.Value(initialExpanded ? EXPANDED_HEIGHT : COLLAPSED_HEIGHT)).current;
 --- 
 ---   const exercises = activeWorkout?.exercises || [];
 --- 
----@@ -73,8 +72,8 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
+---@@ -60,10 +63,8 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
+---       },
+---       onPanResponderMove: (_, gestureState) => {
+---         if (!isExpanded && gestureState.dy < -20) {
+----          // Dragging up from collapsed
+---           expand();
+---         } else if (isExpanded && gestureState.dy > 20) {
+----          // Dragging down from expanded
+---           collapse();
+---         }
+---       },
+---@@ -72,8 +73,8 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
 ---   ).current;
 --- 
 ---   const expand = () => {
-----    Animated.spring(animatedHeight, {
-----      toValue: EXPANDED_HEIGHT,
----+    Animated.spring(animatedTop, {
----+      toValue: insets.top, // Expand to just below status bar
+----    Animated.spring(animatedTop, {
+----      toValue: insets.top, // Expand to just below status bar
+---+    Animated.spring(animatedHeight, {
+---+      toValue: EXPANDED_HEIGHT,
 ---       useNativeDriver: false,
 ---       friction: 10,
 ---     }).start();
----@@ -82,8 +81,8 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
+---@@ -81,8 +82,8 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
 ---   };
 --- 
 ---   const collapse = () => {
-----    Animated.spring(animatedHeight, {
-----      toValue: COLLAPSED_HEIGHT,
----+    Animated.spring(animatedTop, {
----+      toValue: SCREEN_HEIGHT - COLLAPSED_HEIGHT - insets.bottom, // Collapse to bottom
+----    Animated.spring(animatedTop, {
+----      toValue: SCREEN_HEIGHT - COLLAPSED_HEIGHT - insets.bottom, // Collapse to bottom
+---+    Animated.spring(animatedHeight, {
+---+      toValue: COLLAPSED_HEIGHT,
 ---       useNativeDriver: false,
 ---       friction: 10,
 ---     }).start();
----@@ -98,7 +97,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
+---@@ -97,7 +98,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
 ---     }
 ---   };
 --- 
-----  // Update height when initialExpanded changes
----+  // Update position when initialExpanded changes
+----  // Update position when initialExpanded changes
+---+  // Update height when initialExpanded changes
 ---   useEffect(() => {
 ---     if (initialExpanded) {
 ---       expand();
----@@ -271,7 +270,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
+---@@ -270,7 +271,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
 --- 
 ---   return (
 ---     <>
-----      <Animated.View style={[styles.container, { height: animatedHeight }]}>
----+      <Animated.View style={[styles.container, { top: animatedTop }]}>
+----      <Animated.View style={[styles.container, { top: animatedTop }]}>
+---+      <Animated.View style={[styles.container, { height: animatedHeight }]}>
 ---         {/* Collapsed Header - always visible, supports drag */}
 ---         <View {...panResponder.panHandlers}>
 ---           <TouchableOpacity style={styles.collapsedHeader} onPress={toggleExpand} activeOpacity={0.9}>
----@@ -497,9 +496,9 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
---- const styles = StyleSheet.create({
----   container: {
----     position: 'absolute',
-----    bottom: 0,
----     left: 0,
----     right: 0,
----+    bottom: 0,
----     backgroundColor: '#FFFFFF',
----     borderTopLeftRadius: 20,
----     borderTopRightRadius: 20,
 ---diff --git a/model.patch b/model.patch
----index 64825d7..e69de29 100644
+---index 1fe0077..e69de29 100644
 ------ a/model.patch
 ---+++ b/model.patch
----@@ -1,209 +0,0 @@
+---@@ -1,288 +0,0 @@
 ----diff --git a/frontend/components/ActiveWorkoutSheet.tsx b/frontend/components/ActiveWorkoutSheet.tsx
-----index 329366b..7ed7ab5 100644
+----index a3a6ca0..10f6dea 100644
 ------- a/frontend/components/ActiveWorkoutSheet.tsx
 ----+++ b/frontend/components/ActiveWorkoutSheet.tsx
-----@@ -220,16 +220,18 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
+----@@ -34,8 +34,6 @@ interface ActiveWorkoutSheetProps {
 ---- 
-----     try {
-----       setSaving(true);
------      await api.patch(`/workouts/${activeWorkout.id}`, {
-----+      // Use PUT instead of PATCH - backend requires PUT
-----+      await api.put(`/workouts/${activeWorkout.id}`, {
-----         exercises: exercises,
-----         status: 'completed',
------        end_time: new Date().toISOString(),
-----+        ended_at: new Date().toISOString(),
-----         duration: timer,
-----       });
-----       endWorkout();
------      setIsExpanded(false);
-----+      collapse();
-----       onFinishWorkout();
-----     } catch (error: any) {
-----+      console.error('Save error:', error.response?.data || error);
-----       Alert.alert('Error', error.response?.data?.detail || 'Failed to save workout');
-----     } finally {
-----       setSaving(false);
-----@@ -247,7 +249,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
-----           style: 'destructive',
-----           onPress: () => {
-----             endWorkout();
------            setIsExpanded(false);
-----+            collapse();
-----           }
-----         },
-----       ]
+---- export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = false }: ActiveWorkoutSheetProps) {
+----   const insets = useSafeAreaInsets();
+-----  // More conservative height - leave room for top safe area, status bar, and some padding
+-----  const EXPANDED_HEIGHT = SCREEN_HEIGHT - insets.top - insets.bottom - 120;
+----   
+----   const { activeWorkout, updateWorkout, endWorkout, workoutStartTime } = useWorkoutStore();
+----   const [isExpanded, setIsExpanded] = useState(initialExpanded);
+----@@ -48,7 +46,8 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
+----   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
+----   const [availableExercises, setAvailableExercises] = useState<Exercise[]>([]);
+----   
+-----  const animatedHeight = useRef(new Animated.Value(initialExpanded ? EXPANDED_HEIGHT : COLLAPSED_HEIGHT)).current;
+----+  // Use animated value for the top position (0 = expanded, large value = collapsed)
+----+  const animatedTop = useRef(new Animated.Value(initialExpanded ? insets.top : SCREEN_HEIGHT - COLLAPSED_HEIGHT - insets.bottom)).current;
+---- 
+----   const exercises = activeWorkout?.exercises || [];
+---- 
+----@@ -73,8 +72,8 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
+----   ).current;
+---- 
+----   const expand = () => {
+-----    Animated.spring(animatedHeight, {
+-----      toValue: EXPANDED_HEIGHT,
+----+    Animated.spring(animatedTop, {
+----+      toValue: insets.top, // Expand to just below status bar
+----       useNativeDriver: false,
+----       friction: 10,
+----     }).start();
+----@@ -82,8 +81,8 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
+----   };
+---- 
+----   const collapse = () => {
+-----    Animated.spring(animatedHeight, {
+-----      toValue: COLLAPSED_HEIGHT,
+----+    Animated.spring(animatedTop, {
+----+      toValue: SCREEN_HEIGHT - COLLAPSED_HEIGHT - insets.bottom, // Collapse to bottom
+----       useNativeDriver: false,
+----       friction: 10,
+----     }).start();
+----@@ -98,7 +97,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
+----     }
+----   };
+---- 
+-----  // Update height when initialExpanded changes
+----+  // Update position when initialExpanded changes
+----   useEffect(() => {
+----     if (initialExpanded) {
+----       expand();
+----@@ -271,7 +270,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
+---- 
+----   return (
+----     <>
+-----      <Animated.View style={[styles.container, { height: animatedHeight }]}>
+----+      <Animated.View style={[styles.container, { top: animatedTop }]}>
+----         {/* Collapsed Header - always visible, supports drag */}
+----         <View {...panResponder.panHandlers}>
+----           <TouchableOpacity style={styles.collapsedHeader} onPress={toggleExpand} activeOpacity={0.9}>
+----@@ -497,9 +496,9 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
+---- const styles = StyleSheet.create({
+----   container: {
+----     position: 'absolute',
+-----    bottom: 0,
+----     left: 0,
+----     right: 0,
+----+    bottom: 0,
+----     backgroundColor: '#FFFFFF',
+----     borderTopLeftRadius: 20,
+----     borderTopRightRadius: 20,
 ----diff --git a/model.patch b/model.patch
-----index 882a525..e69de29 100644
+----index 64825d7..e69de29 100644
 ------- a/model.patch
 ----+++ b/model.patch
-----@@ -1,169 +0,0 @@
------diff --git a/backend/server.py b/backend/server.py
------index 6031a5c..fe9ee28 100644
--------- a/backend/server.py
------+++ b/backend/server.py
------@@ -424,136 +424,6 @@ async def update_workout(
------     return WorkoutSession(**{**workout, "id": str(workout["_id"])})
+----@@ -1,209 +0,0 @@
+-----diff --git a/frontend/components/ActiveWorkoutSheet.tsx b/frontend/components/ActiveWorkoutSheet.tsx
+-----index 329366b..7ed7ab5 100644
+-------- a/frontend/components/ActiveWorkoutSheet.tsx
+-----+++ b/frontend/components/ActiveWorkoutSheet.tsx
+-----@@ -220,16 +220,18 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
 ----- 
------ 
-------# ============= WORKOUT HISTORY/SUMMARY ROUTES =============
-------@api_router.get("/workouts/history", response_model=List[WorkoutSummary])
-------async def get_workout_history(
-------    user_id: str = Depends(get_current_user),
-------    limit: int = 50
-------):
-------    """Get workout history with computed summary statistics"""
-------    workouts = await db.workouts.find({"user_id": user_id, "ended_at": {"$ne": None}}).sort("started_at", -1).limit(limit).to_list(limit)
-------    
-------    # Get all exercise IDs we need
-------    exercise_ids = set()
-------    for workout in workouts:
-------        for ex in workout.get("exercises", []):
-------            exercise_ids.add(ex["exercise_id"])
-------    
-------    # Fetch all exercises in one query
-------    exercises_map = {}
-------    if exercise_ids:
-------        exercises = await db.exercises.find({"_id": {"$in": [ObjectId(eid) for eid in exercise_ids if ObjectId.is_valid(eid)]}}).to_list(len(exercise_ids))
-------        for ex in exercises:
-------            exercises_map[str(ex["_id"])] = ex
-------    
-------    # Count PRs per workout
-------    workout_ids = [str(w["_id"]) for w in workouts]
-------    pr_counts = {}
-------    if workout_ids:
-------        prs = await db.prs.find({"workout_id": {"$in": workout_ids}}).to_list(1000)
-------        for pr in prs:
-------            wid = pr.get("workout_id")
-------            if wid:
-------                pr_counts[wid] = pr_counts.get(wid, 0) + 1
-------    
-------    summaries = []
-------    for workout in workouts:
-------        workout_id = str(workout["_id"])
-------        started_at = workout.get("started_at", datetime.utcnow())
-------        ended_at = workout.get("ended_at")
-------        
-------        duration_seconds = 0
-------        if ended_at and started_at:
-------            duration_seconds = int((ended_at - started_at).total_seconds())
-------        
-------        exercise_count = len(workout.get("exercises", []))
-------        set_count = 0
-------        total_volume_kg = 0.0
-------        exercise_summaries = []
-------        
-------        for ex_item in workout.get("exercises", []):
-------            exercise_id = ex_item["exercise_id"]
-------            sets = ex_item.get("sets", [])
-------            set_count += len(sets)
-------            
-------            ex_data = exercises_map.get(exercise_id, {})
-------            ex_name = ex_data.get("name", "Unknown Exercise")
-------            ex_kind = ex_data.get("exercise_kind", "Barbell")
-------            
-------            # Calculate best set and volume
-------            best_weight = 0
-------            best_reps = 0
-------            best_duration = 0
-------            best_set_display = ""
-------            estimated_1rm = None
-------            
-------            for s in sets:
-------                if s.get("is_warmup", False):
-------                    continue
-------                    
-------                weight = s.get("weight") or 0
-------                reps = s.get("reps") or 0
-------                duration = s.get("duration") or 0
-------                
-------                # Calculate volume for weight-based exercises
-------                if weight > 0 and reps > 0:
-------                    total_volume_kg += weight * reps
-------                    
-------                    # Calculate 1RM for comparison
-------                    set_1rm = weight * (36 / (37 - reps)) if reps < 37 else weight
-------                    
-------                    if set_1rm > (estimated_1rm or 0):
-------                        estimated_1rm = set_1rm
-------                        best_weight = weight
-------                        best_reps = reps
-------                
-------                # Track best duration for duration-based exercises
-------                if duration > best_duration:
-------                    best_duration = duration
-------            
-------            # Format best set display based on exercise kind
-------            if ex_kind in ['Cardio', 'Duration']:
-------                if best_duration > 0:
-------                    mins = best_duration // 60
-------                    secs = best_duration % 60
-------                    best_set_display = f"{mins}:{secs:02d}"
-------                else:
-------                    best_set_display = "0:00"
-------            elif ex_kind == 'Reps Only':
-------                best_set_display = f"{best_reps} reps" if best_reps > 0 else "-"
-------            else:
-------                if best_weight > 0 and best_reps > 0:
-------                    best_set_display = f"{best_weight}kg × {best_reps}"
-------                elif best_reps > 0:
-------                    best_set_display = f"{best_reps} reps"
-------                else:
-------                    best_set_display = "-"
-------            
-------            exercise_summaries.append(WorkoutExerciseSummary(
-------                exercise_id=exercise_id,
-------                name=ex_name,
-------                exercise_kind=ex_kind,
-------                set_count=len(sets),
-------                best_set_display=best_set_display,
-------                estimated_1rm=estimated_1rm
-------            ))
-------        
-------        summaries.append(WorkoutSummary(
-------            id=workout_id,
-------            name=workout.get("name"),
-------            started_at=started_at,
-------            ended_at=ended_at,
-------            duration_seconds=duration_seconds,
-------            exercise_count=exercise_count,
-------            set_count=set_count,
-------            total_volume_kg=total_volume_kg,
-------            pr_count=pr_counts.get(workout_id, 0),
-------            exercises=exercise_summaries
-------        ))
-------    
-------    return summaries
-------
-------
------ @api_router.get("/workouts/{workout_id}/detail", response_model=WorkoutSummary)
------ async def get_workout_detail(
------     workout_id: str,
+-----     try {
+-----       setSaving(true);
+------      await api.patch(`/workouts/${activeWorkout.id}`, {
+-----+      // Use PUT instead of PATCH - backend requires PUT
+-----+      await api.put(`/workouts/${activeWorkout.id}`, {
+-----         exercises: exercises,
+-----         status: 'completed',
+------        end_time: new Date().toISOString(),
+-----+        ended_at: new Date().toISOString(),
+-----         duration: timer,
+-----       });
+-----       endWorkout();
+------      setIsExpanded(false);
+-----+      collapse();
+-----       onFinishWorkout();
+-----     } catch (error: any) {
+-----+      console.error('Save error:', error.response?.data || error);
+-----       Alert.alert('Error', error.response?.data?.detail || 'Failed to save workout');
+-----     } finally {
+-----       setSaving(false);
+-----@@ -247,7 +249,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded =
+-----           style: 'destructive',
+-----           onPress: () => {
+-----             endWorkout();
+------            setIsExpanded(false);
+-----+            collapse();
+-----           }
+-----         },
+-----       ]
 -----diff --git a/model.patch b/model.patch
------index 021fb26..3b237bd 100644
+-----index 882a525..e69de29 100644
 -------- a/model.patch
 -----+++ b/model.patch
------@@ -1,23 +0,0 @@
-------diff --git a/frontend/app/(tabs)/exercises.tsx b/frontend/app/(tabs)/exercises.tsx
-------index 17c0fa5..b96bf00 100644
---------- a/frontend/app/(tabs)/exercises.tsx
-------+++ b/frontend/app/(tabs)/exercises.tsx
-------@@ -147,15 +147,16 @@ export default function ExercisesScreen() {
------- const styles = StyleSheet.create({
-------   container: {
-------     flex: 1,
--------    backgroundColor: '#000000',
-------+    backgroundColor: '#F5F5F7',
-------   },
-------   header: {
-------     padding: 16,
-------+    backgroundColor: '#FFFFFF',
-------   },
-------   title: {
-------     fontSize: 32,
-------     fontWeight: 'bold',
--------    color: '#FFFFFF',
-------+    color: '#1C1C1E',
-------     marginBottom: 16,
-------   },
-------   searchContainer: {
+-----@@ -1,169 +0,0 @@
+------diff --git a/backend/server.py b/backend/server.py
+------index 6031a5c..fe9ee28 100644
+--------- a/backend/server.py
+------+++ b/backend/server.py
+------@@ -424,136 +424,6 @@ async def update_workout(
+------     return WorkoutSession(**{**workout, "id": str(workout["_id"])})
+------ 
+------ 
+-------# ============= WORKOUT HISTORY/SUMMARY ROUTES =============
+-------@api_router.get("/workouts/history", response_model=List[WorkoutSummary])
+-------async def get_workout_history(
+-------    user_id: str = Depends(get_current_user),
+-------    limit: int = 50
+-------):
+-------    """Get workout history with computed summary statistics"""
+-------    workouts = await db.workouts.find({"user_id": user_id, "ended_at": {"$ne": None}}).sort("started_at", -1).limit(limit).to_list(limit)
+-------    
+-------    # Get all exercise IDs we need
+-------    exercise_ids = set()
+-------    for workout in workouts:
+-------        for ex in workout.get("exercises", []):
+-------            exercise_ids.add(ex["exercise_id"])
+-------    
+-------    # Fetch all exercises in one query
+-------    exercises_map = {}
+-------    if exercise_ids:
+-------        exercises = await db.exercises.find({"_id": {"$in": [ObjectId(eid) for eid in exercise_ids if ObjectId.is_valid(eid)]}}).to_list(len(exercise_ids))
+-------        for ex in exercises:
+-------            exercises_map[str(ex["_id"])] = ex
+-------    
+-------    # Count PRs per workout
+-------    workout_ids = [str(w["_id"]) for w in workouts]
+-------    pr_counts = {}
+-------    if workout_ids:
+-------        prs = await db.prs.find({"workout_id": {"$in": workout_ids}}).to_list(1000)
+-------        for pr in prs:
+-------            wid = pr.get("workout_id")
+-------            if wid:
+-------                pr_counts[wid] = pr_counts.get(wid, 0) + 1
+-------    
+-------    summaries = []
+-------    for workout in workouts:
+-------        workout_id = str(workout["_id"])
+-------        started_at = workout.get("started_at", datetime.utcnow())
+-------        ended_at = workout.get("ended_at")
+-------        
+-------        duration_seconds = 0
+-------        if ended_at and started_at:
+-------            duration_seconds = int((ended_at - started_at).total_seconds())
+-------        
+-------        exercise_count = len(workout.get("exercises", []))
+-------        set_count = 0
+-------        total_volume_kg = 0.0
+-------        exercise_summaries = []
+-------        
+-------        for ex_item in workout.get("exercises", []):
+-------            exercise_id = ex_item["exercise_id"]
+-------            sets = ex_item.get("sets", [])
+-------            set_count += len(sets)
+-------            
+-------            ex_data = exercises_map.get(exercise_id, {})
+-------            ex_name = ex_data.get("name", "Unknown Exercise")
+-------            ex_kind = ex_data.get("exercise_kind", "Barbell")
+-------            
+-------            # Calculate best set and volume
+-------            best_weight = 0
+-------            best_reps = 0
+-------            best_duration = 0
+-------            best_set_display = ""
+-------            estimated_1rm = None
+-------            
+-------            for s in sets:
+-------                if s.get("is_warmup", False):
+-------                    continue
+-------                    
+-------                weight = s.get("weight") or 0
+-------                reps = s.get("reps") or 0
+-------                duration = s.get("duration") or 0
+-------                
+-------                # Calculate volume for weight-based exercises
+-------                if weight > 0 and reps > 0:
+-------                    total_volume_kg += weight * reps
+-------                    
+-------                    # Calculate 1RM for comparison
+-------                    set_1rm = weight * (36 / (37 - reps)) if reps < 37 else weight
+-------                    
+-------                    if set_1rm > (estimated_1rm or 0):
+-------                        estimated_1rm = set_1rm
+-------                        best_weight = weight
+-------                        best_reps = reps
+-------                
+-------                # Track best duration for duration-based exercises
+-------                if duration > best_duration:
+-------                    best_duration = duration
+-------            
+-------            # Format best set display based on exercise kind
+-------            if ex_kind in ['Cardio', 'Duration']:
+-------                if best_duration > 0:
+-------                    mins = best_duration // 60
+-------                    secs = best_duration % 60
+-------                    best_set_display = f"{mins}:{secs:02d}"
+-------                else:
+-------                    best_set_display = "0:00"
+-------            elif ex_kind == 'Reps Only':
+-------                best_set_display = f"{best_reps} reps" if best_reps > 0 else "-"
+-------            else:
+-------                if best_weight > 0 and best_reps > 0:
+-------                    best_set_display = f"{best_weight}kg × {best_reps}"
+-------                elif best_reps > 0:
+-------                    best_set_display = f"{best_reps} reps"
+-------                else:
+-------                    best_set_display = "-"
+-------            
+-------            exercise_summaries.append(WorkoutExerciseSummary(
+-------                exercise_id=exercise_id,
+-------                name=ex_name,
+-------                exercise_kind=ex_kind,
+-------                set_count=len(sets),
+-------                best_set_display=best_set_display,
+-------                estimated_1rm=estimated_1rm
+-------            ))
+-------        
+-------        summaries.append(WorkoutSummary(
+-------            id=workout_id,
+-------            name=workout.get("name"),
+-------            started_at=started_at,
+-------            ended_at=ended_at,
+-------            duration_seconds=duration_seconds,
+-------            exercise_count=exercise_count,
+-------            set_count=set_count,
+-------            total_volume_kg=total_volume_kg,
+-------            pr_count=pr_counts.get(workout_id, 0),
+-------            exercises=exercise_summaries
+-------        ))
+-------    
+-------    return summaries
+-------
+-------
+------ @api_router.get("/workouts/{workout_id}/detail", response_model=WorkoutSummary)
+------ async def get_workout_detail(
+------     workout_id: str,
+------diff --git a/model.patch b/model.patch
+------index 021fb26..3b237bd 100644
+--------- a/model.patch
+------+++ b/model.patch
+------@@ -1,23 +0,0 @@
+-------diff --git a/frontend/app/(tabs)/exercises.tsx b/frontend/app/(tabs)/exercises.tsx
+-------index 17c0fa5..b96bf00 100644
+---------- a/frontend/app/(tabs)/exercises.tsx
+-------+++ b/frontend/app/(tabs)/exercises.tsx
+-------@@ -147,15 +147,16 @@ export default function ExercisesScreen() {
+------- const styles = StyleSheet.create({
+-------   container: {
+-------     flex: 1,
+--------    backgroundColor: '#000000',
+-------+    backgroundColor: '#F5F5F7',
+-------   },
+-------   header: {
+-------     padding: 16,
+-------+    backgroundColor: '#FFFFFF',
+-------   },
+-------   title: {
+-------     fontSize: 32,
+-------     fontWeight: 'bold',
+--------    color: '#FFFFFF',
+-------+    color: '#1C1C1E',
+-------     marginBottom: 16,
+-------   },
+-------   searchContainer: {
