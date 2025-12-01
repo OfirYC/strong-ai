@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuthStore } from '../store/authStore';
 
 export default function RootLayout() {
@@ -13,7 +14,7 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <View style={styles.container}>
+    <GestureHandlerRootView style={styles.container}>
       {/* Top safe area - matches app background */}
       <View style={[styles.topSafeArea, { height: insets.top }]} />
       
@@ -28,7 +29,7 @@ export default function RootLayout() {
       
       {/* Bottom safe area - matches tab bar (white) */}
       <View style={[styles.bottomSafeArea, { height: insets.bottom }]} />
-    </View>
+    </GestureHandlerRootView>
   );
 }
 
