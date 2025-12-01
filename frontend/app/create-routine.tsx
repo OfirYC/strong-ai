@@ -162,7 +162,21 @@ export default function CreateRoutineScreen() {
           <Ionicons name="close" size={28} color="#1C1C1E" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Create Routine</Text>
-        <View style={{ width: 28 }} />
+        <TouchableOpacity 
+          onPress={handleSave}
+          disabled={saving || !name.trim() || selectedExercises.length === 0}
+          style={[
+            styles.saveButton,
+            (saving || !name.trim() || selectedExercises.length === 0) && styles.saveButtonDisabled
+          ]}
+        >
+          <Text style={[
+            styles.saveButtonText,
+            (saving || !name.trim() || selectedExercises.length === 0) && styles.saveButtonTextDisabled
+          ]}>
+            {saving ? 'Saving...' : 'Save'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
