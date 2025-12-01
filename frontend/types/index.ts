@@ -41,6 +41,7 @@ export interface WorkoutSet {
   calories?: number;
   
   is_warmup?: boolean;
+  completed?: boolean;
   completed_at?: string;
   
   // PR flags
