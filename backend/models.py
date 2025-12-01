@@ -84,12 +84,26 @@ class ExerciseUpdate(BaseModel):
 
 
 # Workout Template Models
+class TemplateSetItem(BaseModel):
+    """A single set in a template exercise with default values"""
+    weight: Optional[float] = None
+    reps: Optional[int] = None
+    duration: Optional[int] = None  # in seconds
+    distance: Optional[float] = None  # in km
+    is_warmup: bool = False
+
+
 class TemplateExerciseItem(BaseModel):
     exercise_id: str
     order: int
+    sets: List[TemplateSetItem] = []  # Actual sets with values
+    notes: Optional[str] = None
+    # Legacy fields for backward compatibility
     default_sets: int = 3
     default_reps: Optional[int] = 10
     default_weight: Optional[float] = None
+    default_duration: Optional[int] = None
+    default_distance: Optional[float] = None
 
 
 class WorkoutTemplateCreate(BaseModel):
