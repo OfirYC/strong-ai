@@ -603,12 +603,12 @@ async def check_and_create_prs(user_id: str, workout_id: str):
             "exercise_id": exercise_id
         }).to_list(100)
         
-        # Extract max values from existing PRs
-        max_weight = max([pr.get("weight", 0) for pr in existing_prs], default=0)
-        max_reps = max([pr.get("reps", 0) for pr in existing_prs], default=0)
-        max_volume = max([pr.get("volume", 0) for pr in existing_prs], default=0)
-        max_duration = max([pr.get("duration", 0) for pr in existing_prs], default=0)
-        max_1rm = max([pr.get("estimated_1rm", 0) for pr in existing_prs], default=0)
+        # Extract max values from existing PRs (handle None values)
+        max_weight = max([pr.get("weight") or 0 for pr in existing_prs], default=0) or 0
+        max_reps = max([pr.get("reps") or 0 for pr in existing_prs], default=0) or 0
+        max_volume = max([pr.get("volume") or 0 for pr in existing_prs], default=0) or 0
+        max_duration = max([pr.get("duration") or 0 for pr in existing_prs], default=0) or 0
+        max_1rm = max([pr.get("estimated_1rm") or 0 for pr in existing_prs], default=0) or 0
         
         for set_idx, set_data in enumerate(exercise.get("sets", [])):
             if set_data.get("is_warmup", False):
