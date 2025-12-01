@@ -159,51 +159,15 @@ export default function CreateRoutineScreen() {
         />
       </View>
 
-      <Modal
+      <ExercisePickerModal
         visible={showExercisePicker}
-        animationType="slide"
-        presentationStyle="pageSheet"
-      >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setShowExercisePicker(false)}>
-              <Ionicons name="close" size={28} color="#1C1C1E" />
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>Select Exercise</Text>
-            <TouchableOpacity onPress={() => setShowCreateExercise(true)}>
-              <Text style={styles.newExerciseText}>+ New</Text>
-            </TouchableOpacity>
-          </View>
-
-          <FlatList
-            data={availableExercises}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.exerciseOption}
-                onPress={() => addExercise(item)}
-              >
-                <View style={styles.exerciseOptionImageContainer}>
-                  {item.image ? (
-                    <Image source={{ uri: item.image }} style={styles.exerciseOptionImage} />
-                  ) : (
-                    <View style={styles.exerciseOptionPlaceholder}>
-                      <Ionicons name="barbell" size={20} color="#8E8E93" />
-                    </View>
-                  )}
-                </View>
-                <View style={styles.exerciseOptionInfo}>
-                  <Text style={styles.exerciseOptionName}>{item.name}</Text>
-                  <Text style={styles.exerciseOptionDetail}>
-                    {item.exercise_kind} • {item.primary_body_parts?.join(', ')}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            )}
-            contentContainerStyle={styles.exerciseList}
-          />
-        </SafeAreaView>
-      </Modal>
+        onClose={() => setShowExercisePicker(false)}
+        onSelectExercise={addExercise}
+        onCreateNew={() => {
+          setShowExercisePicker(false);
+          setTimeout(() => setShowCreateExercise(true), 300);
+        }}
+      />
 
       <CreateExerciseModal
         visible={showCreateExercise}
