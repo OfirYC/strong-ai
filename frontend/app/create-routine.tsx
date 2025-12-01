@@ -199,7 +199,7 @@ export default function CreateRoutineScreen() {
 
           {selectedExercises.map((exercise, exerciseIndex) => {
             const detail = exerciseDetails[exercise.exercise_id];
-            const fields = getExerciseFields(getExerciseKind(exercise.exercise_id));
+            const exerciseKind = detail?.exercise_kind || 'Barbell';
 
             return (
               <View key={exerciseIndex} style={styles.exerciseCard}>
@@ -215,51 +215,21 @@ export default function CreateRoutineScreen() {
                 {/* Sets */}
                 {exercise.sets.length > 0 && (
                   <View style={styles.setsContainer}>
-                    <View style={styles.setHeader}>
-                      <Text style={styles.setHeaderText}>SET</Text>
-                      {fields.includes('weight') && <Text style={styles.setHeaderText}>KG</Text>}
-                      {fields.includes('reps') && <Text style={styles.setHeaderText}>REPS</Text>}
-                      {fields.includes('duration') && <Text style={styles.setHeaderText}>TIME</Text>}
-                      {fields.includes('distance') && <Text style={styles.setHeaderText}>KM</Text>}
-                      <Text style={styles.setHeaderText}></Text>
-                    </View>
+                    <SetHeader exerciseKind={exerciseKind} />
 
                     {exercise.sets.map((set, setIndex) => (
-                      <View key={setIndex} style={styles.setRow}>
-                        <Text style={styles.setNumber}>{setIndex + 1}</Text>
-                        {fields.includes('weight') && (
-                          <DecimalInput
-                            style={styles.setInput}
-                            value={set.weight || 0}
-                            onChangeValue={(value) => updateSet(exerciseIndex, setIndex, 'weight', value)}
-                            placeholder="0"
-                          />
-                        )}
-                        {fields.includes('reps') && (
-                          <TextInput
-                            style={styles.setInput}
-                            value={set.reps?.toString() || ''}
-                            onChangeText={(value) => updateSet(exerciseIndex, setIndex, 'reps', parseInt(value) || 0)}
-                            keyboardType="number-pad"
-                            placeholder="0"
-                          />
-                        )}
-                        {fields.includes('duration') && (
-                          <DurationInput
-                            value={set.duration || 0}
-                            onChangeValue={(value) => updateSet(exerciseIndex, setIndex, 'duration', value)}
-                            style={styles.durationInput}
-                          />
-                        )}
-                        {fields.includes('distance') && (
-                          <DecimalInput
-                            style={styles.setInput}
-                            value={set.distance || 0}
-                            onChangeValue={(value) => updateSet(exerciseIndex, setIndex, 'distance', value)}
-                            placeholder="0"
-                          />
-                        )}
-                        <TouchableOpacity onPress={() => removeSet(exerciseIndex, setIndex)}>
+                      <View key={setIndex} style={styles.setRowWrapper}>
+                        <SetRowInput
+                          set={set}
+                          setIndex={setIndex}
+                          exerciseKind={exerciseKind}
+                          onUpdateSet={(field, value) => updateSet(exerciseIndex, setIndex, field, value)}
+                          showCompleteButton={false}
+                        />
+                        <TouchableOpacity 
+                          style={styles.removeSetButton}
+                          onPress={() => removeSet(exerciseIndex, setIndex)}
+                        >
                           <Ionicons name="close-circle" size={22} color="#FF3B30" />
                         </TouchableOpacity>
                       </View>
