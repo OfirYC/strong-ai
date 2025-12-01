@@ -51,7 +51,6 @@ export default function CreateRoutineScreen() {
       default_weight: 0,
     };
     setSelectedExercises([...selectedExercises, newExercise]);
-    setShowExercisePicker(false);
   };
 
   const removeExercise = (index: number) => {
