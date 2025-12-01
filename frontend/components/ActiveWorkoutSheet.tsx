@@ -593,7 +593,6 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
               ) : (
                 exercises.map((exercise, exerciseIndex) => {
                   const detail = exerciseDetails[exercise.exercise_id];
-                  const fields = getExerciseFields(detail?.exercise_kind || 'Barbell');
                   
                   return (
                     <View key={`${exercise.exercise_id}-${exerciseIndex}`} style={styles.exerciseCard}>
