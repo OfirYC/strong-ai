@@ -909,12 +909,18 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     gap: 8,
   },
+  setRowCompleted: {
+    opacity: 0.7,
+  },
   setNumber: {
     flex: 1,
     fontSize: 16,
     fontWeight: '600',
     color: '#1C1C1E',
     textAlign: 'center',
+  },
+  setNumberCompleted: {
+    color: '#34C759',
   },
   setInput: {
     flex: 1,
@@ -926,6 +932,24 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     borderWidth: 1,
     borderColor: '#D1D1D6',
+  },
+  setInputCompleted: {
+    backgroundColor: '#E8F8ED',
+    borderColor: '#34C759',
+  },
+  completeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F5F5F7',
+    borderWidth: 2,
+    borderColor: '#D1D1D6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  completeButtonActive: {
+    backgroundColor: '#34C759',
+    borderColor: '#34C759',
   },
   durationInput: {
     flex: 1,
