@@ -6,39 +6,54 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import Input from '../components/Input';
 import Button from '../components/Button';
+import DecimalInput from '../components/DecimalInput';
+import DurationInput from '../components/DurationInput';
 import CreateExerciseModal from '../components/CreateExerciseModal';
 import ExercisePickerModal from '../components/ExercisePickerModal';
 import api from '../utils/api';
-import { Exercise, TemplateExercise } from '../types';
+import { Exercise, TemplateExercise, TemplateSet, getExerciseFields } from '../types';
 
 export default function CreateRoutineScreen() {
   const router = useRouter();
   const [name, setName] = useState('');
   const [notes, setNotes] = useState('');
-  const [selectedExercises, setSelectedExercises] = useState<
-    TemplateExercise[]
-  >([]);
+  const [selectedExercises, setSelectedExercises] = useState<TemplateExercise[]>([]);
   const [showExercisePicker, setShowExercisePicker] = useState(false);
   const [showCreateExercise, setShowCreateExercise] = useState(false);
-  const [availableExercises, setAvailableExercises] = useState<Exercise[]>([]);
+  const [exerciseDetails, setExerciseDetails] = useState<{ [key: string]: Exercise }>({});
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    loadExercises();
-  }, []);
+    loadExerciseDetails();
+  }, [selectedExercises]);
 
-  const loadExercises = async () => {
-    try {
-      const response = await api.get('/exercises');
-      setAvailableExercises(response.data);
-    } catch (error) {
-      console.error('Failed to load exercises:', error);
+  const loadExerciseDetails = async () => {
+    const exerciseIds = selectedExercises.map(e => e.exercise_id);
+    const missingIds = exerciseIds.filter(id => !exerciseDetails[id]);
+    
+    if (missingIds.length > 0) {
+      try {
+        const response = await api.get('/exercises');
+        const allExercises: Exercise[] = response.data;
+        const detailsMap: { [key: string]: Exercise } = { ...exerciseDetails };
+        
+        allExercises.forEach(ex => {
+          if (missingIds.includes(ex.id)) {
+            detailsMap[ex.id] = ex;
+          }
+        });
+        
+        setExerciseDetails(detailsMap);
+      } catch (error) {
+        console.error('Failed to load exercise details:', error);
+      }
     }
   };
 
@@ -46,15 +61,57 @@ export default function CreateRoutineScreen() {
     const newExercise: TemplateExercise = {
       exercise_id: exercise.id,
       order: selectedExercises.length,
-      default_sets: 0,
-      default_reps: 0,
-      default_weight: 0,
+      sets: [{ is_warmup: false }], // Start with one empty set
     };
     setSelectedExercises([...selectedExercises, newExercise]);
+    // Add to details immediately
+    setExerciseDetails(prev => ({ ...prev, [exercise.id]: exercise }));
   };
 
   const removeExercise = (index: number) => {
-    const newExercises = selectedExercises.filter((_, i) => i !== index);
+    Alert.alert(
+      'Remove Exercise',
+      'Are you sure you want to remove this exercise?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => {
+            const newExercises = selectedExercises.filter((_, i) => i !== index);
+            setSelectedExercises(newExercises);
+          },
+        },
+      ]
+    );
+  };
+
+  const addSet = (exerciseIndex: number) => {
+    const newExercises = [...selectedExercises];
+    newExercises[exerciseIndex] = {
+      ...newExercises[exerciseIndex],
+      sets: [...newExercises[exerciseIndex].sets, { is_warmup: false }],
+    };
+    setSelectedExercises(newExercises);
+  };
+
+  const removeSet = (exerciseIndex: number, setIndex: number) => {
+    const newExercises = [...selectedExercises];
+    newExercises[exerciseIndex] = {
+      ...newExercises[exerciseIndex],
+      sets: newExercises[exerciseIndex].sets.filter((_, i) => i !== setIndex),
+    };
+    setSelectedExercises(newExercises);
+  };
+
+  const updateSet = (exerciseIndex: number, setIndex: number, field: string, value: any) => {
+    const newExercises = [...selectedExercises];
+    newExercises[exerciseIndex] = {
+      ...newExercises[exerciseIndex],
+      sets: newExercises[exerciseIndex].sets.map((set, i) =>
+        i === setIndex ? { ...set, [field]: value } : set
+      ),
+    };
     setSelectedExercises(newExercises);
   };
 
@@ -91,8 +148,11 @@ export default function CreateRoutineScreen() {
   };
 
   const getExerciseName = (exerciseId: string) => {
-    const exercise = availableExercises.find((e) => e.id === exerciseId);
-    return exercise?.name || 'Unknown Exercise';
+    return exerciseDetails[exerciseId]?.name || 'Loading...';
+  };
+
+  const getExerciseKind = (exerciseId: string) => {
+    return exerciseDetails[exerciseId]?.exercise_kind || 'Barbell';
   };
 
   return (
@@ -126,25 +186,89 @@ export default function CreateRoutineScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Exercises</Text>
 
-          {selectedExercises.map((exercise, index) => (
-            <View key={index} style={styles.exerciseCard}>
-              <View style={styles.exerciseInfo}>
-                <Text style={styles.exerciseNumber}>{index + 1}</Text>
-                <Text style={styles.exerciseName}>
-                  {getExerciseName(exercise.exercise_id)}
-                </Text>
+          {selectedExercises.map((exercise, exerciseIndex) => {
+            const detail = exerciseDetails[exercise.exercise_id];
+            const fields = getExerciseFields(getExerciseKind(exercise.exercise_id));
+
+            return (
+              <View key={exerciseIndex} style={styles.exerciseCard}>
+                <View style={styles.exerciseHeader}>
+                  <Text style={styles.exerciseName}>
+                    {getExerciseName(exercise.exercise_id)}
+                  </Text>
+                  <TouchableOpacity onPress={() => removeExercise(exerciseIndex)}>
+                    <Ionicons name="trash-outline" size={22} color="#FF3B30" />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Sets */}
+                {exercise.sets.length > 0 && (
+                  <View style={styles.setsContainer}>
+                    <View style={styles.setHeader}>
+                      <Text style={styles.setHeaderText}>SET</Text>
+                      {fields.includes('weight') && <Text style={styles.setHeaderText}>KG</Text>}
+                      {fields.includes('reps') && <Text style={styles.setHeaderText}>REPS</Text>}
+                      {fields.includes('duration') && <Text style={styles.setHeaderText}>TIME</Text>}
+                      {fields.includes('distance') && <Text style={styles.setHeaderText}>KM</Text>}
+                      <Text style={styles.setHeaderText}></Text>
+                    </View>
+
+                    {exercise.sets.map((set, setIndex) => (
+                      <View key={setIndex} style={styles.setRow}>
+                        <Text style={styles.setNumber}>{setIndex + 1}</Text>
+                        {fields.includes('weight') && (
+                          <DecimalInput
+                            style={styles.setInput}
+                            value={set.weight || 0}
+                            onChangeValue={(value) => updateSet(exerciseIndex, setIndex, 'weight', value)}
+                            placeholder="0"
+                          />
+                        )}
+                        {fields.includes('reps') && (
+                          <TextInput
+                            style={styles.setInput}
+                            value={set.reps?.toString() || ''}
+                            onChangeText={(value) => updateSet(exerciseIndex, setIndex, 'reps', parseInt(value) || 0)}
+                            keyboardType="number-pad"
+                            placeholder="0"
+                          />
+                        )}
+                        {fields.includes('duration') && (
+                          <DurationInput
+                            value={set.duration || 0}
+                            onChangeValue={(value) => updateSet(exerciseIndex, setIndex, 'duration', value)}
+                            style={styles.durationInput}
+                          />
+                        )}
+                        {fields.includes('distance') && (
+                          <DecimalInput
+                            style={styles.setInput}
+                            value={set.distance || 0}
+                            onChangeValue={(value) => updateSet(exerciseIndex, setIndex, 'distance', value)}
+                            placeholder="0"
+                          />
+                        )}
+                        <TouchableOpacity onPress={() => removeSet(exerciseIndex, setIndex)}>
+                          <Ionicons name="close-circle" size={22} color="#FF3B30" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                <TouchableOpacity style={styles.addSetButton} onPress={() => addSet(exerciseIndex)}>
+                  <Ionicons name="add" size={20} color="#007AFF" />
+                  <Text style={styles.addSetText}>Add Set</Text>
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity onPress={() => removeExercise(index)}>
-                <Ionicons name="close-circle" size={24} color="#FF453A" />
-              </TouchableOpacity>
-            </View>
-          ))}
+            );
+          })}
 
           <TouchableOpacity
             style={styles.addExerciseButton}
             onPress={() => setShowExercisePicker(true)}
           >
-            <Ionicons name="add" size={24} color="#4A90E2" />
+            <Ionicons name="add" size={24} color="#007AFF" />
             <Text style={styles.addExerciseText}>Add Exercise</Text>
           </TouchableOpacity>
         </View>
@@ -172,7 +296,7 @@ export default function CreateRoutineScreen() {
       <CreateExerciseModal
         visible={showCreateExercise}
         onClose={() => setShowCreateExercise(false)}
-        onExerciseCreated={loadExercises}
+        onExerciseCreated={() => {}}
       />
     </SafeAreaView>
   );
@@ -190,6 +314,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#D1D1D6',
+    backgroundColor: '#FFFFFF',
   },
   headerTitle: {
     fontSize: 18,
@@ -198,6 +323,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
+    paddingBottom: 100,
   },
   notesInput: {
     height: 80,
@@ -216,27 +342,74 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
+    marginBottom: 16,
+  },
+  exerciseHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 12,
   },
-  exerciseInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  exerciseNumber: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#8E8E93',
-    width: 32,
-  },
   exerciseName: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '600',
     color: '#1C1C1E',
     flex: 1,
+  },
+  setsContainer: {
+    marginBottom: 12,
+  },
+  setHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  setHeaderText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#8E8E93',
+    textAlign: 'center',
+  },
+  setRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 8,
+  },
+  setNumber: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1C1C1E',
+    textAlign: 'center',
+  },
+  setInput: {
+    flex: 1,
+    backgroundColor: '#F5F5F7',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    textAlign: 'center',
+    borderWidth: 1,
+    borderColor: '#D1D1D6',
+  },
+  durationInput: {
+    flex: 1,
+  },
+  addSetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+  },
+  addSetText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#007AFF',
+    marginLeft: 6,
   },
   addExerciseButton: {
     borderRadius: 12,
@@ -256,5 +429,8 @@ const styles = StyleSheet.create({
   },
   footer: {
     padding: 16,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#D1D1D6',
   },
 });
