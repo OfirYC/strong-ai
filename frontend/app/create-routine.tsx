@@ -148,10 +148,6 @@ export default function CreateRoutineScreen() {
     return exerciseDetails[exerciseId]?.name || 'Loading...';
   };
 
-  const getExerciseKind = (exerciseId: string) => {
-    return exerciseDetails[exerciseId]?.exercise_kind || 'Barbell';
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
