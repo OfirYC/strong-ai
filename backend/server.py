@@ -261,9 +261,49 @@ async def start_workout(
     workout_data: WorkoutSessionCreate,
     user_id: str = Depends(get_current_user)
 ):
+    # If template_id is provided, load the template and pre-populate exercises
+    exercises = []
+    name = workout_data.name
+    notes = workout_data.notes
+    
+    if workout_data.template_id:
+        template = await db.templates.find_one({
+            "_id": ObjectId(workout_data.template_id),
+            "user_id": user_id
+        })
+        if template:
+            name = name or template.get("name")
+            notes = notes or template.get("notes")
+            # Convert template exercises to workout exercises with pre-populated sets
+            for tmpl_ex in template.get("exercises", []):
+                sets = []
+                # Create default sets based on template
+                num_sets = tmpl_ex.get("default_sets", 3)
+                for _ in range(num_sets):
+                    set_item = {"is_warmup": False}
+                    if tmpl_ex.get("default_weight") is not None:
+                        set_item["weight"] = tmpl_ex["default_weight"]
+                    if tmpl_ex.get("default_reps") is not None:
+                        set_item["reps"] = tmpl_ex["default_reps"]
+                    if tmpl_ex.get("default_duration") is not None:
+                        set_item["duration"] = tmpl_ex["default_duration"]
+                    if tmpl_ex.get("default_distance") is not None:
+                        set_item["distance"] = tmpl_ex["default_distance"]
+                    sets.append(set_item)
+                
+                exercises.append({
+                    "exercise_id": tmpl_ex["exercise_id"],
+                    "order": tmpl_ex["order"],
+                    "sets": sets,
+                    "notes": tmpl_ex.get("notes")
+                })
+    
     workout = WorkoutSession(
-        **workout_data.dict(),
-        user_id=user_id
+        user_id=user_id,
+        template_id=workout_data.template_id,
+        name=name,
+        notes=notes,
+        exercises=exercises
     )
     
     result = await db.workouts.insert_one(workout.dict(by_alias=True, exclude={"id"}))
