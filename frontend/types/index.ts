@@ -87,10 +87,21 @@ export interface WorkoutExercise {
   notes?: string;
 }
 
+export interface TemplateSet {
+  weight?: number;
+  reps?: number;
+  duration?: number;
+  distance?: number;
+  is_warmup?: boolean;
+}
+
 export interface TemplateExercise {
   exercise_id: string;
   order: number;
-  default_sets: number;
+  sets: TemplateSet[];
+  notes?: string;
+  // Legacy fields
+  default_sets?: number;
   default_reps?: number;
   default_weight?: number;
 }
