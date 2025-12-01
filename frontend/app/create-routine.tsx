@@ -305,16 +305,12 @@ export default function CreateRoutineScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F7',
+    backgroundColor: '#FFFFFF',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#D1D1D6',
-    backgroundColor: '#FFFFFF',
   },
   headerTitle: {
     fontSize: 18,
@@ -339,7 +335,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   exerciseCard: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -428,9 +423,5 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   footer: {
-    padding: 16,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#D1D1D6',
   },
 });

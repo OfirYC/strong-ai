@@ -872,7 +872,6 @@ const styles = StyleSheet.create({
     color: '#8E8E93',
   },
   exerciseCard: {
-    backgroundColor: '#F5F5F7',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
