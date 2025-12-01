@@ -937,10 +937,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#E8F8ED',
     borderColor: '#34C759',
   },
+  durationInputCompleted: {
+    backgroundColor: '#E8F8ED',
+    borderColor: '#34C759',
+  },
   completeButton: {
     width: 32,
     height: 32,
-    borderRadius: 16,
+    borderRadius: 8,
     backgroundColor: '#F5F5F7',
     borderWidth: 2,
     borderColor: '#D1D1D6',
