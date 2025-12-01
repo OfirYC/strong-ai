@@ -12,7 +12,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import Input from '../components/Input';
-import Button from '../components/Button';
 import DecimalInput from '../components/DecimalInput';
 import DurationInput from '../components/DurationInput';
 import CreateExerciseModal from '../components/CreateExerciseModal';
