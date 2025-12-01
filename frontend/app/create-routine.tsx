@@ -6,18 +6,16 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import Input from '../components/Input';
-import DecimalInput from '../components/DecimalInput';
-import DurationInput from '../components/DurationInput';
+import SetRowInput, { SetHeader } from '../components/SetRowInput';
 import CreateExerciseModal from '../components/CreateExerciseModal';
 import ExercisePickerModal from '../components/ExercisePickerModal';
 import api from '../utils/api';
-import { Exercise, TemplateExercise, TemplateSet, getExerciseFields } from '../types';
+import { Exercise, TemplateExercise } from '../types';
 
 export default function CreateRoutineScreen() {
   const router = useRouter();
