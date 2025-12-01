@@ -276,20 +276,38 @@ async def start_workout(
             notes = notes or template.get("notes")
             # Convert template exercises to workout exercises with pre-populated sets
             for tmpl_ex in template.get("exercises", []):
-                sets = []
-                # Create default sets based on template
-                num_sets = tmpl_ex.get("default_sets", 3)
-                for _ in range(num_sets):
-                    set_item = {"is_warmup": False}
-                    if tmpl_ex.get("default_weight") is not None:
-                        set_item["weight"] = tmpl_ex["default_weight"]
-                    if tmpl_ex.get("default_reps") is not None:
-                        set_item["reps"] = tmpl_ex["default_reps"]
-                    if tmpl_ex.get("default_duration") is not None:
-                        set_item["duration"] = tmpl_ex["default_duration"]
-                    if tmpl_ex.get("default_distance") is not None:
-                        set_item["distance"] = tmpl_ex["default_distance"]
-                    sets.append(set_item)
+                # Check if new format (has 'sets' array) or legacy format
+                tmpl_sets = tmpl_ex.get("sets", [])
+                if tmpl_sets:
+                    # New format: use the sets directly
+                    sets = []
+                    for tmpl_set in tmpl_sets:
+                        set_item = {
+                            "is_warmup": tmpl_set.get("is_warmup", False),
+                            "weight": tmpl_set.get("weight"),
+                            "reps": tmpl_set.get("reps"),
+                            "duration": tmpl_set.get("duration"),
+                            "distance": tmpl_set.get("distance"),
+                        }
+                        # Remove None values
+                        set_item = {k: v for k, v in set_item.items() if v is not None}
+                        set_item["is_warmup"] = tmpl_set.get("is_warmup", False)
+                        sets.append(set_item)
+                else:
+                    # Legacy format: create default sets
+                    sets = []
+                    num_sets = tmpl_ex.get("default_sets", 3)
+                    for _ in range(num_sets):
+                        set_item = {"is_warmup": False}
+                        if tmpl_ex.get("default_weight") is not None:
+                            set_item["weight"] = tmpl_ex["default_weight"]
+                        if tmpl_ex.get("default_reps") is not None:
+                            set_item["reps"] = tmpl_ex["default_reps"]
+                        if tmpl_ex.get("default_duration") is not None:
+                            set_item["duration"] = tmpl_ex["default_duration"]
+                        if tmpl_ex.get("default_distance") is not None:
+                            set_item["distance"] = tmpl_ex["default_distance"]
+                        sets.append(set_item)
                 
                 exercises.append({
                     "exercise_id": tmpl_ex["exercise_id"],
