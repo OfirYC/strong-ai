@@ -449,6 +449,4 @@ const styles = StyleSheet.create({
     color: '#007AFF',
     marginLeft: 8,
   },
-  footer: {
-  },
 });
