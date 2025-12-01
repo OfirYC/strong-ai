@@ -21,6 +21,7 @@ import { useWorkoutStore } from '../store/workoutStore';
 import Button from './Button';
 import DurationInput from './DurationInput';
 import DecimalInput from './DecimalInput';
+import SetRowInput, { SetHeader } from './SetRowInput';
 import CreateExerciseModal from './CreateExerciseModal';
 import ExerciseDetailModal from './ExerciseDetailModal';
 import ExercisePickerModal from './ExercisePickerModal';
