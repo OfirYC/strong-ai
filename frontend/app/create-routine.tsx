@@ -288,15 +288,6 @@ export default function CreateRoutineScreen() {
         </View>
       </ScrollView>
 
-      <View style={styles.footer}>
-        <Button
-          title="Create Routine"
-          onPress={handleSave}
-          loading={saving}
-          disabled={!name.trim() || selectedExercises.length === 0}
-        />
-      </View>
-
       <ExercisePickerModal
         visible={showExercisePicker}
         onClose={() => setShowExercisePicker(false)}
