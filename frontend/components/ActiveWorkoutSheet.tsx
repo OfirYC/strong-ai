@@ -589,11 +589,11 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
                             </View>
                             
                             {exercise.sets.map((set, setIndex) => (
-                              <View key={setIndex} style={styles.setRow}>
-                                <Text style={styles.setNumber}>{setIndex + 1}</Text>
+                              <View key={setIndex} style={[styles.setRow, set.completed && styles.setRowCompleted]}>
+                                <Text style={[styles.setNumber, set.completed && styles.setNumberCompleted]}>{setIndex + 1}</Text>
                                 {fields.includes('weight') && (
                                   <DecimalInput
-                                    style={styles.setInput}
+                                    style={[styles.setInput, set.completed && styles.setInputCompleted]}
                                     value={set.weight || 0}
                                     onChangeValue={(value) => updateSet(exerciseIndex, setIndex, 'weight', value)}
                                     placeholder="0"
@@ -601,7 +601,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
                                 )}
                                 {fields.includes('reps') && (
                                   <TextInput
-                                    style={styles.setInput}
+                                    style={[styles.setInput, set.completed && styles.setInputCompleted]}
                                     value={set.reps?.toString() || '0'}
                                     onChangeText={(value) => updateSet(exerciseIndex, setIndex, 'reps', parseInt(value) || 0)}
                                     keyboardType="number-pad"
@@ -617,14 +617,17 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
                                 )}
                                 {fields.includes('distance') && (
                                   <DecimalInput
-                                    style={styles.setInput}
+                                    style={[styles.setInput, set.completed && styles.setInputCompleted]}
                                     value={set.distance || 0}
                                     onChangeValue={(value) => updateSet(exerciseIndex, setIndex, 'distance', value)}
                                     placeholder="0"
                                   />
                                 )}
-                                <TouchableOpacity onPress={() => removeSet(exerciseIndex, setIndex)}>
-                                  <Ionicons name="trash-outline" size={20} color="#FF3B30" />
+                                <TouchableOpacity 
+                                  style={[styles.completeButton, set.completed && styles.completeButtonActive]}
+                                  onPress={() => updateSet(exerciseIndex, setIndex, 'completed', !set.completed)}
+                                >
+                                  <Ionicons name="checkmark" size={18} color={set.completed ? '#FFFFFF' : '#D1D1D6'} />
                                 </TouchableOpacity>
                               </View>
                             ))}
