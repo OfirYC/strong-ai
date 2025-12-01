@@ -23,6 +23,7 @@ import DurationInput from './DurationInput';
 import DecimalInput from './DecimalInput';
 import CreateExerciseModal from './CreateExerciseModal';
 import ExerciseDetailModal from './ExerciseDetailModal';
+import ExercisePickerModal from './ExercisePickerModal';
 import WorkoutCompleteModal from './WorkoutCompleteModal';
 import api from '../utils/api';
 import { Exercise, WorkoutExercise, WorkoutSet, getExerciseFields } from '../types';
