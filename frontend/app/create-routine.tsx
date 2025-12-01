@@ -278,7 +278,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   addExerciseButton: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
@@ -296,8 +295,6 @@ const styles = StyleSheet.create({
   },
   footer: {
     padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#2C2C2E',
   },
   modalContainer: {
     flex: 1,
