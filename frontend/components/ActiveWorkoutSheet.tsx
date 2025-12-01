@@ -675,105 +675,15 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
       </Animated.View>
 
       {/* Exercise Picker Modal */}
-      <Modal
+      <ExercisePickerModal
         visible={showExercisePicker}
-        animationType="slide"
-        presentationStyle="pageSheet"
-      >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setShowExercisePicker(false)}>
-              <Ionicons name="close" size={28} color="#1C1C1E" />
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>Add Exercise</Text>
-            <TouchableOpacity onPress={() => {
-              setShowExercisePicker(false);
-              setTimeout(() => setShowCreateExercise(true), 300);
-            }}>
-              <Text style={styles.newExerciseText}>+ New</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Search Bar */}
-          <View style={styles.searchContainer}>
-            <Ionicons name="search" size={20} color="#8E8E93" />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search exercises"
-              placeholderTextColor="#8E8E93"
-              value={exerciseSearchQuery}
-              onChangeText={setExerciseSearchQuery}
-            />
-            {exerciseSearchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setExerciseSearchQuery('')}>
-                <Ionicons name="close-circle" size={20} color="#8E8E93" />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Muscle Group Filter */}
-          <View style={styles.filterContainer}>
-            <FlatList
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              data={MUSCLE_GROUPS}
-              keyExtractor={(item) => item}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.filterChip,
-                    selectedMuscleGroup === item && styles.filterChipActive,
-                  ]}
-                  onPress={() => setSelectedMuscleGroup(item)}
-                >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      selectedMuscleGroup === item && styles.filterChipTextActive,
-                    ]}
-                  >
-                    {item}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            />
-          </View>
-
-          <FlatList
-            data={filteredExercises}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.exerciseOption}
-                onPress={() => handleAddExerciseToWorkout(item)}
-              >
-                <View style={styles.exerciseOptionImageContainer}>
-                  {item.image ? (
-                    <Image source={{ uri: item.image }} style={styles.exerciseOptionImage} />
-                  ) : (
-                    <View style={styles.exerciseOptionPlaceholder}>
-                      <Ionicons name="barbell" size={20} color="#8E8E93" />
-                    </View>
-                  )}
-                </View>
-                <View style={styles.exerciseOptionInfo}>
-                  <Text style={styles.exerciseOptionName}>{item.name}</Text>
-                  <Text style={styles.exerciseOptionDetail}>
-                    {item.exercise_kind} • {item.primary_body_parts.join(', ')}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            )}
-            contentContainerStyle={styles.exerciseList}
-            ListEmptyComponent={
-              <View style={styles.emptyExerciseList}>
-                <Ionicons name="fitness-outline" size={48} color="#8E8E93" />
-                <Text style={styles.emptyExerciseText}>No exercises found</Text>
-              </View>
-            }
-          />
-        </SafeAreaView>
-      </Modal>
+        onClose={() => setShowExercisePicker(false)}
+        onSelectExercise={handleAddExerciseToWorkout}
+        onCreateNew={() => {
+          setShowExercisePicker(false);
+          setTimeout(() => setShowCreateExercise(true), 300);
+        }}
+      />
 
       <CreateExerciseModal
         visible={showCreateExercise}
