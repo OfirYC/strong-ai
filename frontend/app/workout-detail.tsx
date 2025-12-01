@@ -109,9 +109,19 @@ export default function WorkoutDetailScreen() {
     </View>
   );
 
+  // Helper to format pace (min:sec per km)
+  const formatPace = (durationSeconds: number, distanceKm: number): string => {
+    if (distanceKm <= 0) return '--:--';
+    const paceSeconds = durationSeconds / distanceKm;
+    const mins = Math.floor(paceSeconds / 60);
+    const secs = Math.floor(paceSeconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   const renderSetValue = (set: WorkoutSet, kind: ExerciseKind, index: number) => {
     const isDuration = isDurationBased(kind);
     const hasWeight = usesWeight(kind);
+    const isCardio = kind === 'Cardio';
     
     // Collect PR badges
     const badges: string[] = [];
@@ -120,7 +130,33 @@ export default function WorkoutDetailScreen() {
     if (set.is_volume_pr) badges.push('VOL.');
     if (set.is_duration_pr) badges.push('DURATION');
     
-    if (isDuration) {
+    // Cardio: show distance, time, and pace
+    if (isCardio) {
+      const duration = set.duration || 0;
+      const distance = set.distance || 0;
+      const pace = formatPace(duration, distance);
+      
+      return (
+        <View style={styles.setRow}>
+          <Text style={styles.setIndex}>{index + 1}</Text>
+          <View style={styles.cardioSetValue}>
+            {distance > 0 && (
+              <Text style={styles.setValue}>{distance} km</Text>
+            )}
+            <Text style={styles.setValueSecondary}>{formatDuration(duration)}</Text>
+            {distance > 0 && (
+              <Text style={styles.setValuePace}>{pace}/km</Text>
+            )}
+          </View>
+          {badges.length > 0 && (
+            <View style={styles.badgesContainer}>
+              {badges.map(renderPRBadge)}
+            </View>
+          )}
+        </View>
+      );
+    } else if (isDuration) {
+      // Duration only (non-cardio timed exercises like planks)
       const duration = set.duration || 0;
       return (
         <View style={styles.setRow}>
