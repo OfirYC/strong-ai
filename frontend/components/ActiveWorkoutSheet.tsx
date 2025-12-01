@@ -981,6 +981,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
     gap: 8,
+    backgroundColor: '#F5F5F7',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
   },
   setRowCompleted: {
     opacity: 0.7,
