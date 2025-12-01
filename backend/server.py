@@ -281,6 +281,16 @@ async def get_workouts(
     return [WorkoutSession(**{**w, "id": str(w["_id"])}) for w in workouts]
 
 
+# Get completed workout count for user
+@api_router.get("/workouts/count")
+async def get_workout_count(
+    user_id: str = Depends(get_current_user)
+):
+    """Get the total number of completed workouts for the user"""
+    count = await db.workouts.count_documents({"user_id": user_id, "ended_at": {"$ne": None}})
+    return {"count": count}
+
+
 # IMPORTANT: This route MUST come before /workouts/{workout_id} to avoid "history" being treated as a workout_id
 @api_router.get("/workouts/history", response_model=List[WorkoutSummary])
 async def get_workout_history(
