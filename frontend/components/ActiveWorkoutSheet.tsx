@@ -20,6 +20,7 @@ import { Swipeable } from 'react-native-gesture-handler';
 import { useWorkoutStore } from '../store/workoutStore';
 import Button from './Button';
 import DurationInput from './DurationInput';
+import DecimalInput from './DecimalInput';
 import CreateExerciseModal from './CreateExerciseModal';
 import ExerciseDetailModal from './ExerciseDetailModal';
 import api from '../utils/api';
