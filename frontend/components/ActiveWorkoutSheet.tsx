@@ -726,6 +726,12 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
         }}
         onExerciseUpdated={loadExerciseDetails}
       />
+
+      <WorkoutCompleteModal
+        visible={showWorkoutComplete}
+        onClose={handleCloseWorkoutComplete}
+        summaryData={workoutSummary}
+      />
     </>
   );
 }
