@@ -23,8 +23,24 @@ import DurationInput from './DurationInput';
 import DecimalInput from './DecimalInput';
 import CreateExerciseModal from './CreateExerciseModal';
 import ExerciseDetailModal from './ExerciseDetailModal';
+import WorkoutCompleteModal from './WorkoutCompleteModal';
 import api from '../utils/api';
 import { Exercise, WorkoutExercise, WorkoutSet, getExerciseFields } from '../types';
+
+interface WorkoutSummaryData {
+  name: string;
+  date: Date;
+  duration: number;
+  totalVolume: number;
+  prCount: number;
+  exerciseCount: number;
+  exercises: Array<{
+    name: string;
+    sets: number;
+    bestSet: string;
+  }>;
+  workoutNumber: number;
+}
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const COLLAPSED_HEIGHT = 80;
