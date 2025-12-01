@@ -223,6 +223,50 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
     updateWorkout(newExercises);
   };
 
+  const removeExercise = (exerciseIndex: number) => {
+    const exerciseName = exerciseDetails[exercises[exerciseIndex]?.exercise_id]?.name || 'this exercise';
+    Alert.alert(
+      'Delete Exercise',
+      `Are you sure you want to remove ${exerciseName} from this workout?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: () => {
+            const newExercises = exercises.filter((_, i) => i !== exerciseIndex);
+            updateWorkout(newExercises);
+          }
+        },
+      ]
+    );
+  };
+
+  // Helper to handle decimal input - preserves decimal point during typing
+  const handleDecimalInput = (text: string, callback: (value: number) => void) => {
+    // Allow empty input, numbers, and decimal point
+    const cleaned = text.replace(/[^0-9.]/g, '');
+    // Only allow one decimal point
+    const parts = cleaned.split('.');
+    const formatted = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : cleaned;
+    // Parse to number, preserving 0 for empty input
+    const numValue = formatted === '' || formatted === '.' ? 0 : parseFloat(formatted);
+    callback(isNaN(numValue) ? 0 : numValue);
+  };
+
+  // Render the delete action for swipeable
+  const renderRightActions = (exerciseIndex: number) => {
+    return (
+      <TouchableOpacity 
+        style={styles.deleteAction}
+        onPress={() => removeExercise(exerciseIndex)}
+      >
+        <Ionicons name="trash" size={24} color="#FFFFFF" />
+        <Text style={styles.deleteActionText}>Delete</Text>
+      </TouchableOpacity>
+    );
+  };
+
   const handleSaveAndFinish = async () => {
     if (!activeWorkout) return;
 
