@@ -1080,4 +1080,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 4,
   },
+  deleteSetAction: {
+    backgroundColor: '#FF3B30',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 50,
+    marginBottom: 8,
+    borderTopRightRadius: 8,
+    borderBottomRightRadius: 8,
+  },
 });
