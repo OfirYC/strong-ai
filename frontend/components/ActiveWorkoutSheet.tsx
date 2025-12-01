@@ -338,8 +338,8 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
         console.log('Could not fetch workout count');
       }
       
-      // Build exercise summaries
-      const exerciseSummaries = exercises.map(ex => {
+      // Build exercise summaries (use saved exercises, not original)
+      const exerciseSummaries = exercisesToSave.map(ex => {
         const detail = exerciseDetails[ex.exercise_id];
         const sets = ex.sets;
         let bestSet = '';
@@ -383,9 +383,9 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
         };
       });
       
-      // Calculate total volume (only for weight exercises)
+      // Calculate total volume (only for weight exercises, use saved exercises)
       let totalVolume = 0;
-      exercises.forEach(ex => {
+      exercisesToSave.forEach(ex => {
         ex.sets.forEach(set => {
           if (set.weight && set.reps) {
             totalVolume += set.weight * set.reps;
