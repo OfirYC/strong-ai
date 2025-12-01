@@ -525,6 +525,22 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     flex: 1,
   },
+  cardioSetValue: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  setValueSecondary: {
+    fontSize: 14,
+    color: '#8E8E93',
+    fontWeight: '500',
+  },
+  setValuePace: {
+    fontSize: 14,
+    color: '#007AFF',
+    fontWeight: '600',
+  },
   badgesContainer: {
     flexDirection: 'row',
     gap: 6,
