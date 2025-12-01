@@ -344,45 +344,13 @@ const styles = StyleSheet.create({
   setsContainer: {
     marginBottom: 12,
   },
-  setHeader: {
+  setRowWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
-    paddingHorizontal: 4,
-  },
-  setHeaderText: {
-    flex: 1,
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#8E8E93',
-    textAlign: 'center',
-  },
-  setRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
     gap: 8,
   },
-  setNumber: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1C1C1E',
-    textAlign: 'center',
-  },
-  setInput: {
-    flex: 1,
-    backgroundColor: '#F5F5F7',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    textAlign: 'center',
-    borderWidth: 1,
-    borderColor: '#D1D1D6',
-  },
-  durationInput: {
-    flex: 1,
+  removeSetButton: {
+    padding: 4,
   },
   addSetButton: {
     flexDirection: 'row',
