@@ -873,11 +873,11 @@ const styles = StyleSheet.create({
   },
   exerciseCard: {
     borderRadius: 12,
-    padding: 16,
+    padding: 4,
     marginBottom: 16,
   },
   exerciseNameClickable: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '600',
     color: '#007AFF',
     marginBottom: 12,
@@ -887,6 +887,7 @@ const styles = StyleSheet.create({
   },
   setHeader: {
     flexDirection: 'row',
+    justifyContent: "space-between",
     alignItems: 'center',
     marginBottom: 8,
     paddingHorizontal: 4,
@@ -900,6 +901,7 @@ const styles = StyleSheet.create({
   },
   setRow: {
     flexDirection: 'row',
+    justifyContent: "space-between",
     alignItems: 'center',
     marginBottom: 8,
     gap: 8,
