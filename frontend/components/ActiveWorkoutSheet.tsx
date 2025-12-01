@@ -635,14 +635,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
                       {/* Sets */}
                       {exercise.sets.length > 0 && (
                         <View style={styles.setsContainer}>
-                          <View style={styles.setHeader}>
-                            <Text style={styles.setHeaderText}>SET</Text>
-                            {fields.includes('weight') && <Text style={styles.setHeaderText}>KG</Text>}
-                            {fields.includes('reps') && <Text style={styles.setHeaderText}>REPS</Text>}
-                            {fields.includes('duration') && <Text style={styles.setHeaderText}>TIME</Text>}
-                            {fields.includes('distance') && <Text style={styles.setHeaderText}>KM</Text>}
-                            <Text style={styles.setHeaderText}></Text>
-                          </View>
+                          <SetHeader exerciseKind={detail?.exercise_kind || 'Barbell'} showCompleteColumn />
                           
                           {exercise.sets.map((set, setIndex) => (
                             <Swipeable
@@ -651,47 +644,13 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
                               overshootRight={false}
                               friction={2}
                             >
-                              <View style={[styles.setRow, set.completed && styles.setRowCompleted]}>
-                                <Text style={[styles.setNumber, set.completed && styles.setNumberCompleted]}>{setIndex + 1}</Text>
-                                {fields.includes('weight') && (
-                                  <DecimalInput
-                                    style={[styles.setInput, set.completed && styles.setInputCompleted]}
-                                    value={set.weight || 0}
-                                    onChangeValue={(value) => updateSet(exerciseIndex, setIndex, 'weight', value)}
-                                    placeholder="0"
-                                  />
-                                )}
-                                {fields.includes('reps') && (
-                                  <TextInput
-                                    style={[styles.setInput, set.completed && styles.setInputCompleted]}
-                                    value={set.reps?.toString() || '0'}
-                                    onChangeText={(value) => updateSet(exerciseIndex, setIndex, 'reps', parseInt(value) || 0)}
-                                    keyboardType="number-pad"
-                                    placeholder="0"
-                                  />
-                                )}
-                                {fields.includes('duration') && (
-                                  <DurationInput
-                                    value={set.duration || 0}
-                                    onChangeValue={(value) => updateSet(exerciseIndex, setIndex, 'duration', value)}
-                                    style={[styles.durationInput, set.completed && styles.durationInputCompleted]}
-                                  />
-                                )}
-                                {fields.includes('distance') && (
-                                  <DecimalInput
-                                    style={[styles.setInput, set.completed && styles.setInputCompleted]}
-                                    value={set.distance || 0}
-                                    onChangeValue={(value) => updateSet(exerciseIndex, setIndex, 'distance', value)}
-                                    placeholder="0"
-                                  />
-                                )}
-                                <TouchableOpacity 
-                                  style={[styles.completeButton, set.completed && styles.completeButtonActive]}
-                                  onPress={() => updateSet(exerciseIndex, setIndex, 'completed', !set.completed)}
-                                >
-                                  <Ionicons name="checkmark" size={18} color={set.completed ? '#FFFFFF' : '#D1D1D6'} />
-                                </TouchableOpacity>
-                              </View>
+                              <SetRowInput
+                                set={set}
+                                setIndex={setIndex}
+                                exerciseKind={detail?.exercise_kind || 'Barbell'}
+                                onUpdateSet={(field, value) => updateSet(exerciseIndex, setIndex, field, value)}
+                                showCompleteButton
+                              />
                             </Swipeable>
                           ))}
                         </View>
