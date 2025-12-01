@@ -936,15 +936,27 @@ const styles = StyleSheet.create({
     color: '#8E8E93',
   },
   exerciseCard: {
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 4,
+    padding: 16,
     marginBottom: 16,
   },
+  exerciseHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  exerciseNameContainer: {
+    flex: 1,
+  },
   exerciseNameClickable: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     color: '#007AFF',
-    marginBottom: 12,
+  },
+  exerciseMenuButton: {
+    padding: 8,
   },
   setsContainer: {
     marginBottom: 12,
