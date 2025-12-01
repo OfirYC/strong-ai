@@ -180,8 +180,19 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
     }
   };
 
+  // Filter exercises based on search query and muscle group
+  const filteredExercises = availableExercises.filter(exercise => {
+    const matchesSearch = !exerciseSearchQuery || 
+      exercise.name.toLowerCase().includes(exerciseSearchQuery.toLowerCase());
+    const matchesMuscleGroup = selectedMuscleGroup === 'All' || 
+      exercise.muscle_group === selectedMuscleGroup;
+    return matchesSearch && matchesMuscleGroup;
+  });
+
   const handleShowExercisePicker = () => {
     loadAvailableExercises();
+    setExerciseSearchQuery('');
+    setSelectedMuscleGroup('All');
     setShowExercisePicker(true);
   };
 
