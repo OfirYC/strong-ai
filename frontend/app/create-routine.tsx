@@ -6,9 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  Modal,
-  FlatList,
-  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +13,7 @@ import { useRouter } from 'expo-router';
 import Input from '../components/Input';
 import Button from '../components/Button';
 import CreateExerciseModal from '../components/CreateExerciseModal';
+import ExercisePickerModal from '../components/ExercisePickerModal';
 import api from '../utils/api';
 import { Exercise, TemplateExercise } from '../types';
 
