@@ -50,7 +50,7 @@ interface ActiveWorkoutSheetProps {
   initialExpanded?: boolean;
 }
 
-export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = false }: ActiveWorkoutSheetProps) {
+export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = true }: ActiveWorkoutSheetProps) {
   const insets = useSafeAreaInsets();
   
   const { activeWorkout, updateWorkout, updateWorkoutName, updateWorkoutNotes, endWorkout, workoutStartTime } = useWorkoutStore();
