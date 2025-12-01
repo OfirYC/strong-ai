@@ -970,4 +970,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6E6E73',
   },
+  deleteAction: {
+    backgroundColor: '#FF3B30',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    marginBottom: 16,
+    borderTopRightRadius: 12,
+    borderBottomRightRadius: 12,
+  },
+  deleteActionText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 4,
+  },
 });
