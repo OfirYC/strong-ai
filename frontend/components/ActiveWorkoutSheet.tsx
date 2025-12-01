@@ -612,7 +612,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
                                   <DurationInput
                                     value={set.duration || 0}
                                     onChangeValue={(value) => updateSet(exerciseIndex, setIndex, 'duration', value)}
-                                    style={styles.durationInput}
+                                    style={[styles.durationInput, set.completed && styles.durationInputCompleted]}
                                   />
                                 )}
                                 {fields.includes('distance') && (
