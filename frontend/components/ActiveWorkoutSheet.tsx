@@ -69,10 +69,6 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
   const [availableExercises, setAvailableExercises] = useState<Exercise[]>([]);
   const [showWorkoutComplete, setShowWorkoutComplete] = useState(false);
   const [workoutSummary, setWorkoutSummary] = useState<WorkoutSummaryData | null>(null);
-  const [exerciseSearchQuery, setExerciseSearchQuery] = useState('');
-  const [selectedMuscleGroup, setSelectedMuscleGroup] = useState('All');
-
-  const MUSCLE_GROUPS = ['All', 'Chest', 'Back', 'Shoulders', 'Arms', 'Legs', 'Abs', 'Full Body'];
   
   // Calculate the maximum height for expanded state
   // Screen height minus top safe area minus tab bar (60px) minus bottom safe area
