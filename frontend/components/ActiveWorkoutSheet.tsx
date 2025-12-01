@@ -595,14 +595,10 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
                   const fields = getExerciseFields(detail?.exercise_kind || 'Barbell');
                   
                   return (
-                    <Swipeable
-                      key={`${exercise.exercise_id}-${exerciseIndex}`}
-                      renderRightActions={() => renderRightActions(exerciseIndex)}
-                      overshootRight={false}
-                      friction={2}
-                    >
-                      <View style={styles.exerciseCard}>
+                    <View key={`${exercise.exercise_id}-${exerciseIndex}`} style={styles.exerciseCard}>
+                      <View style={styles.exerciseHeader}>
                         <TouchableOpacity
+                          style={styles.exerciseNameContainer}
                           onPress={() => {
                             if (detail) {
                               setSelectedExercise(detail);
@@ -614,21 +610,47 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
                             {detail?.name || 'Loading...'}
                           </Text>
                         </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.exerciseMenuButton}
+                          onPress={() => {
+                            Alert.alert(
+                              detail?.name || 'Exercise',
+                              'What would you like to do?',
+                              [
+                                { text: 'Cancel', style: 'cancel' },
+                                { 
+                                  text: 'Delete Exercise', 
+                                  style: 'destructive',
+                                  onPress: () => removeExercise(exerciseIndex)
+                                },
+                              ]
+                            );
+                          }}
+                        >
+                          <Ionicons name="ellipsis-horizontal" size={20} color="#8E8E93" />
+                        </TouchableOpacity>
+                      </View>
 
-                        {/* Sets */}
-                        {exercise.sets.length > 0 && (
-                          <View style={styles.setsContainer}>
-                            <View style={styles.setHeader}>
-                              <Text style={styles.setHeaderText}>SET</Text>
-                              {fields.includes('weight') && <Text style={styles.setHeaderText}>KG</Text>}
-                              {fields.includes('reps') && <Text style={styles.setHeaderText}>REPS</Text>}
-                              {fields.includes('duration') && <Text style={styles.setHeaderText}>TIME</Text>}
-                              {fields.includes('distance') && <Text style={styles.setHeaderText}>KM</Text>}
-                              <Text style={styles.setHeaderText}></Text>
-                            </View>
-                            
-                            {exercise.sets.map((set, setIndex) => (
-                              <View key={setIndex} style={[styles.setRow, set.completed && styles.setRowCompleted]}>
+                      {/* Sets */}
+                      {exercise.sets.length > 0 && (
+                        <View style={styles.setsContainer}>
+                          <View style={styles.setHeader}>
+                            <Text style={styles.setHeaderText}>SET</Text>
+                            {fields.includes('weight') && <Text style={styles.setHeaderText}>KG</Text>}
+                            {fields.includes('reps') && <Text style={styles.setHeaderText}>REPS</Text>}
+                            {fields.includes('duration') && <Text style={styles.setHeaderText}>TIME</Text>}
+                            {fields.includes('distance') && <Text style={styles.setHeaderText}>KM</Text>}
+                            <Text style={styles.setHeaderText}></Text>
+                          </View>
+                          
+                          {exercise.sets.map((set, setIndex) => (
+                            <Swipeable
+                              key={setIndex}
+                              renderRightActions={() => renderSetDeleteAction(exerciseIndex, setIndex)}
+                              overshootRight={false}
+                              friction={2}
+                            >
+                              <View style={[styles.setRow, set.completed && styles.setRowCompleted]}>
                                 <Text style={[styles.setNumber, set.completed && styles.setNumberCompleted]}>{setIndex + 1}</Text>
                                 {fields.includes('weight') && (
                                   <DecimalInput
@@ -669,16 +691,16 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
                                   <Ionicons name="checkmark" size={18} color={set.completed ? '#FFFFFF' : '#D1D1D6'} />
                                 </TouchableOpacity>
                               </View>
-                            ))}
-                          </View>
-                        )}
+                            </Swipeable>
+                          ))}
+                        </View>
+                      )}
 
-                        <TouchableOpacity style={styles.addSetButton} onPress={() => addSet(exerciseIndex)}>
-                          <Ionicons name="add" size={20} color="#007AFF" />
-                          <Text style={styles.addSetText}>Add Set</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </Swipeable>
+                      <TouchableOpacity style={styles.addSetButton} onPress={() => addSet(exerciseIndex)}>
+                        <Ionicons name="add" size={20} color="#007AFF" />
+                        <Text style={styles.addSetText}>Add Set</Text>
+                      </TouchableOpacity>
+                    </View>
                   );
                 })
               )}
