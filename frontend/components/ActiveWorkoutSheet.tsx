@@ -277,11 +277,51 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
   const handleSaveAndFinish = async () => {
     if (!activeWorkout) return;
 
+    // Check for uncompleted sets
+    let uncompletedSetCount = 0;
+    exercises.forEach(ex => {
+      ex.sets.forEach(set => {
+        if (!set.completed) {
+          uncompletedSetCount++;
+        }
+      });
+    });
+
+    if (uncompletedSetCount > 0) {
+      Alert.alert(
+        'Uncompleted Sets',
+        `You have ${uncompletedSetCount} uncompleted set${uncompletedSetCount > 1 ? 's' : ''}. These will be removed. Are you sure you want to finish?`,
+        [
+          { text: 'No', style: 'cancel' },
+          { 
+            text: 'Yes, Finish', 
+            style: 'destructive',
+            onPress: () => saveWorkout(true)
+          },
+        ]
+      );
+    } else {
+      saveWorkout(false);
+    }
+  };
+
+  const saveWorkout = async (removeUncompleted: boolean) => {
+    if (!activeWorkout) return;
+
+    // Filter out uncompleted sets if requested
+    let exercisesToSave = exercises;
+    if (removeUncompleted) {
+      exercisesToSave = exercises.map(ex => ({
+        ...ex,
+        sets: ex.sets.filter(set => set.completed)
+      })).filter(ex => ex.sets.length > 0); // Remove exercises with no completed sets
+    }
+
     try {
       setSaving(true);
       // Use PUT instead of PATCH - backend requires PUT
       await api.put(`/workouts/${activeWorkout.id}`, {
-        exercises: exercises,
+        exercises: exercisesToSave,
         name: activeWorkout.name,
         notes: activeWorkout.notes,
         status: 'completed',
