@@ -693,8 +693,53 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
             </TouchableOpacity>
           </View>
 
+          {/* Search Bar */}
+          <View style={styles.searchContainer}>
+            <Ionicons name="search" size={20} color="#8E8E93" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search exercises"
+              placeholderTextColor="#8E8E93"
+              value={exerciseSearchQuery}
+              onChangeText={setExerciseSearchQuery}
+            />
+            {exerciseSearchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setExerciseSearchQuery('')}>
+                <Ionicons name="close-circle" size={20} color="#8E8E93" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Muscle Group Filter */}
+          <View style={styles.filterContainer}>
+            <FlatList
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              data={MUSCLE_GROUPS}
+              keyExtractor={(item) => item}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.filterChip,
+                    selectedMuscleGroup === item && styles.filterChipActive,
+                  ]}
+                  onPress={() => setSelectedMuscleGroup(item)}
+                >
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      selectedMuscleGroup === item && styles.filterChipTextActive,
+                    ]}
+                  >
+                    {item}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+
           <FlatList
-            data={availableExercises}
+            data={filteredExercises}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
               <TouchableOpacity
@@ -719,6 +764,12 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
               </TouchableOpacity>
             )}
             contentContainerStyle={styles.exerciseList}
+            ListEmptyComponent={
+              <View style={styles.emptyExerciseList}>
+                <Ionicons name="fitness-outline" size={48} color="#8E8E93" />
+                <Text style={styles.emptyExerciseText}>No exercises found</Text>
+              </View>
+            }
           />
         </SafeAreaView>
       </Modal>
