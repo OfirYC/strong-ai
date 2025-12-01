@@ -288,15 +288,100 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
         ended_at: new Date().toISOString(),
         duration: timer,
       });
-      endWorkout();
+      
+      // Get workout count for summary
+      let workoutNumber = 1;
+      try {
+        const countRes = await api.get('/workouts/count');
+        workoutNumber = countRes.data.count;
+      } catch (e) {
+        console.log('Could not fetch workout count');
+      }
+      
+      // Build exercise summaries
+      const exerciseSummaries = exercises.map(ex => {
+        const detail = exerciseDetails[ex.exercise_id];
+        const sets = ex.sets;
+        let bestSet = '';
+        
+        // Determine best set based on exercise type
+        if (detail?.exercise_kind === 'Cardio') {
+          // For cardio, show best distance or longest time
+          const bestDistanceSet = sets.reduce((best, set) => 
+            (set.distance || 0) > (best.distance || 0) ? set : best, sets[0] || {});
+          if (bestDistanceSet?.distance) {
+            bestSet = `${bestDistanceSet.distance} km`;
+          } else if (bestDistanceSet?.duration) {
+            const mins = Math.floor((bestDistanceSet.duration || 0) / 60);
+            bestSet = `${mins}m`;
+          }
+        } else if (detail?.exercise_kind && ['Plank', 'Static Hold'].includes(detail.exercise_kind)) {
+          // Duration-based
+          const bestDurationSet = sets.reduce((best, set) => 
+            (set.duration || 0) > (best.duration || 0) ? set : best, sets[0] || {});
+          const mins = Math.floor((bestDurationSet?.duration || 0) / 60);
+          const secs = (bestDurationSet?.duration || 0) % 60;
+          bestSet = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+        } else {
+          // Weight-based - find highest volume set
+          const bestWeightSet = sets.reduce((best, set) => {
+            const volume = (set.weight || 0) * (set.reps || 0);
+            const bestVolume = (best.weight || 0) * (best.reps || 0);
+            return volume > bestVolume ? set : best;
+          }, sets[0] || {});
+          if (bestWeightSet?.weight) {
+            bestSet = `${bestWeightSet.weight} kg × ${bestWeightSet.reps || 0}`;
+          } else if (bestWeightSet?.reps) {
+            bestSet = `${bestWeightSet.reps} reps`;
+          }
+        }
+        
+        return {
+          name: detail?.name || 'Unknown Exercise',
+          sets: sets.length,
+          bestSet: bestSet || '-',
+        };
+      });
+      
+      // Calculate total volume (only for weight exercises)
+      let totalVolume = 0;
+      exercises.forEach(ex => {
+        ex.sets.forEach(set => {
+          if (set.weight && set.reps) {
+            totalVolume += set.weight * set.reps;
+          }
+        });
+      });
+      
+      // Build summary data
+      const summary: WorkoutSummaryData = {
+        name: activeWorkout.name || 'Workout',
+        date: new Date(),
+        duration: timer,
+        totalVolume: totalVolume,
+        prCount: 0, // TODO: Could fetch from backend PR endpoint
+        exerciseCount: exercises.length,
+        exercises: exerciseSummaries,
+        workoutNumber: workoutNumber,
+      };
+      
+      setWorkoutSummary(summary);
       collapse();
-      onFinishWorkout();
+      setShowWorkoutComplete(true);
+      
     } catch (error: any) {
       console.error('Save error:', error.response?.data || error);
       Alert.alert('Error', error.response?.data?.detail || 'Failed to save workout');
     } finally {
       setSaving(false);
     }
+  };
+  
+  const handleCloseWorkoutComplete = () => {
+    setShowWorkoutComplete(false);
+    setWorkoutSummary(null);
+    endWorkout();
+    onFinishWorkout();
   };
 
   const handleToggleDescription = () => {
