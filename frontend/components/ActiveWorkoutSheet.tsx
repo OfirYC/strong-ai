@@ -465,82 +465,87 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
                   const fields = getExerciseFields(detail?.exercise_kind || 'Barbell');
                   
                   return (
-                    <View key={`${exercise.exercise_id}-${exerciseIndex}`} style={styles.exerciseCard}>
-                      <TouchableOpacity
-                        onPress={() => {
-                          if (detail) {
-                            setSelectedExercise(detail);
-                            setShowExerciseDetail(true);
-                          }
-                        }}
-                      >
-                        <Text style={styles.exerciseNameClickable}>
-                          {detail?.name || 'Loading...'}
-                        </Text>
-                      </TouchableOpacity>
+                    <Swipeable
+                      key={`${exercise.exercise_id}-${exerciseIndex}`}
+                      renderRightActions={() => renderRightActions(exerciseIndex)}
+                      overshootRight={false}
+                      friction={2}
+                    >
+                      <View style={styles.exerciseCard}>
+                        <TouchableOpacity
+                          onPress={() => {
+                            if (detail) {
+                              setSelectedExercise(detail);
+                              setShowExerciseDetail(true);
+                            }
+                          }}
+                        >
+                          <Text style={styles.exerciseNameClickable}>
+                            {detail?.name || 'Loading...'}
+                          </Text>
+                        </TouchableOpacity>
 
-                      {/* Sets */}
-                      {exercise.sets.length > 0 && (
-                        <View style={styles.setsContainer}>
-                          <View style={styles.setHeader}>
-                            <Text style={styles.setHeaderText}>SET</Text>
-                            {fields.includes('weight') && <Text style={styles.setHeaderText}>KG</Text>}
-                            {fields.includes('reps') && <Text style={styles.setHeaderText}>REPS</Text>}
-                            {fields.includes('duration') && <Text style={styles.setHeaderText}>TIME</Text>}
-                            {fields.includes('distance') && <Text style={styles.setHeaderText}>KM</Text>}
-                            <Text style={styles.setHeaderText}></Text>
-                          </View>
-                          
-                          {exercise.sets.map((set, setIndex) => (
-                            <View key={setIndex} style={styles.setRow}>
-                              <Text style={styles.setNumber}>{setIndex + 1}</Text>
-                              {fields.includes('weight') && (
-                                <TextInput
-                                  style={styles.setInput}
-                                  value={set.weight?.toString() || '0'}
-                                  onChangeText={(value) => updateSet(exerciseIndex, setIndex, 'weight', parseFloat(value) || 0)}
-                                  keyboardType="numeric"
-                                  placeholder="0"
-                                />
-                              )}
-                              {fields.includes('reps') && (
-                                <TextInput
-                                  style={styles.setInput}
-                                  value={set.reps?.toString() || '0'}
-                                  onChangeText={(value) => updateSet(exerciseIndex, setIndex, 'reps', parseInt(value) || 0)}
-                                  keyboardType="numeric"
-                                  placeholder="0"
-                                />
-                              )}
-                              {fields.includes('duration') && (
-                                <DurationInput
-                                  value={set.duration || 0}
-                                  onChangeValue={(value) => updateSet(exerciseIndex, setIndex, 'duration', value)}
-                                  style={styles.durationInput}
-                                />
-                              )}
-                              {fields.includes('distance') && (
-                                <TextInput
-                                  style={styles.setInput}
-                                  value={set.distance?.toString() || '0'}
-                                  onChangeText={(value) => updateSet(exerciseIndex, setIndex, 'distance', parseFloat(value) || 0)}
-                                  keyboardType="numeric"
-                                  placeholder="0"
-                                />
-                              )}
-                              <TouchableOpacity onPress={() => removeSet(exerciseIndex, setIndex)}>
-                                <Ionicons name="trash-outline" size={20} color="#FF3B30" />
-                              </TouchableOpacity>
+                        {/* Sets */}
+                        {exercise.sets.length > 0 && (
+                          <View style={styles.setsContainer}>
+                            <View style={styles.setHeader}>
+                              <Text style={styles.setHeaderText}>SET</Text>
+                              {fields.includes('weight') && <Text style={styles.setHeaderText}>KG</Text>}
+                              {fields.includes('reps') && <Text style={styles.setHeaderText}>REPS</Text>}
+                              {fields.includes('duration') && <Text style={styles.setHeaderText}>TIME</Text>}
+                              {fields.includes('distance') && <Text style={styles.setHeaderText}>KM</Text>}
+                              <Text style={styles.setHeaderText}></Text>
                             </View>
-                          ))}
-                        </View>
-                      )}
+                            
+                            {exercise.sets.map((set, setIndex) => (
+                              <View key={setIndex} style={styles.setRow}>
+                                <Text style={styles.setNumber}>{setIndex + 1}</Text>
+                                {fields.includes('weight') && (
+                                  <DecimalInput
+                                    style={styles.setInput}
+                                    value={set.weight || 0}
+                                    onChangeValue={(value) => updateSet(exerciseIndex, setIndex, 'weight', value)}
+                                    placeholder="0"
+                                  />
+                                )}
+                                {fields.includes('reps') && (
+                                  <TextInput
+                                    style={styles.setInput}
+                                    value={set.reps?.toString() || '0'}
+                                    onChangeText={(value) => updateSet(exerciseIndex, setIndex, 'reps', parseInt(value) || 0)}
+                                    keyboardType="number-pad"
+                                    placeholder="0"
+                                  />
+                                )}
+                                {fields.includes('duration') && (
+                                  <DurationInput
+                                    value={set.duration || 0}
+                                    onChangeValue={(value) => updateSet(exerciseIndex, setIndex, 'duration', value)}
+                                    style={styles.durationInput}
+                                  />
+                                )}
+                                {fields.includes('distance') && (
+                                  <DecimalInput
+                                    style={styles.setInput}
+                                    value={set.distance || 0}
+                                    onChangeValue={(value) => updateSet(exerciseIndex, setIndex, 'distance', value)}
+                                    placeholder="0"
+                                  />
+                                )}
+                                <TouchableOpacity onPress={() => removeSet(exerciseIndex, setIndex)}>
+                                  <Ionicons name="trash-outline" size={20} color="#FF3B30" />
+                                </TouchableOpacity>
+                              </View>
+                            ))}
+                          </View>
+                        )}
 
-                      <TouchableOpacity style={styles.addSetButton} onPress={() => addSet(exerciseIndex)}>
-                        <Ionicons name="add" size={20} color="#007AFF" />
-                        <Text style={styles.addSetText}>Add Set</Text>
-                      </TouchableOpacity>
-                    </View>
+                        <TouchableOpacity style={styles.addSetButton} onPress={() => addSet(exerciseIndex)}>
+                          <Ionicons name="add" size={20} color="#007AFF" />
+                          <Text style={styles.addSetText}>Add Set</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </Swipeable>
                   );
                 })
               )}
