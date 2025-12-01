@@ -310,21 +310,42 @@ export default function CreateRoutineScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F5F5F7',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#D1D1D6',
+    backgroundColor: '#FFFFFF',
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#1C1C1E',
   },
+  saveButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#007AFF',
+  },
+  saveButtonDisabled: {
+    backgroundColor: '#D1D1D6',
+  },
+  saveButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  saveButtonTextDisabled: {
+    color: '#8E8E93',
+  },
   scrollContent: {
     padding: 16,
-    paddingBottom: 100,
+    paddingBottom: 40,
   },
   notesInput: {
     height: 80,
@@ -340,6 +361,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   exerciseCard: {
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
