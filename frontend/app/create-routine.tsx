@@ -102,7 +102,7 @@ export default function CreateRoutineScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="close" size={28} color="#FFFFFF" />
+          <Ionicons name="close" size={28} color="#1C1C1E" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Create Routine</Text>
         <View style={{ width: 28 }} />
