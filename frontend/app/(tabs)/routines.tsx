@@ -13,6 +13,8 @@ import { useRouter } from 'expo-router';
 import Button from '../../components/Button';
 import api from '../../utils/api';
 import { WorkoutTemplate } from '../../types';
+import RoutineDetailModal from '../../components/RoutineDetailModal';
+import { useWorkoutStore } from '../../store/workoutStore';
 
 export default function RoutinesScreen() {
   const router = useRouter();
