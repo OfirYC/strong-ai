@@ -150,6 +150,13 @@ export default function RoutinesScreen() {
           </View>
         }
       />
+
+      <RoutineDetailModal
+        visible={showRoutineModal}
+        routine={selectedRoutine}
+        onClose={() => setShowRoutineModal(false)}
+        onStartWorkout={handleStartWorkoutFromRoutine}
+      />
     </SafeAreaView>
   );
 }
