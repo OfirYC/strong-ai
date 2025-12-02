@@ -625,17 +625,9 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
                           <SetHeader exerciseKind={detail?.exercise_kind || 'Barbell'} showCompleteColumn />
                           
                           {exercise.sets.map((set, setIndex) => (
-                            <Swipeable
+                            <SwipeToDeleteRow
                               key={setIndex}
-                              renderRightActions={renderSetDeleteAction}
-                              onSwipeableOpen={(direction) => {
-                                if (direction === 'right') {
-                                  removeSet(exerciseIndex, setIndex);
-                                }
-                              }}
-                              rightThreshold={40}
-                              overshootRight={false}
-                              friction={2}
+                              onDelete={() => removeSet(exerciseIndex, setIndex)}
                             >
                               <SetRowInput
                                 set={set}
@@ -644,8 +636,10 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
                                 onUpdateSet={(field, value) => updateSet(exerciseIndex, setIndex, field, value)}
                                 showCompleteButton
                               />
-                            </Swipeable>
+                            </SwipeToDeleteRow>
                           ))}
+                        </View>
+                      )}
                         </View>
                       )}
 
