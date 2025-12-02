@@ -215,21 +215,9 @@ export default function CreateRoutineScreen() {
                     <SetHeader exerciseKind={exerciseKind} />
 
                     {exercise.sets.map((set, setIndex) => (
-                      <Swipeable
+                      <SwipeToDeleteRow
                         key={setIndex}
-                        renderRightActions={() => (
-                          <View style={styles.deleteSetAction}>
-                            <Ionicons name="trash" size={20} color="#FFFFFF" />
-                          </View>
-                        )}
-                        onSwipeableOpen={(direction) => {
-                          if (direction === 'right') {
-                            removeSet(exerciseIndex, setIndex);
-                          }
-                        }}
-                        rightThreshold={40}
-                        overshootRight={false}
-                        friction={2}
+                        onDelete={() => removeSet(exerciseIndex, setIndex)}
                       >
                         <SetRowInput
                           set={set}
@@ -238,7 +226,7 @@ export default function CreateRoutineScreen() {
                           onUpdateSet={(field, value) => updateSet(exerciseIndex, setIndex, field, value)}
                           showCompleteButton={false}
                         />
-                      </Swipeable>
+                      </SwipeToDeleteRow>
                     ))}
                   </View>
                 )}
