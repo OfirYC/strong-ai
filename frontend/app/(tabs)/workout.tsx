@@ -23,9 +23,17 @@ export default function WorkoutScreen() {
   const [selectedRoutine, setSelectedRoutine] = useState<WorkoutTemplate | null>(null);
   const [showRoutineModal, setShowRoutineModal] = useState(false);
 
+  // Load templates on mount
   useEffect(() => {
     loadTemplates();
   }, []);
+
+  // Reload templates whenever the screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadTemplates();
+    }, [])
+  );
 
   const loadTemplates = async () => {
     try {
