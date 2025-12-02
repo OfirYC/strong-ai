@@ -200,7 +200,15 @@ export default function RoutineDetailModal({
                     </Text>
                   </View>
                   
-                  <TouchableOpacity style={styles.infoButton} onPress={() => }>
+                  <TouchableOpacity 
+                    style={styles.infoButton}
+                    onPress={() => {
+                      if (detail) {
+                        setSelectedExercise(detail);
+                        setShowExerciseDetail(true);
+                      }
+                    }}
+                  >
                     <Ionicons name="help-circle" size={28} color="#007AFF" />
                   </TouchableOpacity>
                 </View>
