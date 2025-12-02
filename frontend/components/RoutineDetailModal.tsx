@@ -39,6 +39,8 @@ export default function RoutineDetailModal({
   const [exerciseDetails, setExerciseDetails] = useState<{ [key: string]: Exercise }>({});
   const [loading, setLoading] = useState(false);
   const [lastPerformed, setLastPerformed] = useState<string | null>(null);
+  const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
+  const [showExerciseDetail, setShowExerciseDetail] = useState(false);
 
   useEffect(() => {
     if (visible && routine) {
