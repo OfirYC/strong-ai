@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -25,10 +25,14 @@ interface SwipeToDeleteRowProps {
  */
 export default function SwipeToDeleteRow({ children, onDelete }: SwipeToDeleteRowProps) {
   const translateX = useRef(new Animated.Value(0)).current;
-  const [rowWidth, setRowWidth] = useState(SCREEN_WIDTH - 40);
+  const rowWidthRef = useRef(SCREEN_WIDTH - 40);
+  const onDeleteRef = useRef(onDelete);
+  
+  // Keep onDelete ref updated
+  onDeleteRef.current = onDelete;
 
   const handleLayout = (event: LayoutChangeEvent) => {
-    setRowWidth(event.nativeEvent.layout.width);
+    rowWidthRef.current = event.nativeEvent.layout.width;
   };
 
   const panResponder = useRef(
@@ -39,12 +43,14 @@ export default function SwipeToDeleteRow({ children, onDelete }: SwipeToDeleteRo
         return gestureState.dx < -10 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
       },
       onPanResponderMove: (_, gestureState) => {
-        // Only allow left swipe (negative dx)
+        // Only allow left swipe (negative dx), clamp to row width
         if (gestureState.dx < 0) {
-          translateX.setValue(gestureState.dx);
+          const clampedX = Math.max(gestureState.dx, -rowWidthRef.current);
+          translateX.setValue(clampedX);
         }
       },
       onPanResponderRelease: (_, gestureState) => {
+        const rowWidth = rowWidthRef.current;
         const midpoint = -rowWidth / 2;
         
         if (gestureState.dx < midpoint) {
@@ -54,7 +60,7 @@ export default function SwipeToDeleteRow({ children, onDelete }: SwipeToDeleteRo
             duration: 200,
             useNativeDriver: true,
           }).start(() => {
-            onDelete();
+            onDeleteRef.current();
             // Reset position after delete
             translateX.setValue(0);
           });
@@ -80,14 +86,14 @@ export default function SwipeToDeleteRow({ children, onDelete }: SwipeToDeleteRo
 
   // Scale up the trash icon when past midpoint
   const iconScale = translateX.interpolate({
-    inputRange: [-rowWidth, -rowWidth / 2, 0],
+    inputRange: [-SCREEN_WIDTH, -SCREEN_WIDTH / 4, 0],
     outputRange: [1.3, 1, 1],
     extrapolate: 'clamp',
   });
 
   // Fade in "Delete" text when past midpoint
   const textOpacity = translateX.interpolate({
-    inputRange: [-rowWidth, -rowWidth / 2, -rowWidth / 2 + 1, 0],
+    inputRange: [-SCREEN_WIDTH, -SCREEN_WIDTH / 4, -SCREEN_WIDTH / 4 + 20, 0],
     outputRange: [1, 1, 0, 0],
     extrapolate: 'clamp',
   });
