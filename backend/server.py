@@ -594,9 +594,17 @@ async def get_workout_detail(
         
         # Format best set display
         if ex_kind in ['Cardio', 'Duration']:
-            mins = best_duration // 60
-            secs = best_duration % 60
-            best_set_display = f"{mins}:{secs:02d}" if best_duration > 0 else "0:00"
+            if best_duration > 0:
+                total_centis = int(round(best_duration * 100))
+                mins = total_centis // 6000
+                secs = (total_centis % 6000) // 100
+                centis = total_centis % 100
+                if centis > 0:
+                    best_set_display = f"{mins}:{secs:02d}.{centis:02d}"
+                else:
+                    best_set_display = f"{mins}:{secs:02d}"
+            else:
+                best_set_display = "0:00"
         elif ex_kind == 'Reps Only':
             best_set_display = f"{best_reps} reps" if best_reps > 0 else "-"
         else:
