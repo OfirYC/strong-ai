@@ -451,6 +451,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1C1C1E',
   },
+  viewRoutineButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E5F0FF',
+    borderRadius: 10,
+    paddingVertical: 12,
+    marginTop: 16,
+    gap: 8,
+  },
+  viewRoutineText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#007AFF',
+  },
   exercisesSummarySection: {
     backgroundColor: '#FFFFFF',
     padding: 20,
