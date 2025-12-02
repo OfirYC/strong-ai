@@ -82,6 +82,16 @@ export default function WorkoutDetailScreen() {
       });
       
       setExercisesWithSets(exercises);
+      
+      // Load routine if workout was created from a template
+      if (workoutData.template_id) {
+        try {
+          const routineRes = await api.get(`/templates/${workoutData.template_id}`);
+          setRoutine(routineRes.data);
+        } catch (error) {
+          console.error('Failed to load routine:', error);
+        }
+      }
     } catch (error) {
       console.error('Failed to load workout detail:', error);
     } finally {
