@@ -640,8 +640,6 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
                           ))}
                         </View>
                       )}
-                        </View>
-                      )}
 
                       <TouchableOpacity style={styles.addSetButton} onPress={() => addSet(exerciseIndex)}>
                         <Ionicons name="add" size={20} color="#007AFF" />
