@@ -340,15 +340,6 @@ const styles = StyleSheet.create({
   setsContainer: {
     marginBottom: 12,
   },
-  deleteSetAction: {
-    backgroundColor: '#FF3B30',
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: 50,
-    marginBottom: 8,
-    borderTopRightRadius: 8,
-    borderBottomRightRadius: 8,
-  },
   addSetButton: {
     flexDirection: 'row',
     alignItems: 'center',
