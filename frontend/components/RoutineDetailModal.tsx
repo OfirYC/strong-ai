@@ -230,6 +230,20 @@ export default function RoutineDetailModal({
           </SafeAreaView>
         </TouchableOpacity>
       </TouchableOpacity>
+
+      {/* Exercise Detail Modal */}
+      <ExerciseDetailModal
+        visible={showExerciseDetail}
+        exercise={selectedExercise}
+        onClose={() => {
+          setShowExerciseDetail(false);
+          setSelectedExercise(null);
+        }}
+        onExerciseUpdated={() => {
+          // Reload exercise details if user updates the exercise
+          loadExerciseDetails();
+        }}
+      />
     </Modal>
   );
 }
