@@ -349,6 +349,20 @@ export default function WorkoutDetailScreen() {
         
         <View style={styles.bottomSpacer} />
       </ScrollView>
+
+      {/* Routine Detail Modal */}
+      <RoutineDetailModal
+        visible={showRoutineModal}
+        routine={routine}
+        onClose={() => setShowRoutineModal(false)}
+        onStartWorkout={(routine) => {
+          setShowRoutineModal(false);
+          // Navigate to workout tab to start workout from this routine
+          router.push({
+            pathname: '/(tabs)/workout',
+          });
+        }}
+      />
     </SafeAreaView>
   );
 }
