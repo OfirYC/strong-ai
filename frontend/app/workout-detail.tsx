@@ -43,6 +43,8 @@ export default function WorkoutDetailScreen() {
   const [exercisesWithSets, setExercisesWithSets] = useState<ExerciseWithSets[]>([]);
   const [loading, setLoading] = useState(true);
   const [showFullDetail, setShowFullDetail] = useState(false);
+  const [routine, setRoutine] = useState<WorkoutTemplate | null>(null);
+  const [showRoutineModal, setShowRoutineModal] = useState(false);
 
   useEffect(() => {
     if (workoutId) {
