@@ -102,7 +102,7 @@ class TemplateExerciseItem(BaseModel):
     default_sets: int = 3
     default_reps: Optional[int] = 10
     default_weight: Optional[float] = None
-    default_duration: Optional[int] = None
+    default_duration: Optional[float] = None
     default_distance: Optional[float] = None
 
 
