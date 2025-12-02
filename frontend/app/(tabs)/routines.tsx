@@ -40,6 +40,45 @@ export default function RoutinesScreen() {
     }
   };
 
+  const handleRoutinePress = (routine: WorkoutTemplate) => {
+    setSelectedRoutine(routine);
+    setShowRoutineModal(true);
+  };
+
+  const handleStartWorkoutFromRoutine = async (routine: WorkoutTemplate) => {
+    if (activeWorkout) {
+      Alert.alert(
+        'Active Workout',
+        'You already have an Active Workout. Do you want to discard it and start a new one?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Discard & Start New', 
+            style: 'destructive',
+            onPress: async () => {
+              endWorkout();
+              await createTemplateWorkout(routine.id);
+            }
+          },
+        ]
+      );
+      return;
+    }
+    await createTemplateWorkout(routine.id);
+  };
+
+  const createTemplateWorkout = async (templateId: string) => {
+    try {
+      const response = await api.post('/workouts', { template_id: templateId });
+      startWorkout(response.data);
+      setShowRoutineModal(false);
+      // Navigate to workout tab
+      router.push('/(tabs)/workout');
+    } catch (error: any) {
+      Alert.alert('Error', 'Failed to start workout');
+    }
+  };
+
   const handleDeleteTemplate = async (templateId: string, name: string) => {
     Alert.alert('Delete Routine', `Are you sure you want to delete "${name}"?`, [
       { text: 'Cancel', style: 'cancel' },
