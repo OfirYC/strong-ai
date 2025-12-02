@@ -88,7 +88,7 @@ class TemplateSetItem(BaseModel):
     """A single set in a template exercise with default values"""
     weight: Optional[float] = None
     reps: Optional[int] = None
-    duration: Optional[int] = None  # in seconds
+    duration: Optional[float] = None  # in seconds (supports decimals for centiseconds)
     distance: Optional[float] = None  # in km
     is_warmup: bool = False
 
