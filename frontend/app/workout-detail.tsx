@@ -17,8 +17,8 @@ import {
   WorkoutSession, 
   WorkoutSet, 
   formatDuration, 
+  formatWorkoutDuration,
   formatDurationMinutes,
-  formatDuration,
   isDurationBased,
   usesWeight,
   ExerciseKind 
@@ -240,7 +240,7 @@ export default function WorkoutDetailScreen() {
           <View style={styles.metricsRow}>
             <View style={styles.metricItem}>
               <Ionicons name="time-outline" size={20} color="#007AFF" />
-              <Text style={styles.metricValue}>{formatDuration(summary.duration_seconds)}</Text>
+              <Text style={styles.metricValue}>{formatWorkoutDuration(summary.duration_seconds)}</Text>
             </View>
             
             <View style={styles.metricItem}>

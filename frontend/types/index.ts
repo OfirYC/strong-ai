@@ -178,7 +178,7 @@ export function formatDurationMinutes(seconds: number): string {
   return `${mins}m`;
 }
 
-export function formatDuration(seconds: number): string  {
+export function formatWorkoutDuration(seconds: number): string  {
   const totalMins = Math.round(seconds / 60);
 
   if (totalMins < 60) {
