@@ -156,6 +156,13 @@ export default function WorkoutScreen() {
             )}
           </View>
         </ScrollView>
+
+        <RoutineDetailModal
+          visible={showRoutineModal}
+          routine={selectedRoutine}
+          onClose={() => setShowRoutineModal(false)}
+          onStartWorkout={handleStartWorkoutFromRoutine}
+        />
       </SafeAreaView>
   );
 }
