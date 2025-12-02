@@ -131,6 +131,7 @@ class WorkoutSetItem(BaseModel):
     # Common fields
     is_warmup: bool = False
     completed_at: Optional[datetime] = None
+    completed: Optional[bool] = False
     
     # Weight + Reps (Barbell, Dumbbell, Machine, Weighted Bodyweight, Assisted Bodyweight, Reps Only)
     reps: Optional[int] = None
@@ -138,7 +139,7 @@ class WorkoutSetItem(BaseModel):
     
     # Cardio fields
     distance: Optional[float] = None  # in km or miles
-    duration: Optional[int] = None  # in seconds
+    duration: Optional[float] = None  # in seconds (supports decimals for centiseconds)
     calories: Optional[int] = None
     
     # PR flags (computed when workout is completed)
