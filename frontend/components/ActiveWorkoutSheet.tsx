@@ -263,14 +263,11 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
   };
 
   // Render the delete action for swipeable sets
-  const renderSetDeleteAction = (exerciseIndex: number, setIndex: number) => {
+  const renderSetDeleteAction = () => {
     return (
-      <TouchableOpacity 
-        style={styles.deleteSetAction}
-        onPress={() => removeSet(exerciseIndex, setIndex)}
-      >
+      <View style={styles.deleteSetAction}>
         <Ionicons name="trash" size={20} color="#FFFFFF" />
-      </TouchableOpacity>
+      </View>
     );
   };
 
