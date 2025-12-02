@@ -173,3 +173,46 @@ agent_communication:
       with WorkoutCompleteModal.
       
       User will test the frontend manually.
+
+  - task: "Routine Detail Modal - History Tab Integration"
+    implemented: true
+    working: "pending_user_test"
+    file: "frontend/app/workout-detail.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Added "View Routine" button to workout detail screen:
+          - Automatically loads routine if workout was created from a template (has template_id)
+          - Shows button only when routine data is available
+          - Opens RoutineDetailModal when clicked
+          - Modal allows viewing routine and starting a new workout from it
+          - Navigates back to workout tab when "Start Workout" is pressed
+
+agent_communication:
+  - agent: "main"
+    message: |
+      Feature 1 Complete: Routine Detail Modal in History/Workout Detail
+      - Added modal integration to workout detail screen
+      - Shows "View Routine" button when workout was created from a template
+      - Users can view the original routine and start a new workout from it
+      
+      Feature 2: Expo Go / ngrok connectivity
+      - Investigated ngrok 404 error
+      - ngrok tunnel is running correctly at https://fittrack.ngrok.io
+      - The issue is likely:
+        a) Expo Go app cached an old tunnel URL
+        b) Need to scan a fresh QR code from the web preview
+        c) Tunnel URL might have changed since last session
+      
+      Solution for user:
+      1. Access the web preview at https://fittrack-119.preview.emergentagent.com
+      2. Generate a new QR code from there
+      3. Scan with Expo Go app (make sure to "clear" any cached projects first)
+      4. Alternative: Use the web preview directly in a browser for testing
+      
+      Note: The app is fully functional on web preview. ngrok tunnels are ephemeral
+      and may change between sessions.
