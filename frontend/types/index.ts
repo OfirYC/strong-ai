@@ -177,3 +177,19 @@ export function formatDurationMinutes(seconds: number): string {
   const mins = Math.round(seconds / 60);
   return `${mins}m`;
 }
+
+export function formatDuration(seconds: number): string  {
+  const totalMins = Math.round(seconds / 60);
+
+  if (totalMins < 60) {
+    return `${totalMins}m`;
+  }
+
+  const hours = Math.floor(totalMins / 60);
+  const mins = totalMins % 60;
+
+  // pad minutes to always 2 digits (e.g., 1:05)
+  const paddedMins = mins.toString().padStart(2, "0");
+
+  return `${hours}h ${paddedMins}m`;
+}

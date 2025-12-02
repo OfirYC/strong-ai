@@ -18,6 +18,7 @@ import {
   WorkoutSet, 
   formatDuration, 
   formatDurationMinutes,
+  formatDuration,
   isDurationBased,
   usesWeight,
   ExerciseKind 
@@ -239,7 +240,7 @@ export default function WorkoutDetailScreen() {
           <View style={styles.metricsRow}>
             <View style={styles.metricItem}>
               <Ionicons name="time-outline" size={20} color="#007AFF" />
-              <Text style={styles.metricValue}>{formatDurationMinutes(summary.duration_seconds)}</Text>
+              <Text style={styles.metricValue}>{formatDuration(summary.duration_seconds)}</Text>
             </View>
             
             <View style={styles.metricItem}>
@@ -330,7 +331,6 @@ export default function WorkoutDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F7',
   },
   loadingContainer: {
     flex: 1,
