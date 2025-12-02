@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../utils/api';
 import { Exercise, WorkoutTemplate } from '../types';
+import ExerciseDetailModal from './ExerciseDetailModal';
 
 interface RoutineDetailModalProps {
   visible: boolean;
