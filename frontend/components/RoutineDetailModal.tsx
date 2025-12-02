@@ -122,10 +122,20 @@ export default function RoutineDetailModal({
     <Modal
       visible={visible}
       animationType="slide"
-      presentationStyle="pageSheet"
+      transparent={true}
       onRequestClose={onClose}
     >
-      <SafeAreaView style={styles.container}>
+      <TouchableOpacity 
+        style={styles.backdrop} 
+        activeOpacity={1} 
+        onPress={onClose}
+      >
+        <TouchableOpacity 
+          style={styles.modalContent} 
+          activeOpacity={1} 
+          onPress={(e) => e.stopPropagation()}
+        >
+          <SafeAreaView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} style={styles.headerButton}>
