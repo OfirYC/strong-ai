@@ -16,6 +16,7 @@ import {
   WorkoutSummary, 
   WorkoutSession, 
   WorkoutSet, 
+  WorkoutTemplate,
   formatDuration, 
   formatWorkoutDuration,
   formatDurationMinutes,
@@ -23,6 +24,7 @@ import {
   usesWeight,
   ExerciseKind 
 } from '../types';
+import RoutineDetailModal from '../components/RoutineDetailModal';
 
 interface ExerciseWithSets {
   exercise_id: string;
