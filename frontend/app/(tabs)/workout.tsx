@@ -69,7 +69,12 @@ export default function WorkoutScreen() {
     }
   };
 
-  const handleStartTemplate = async (templateId: string) => {
+  const handleStartTemplate = (template: WorkoutTemplate) => {
+    setSelectedRoutine(template);
+    setShowRoutineModal(true);
+  };
+
+  const handleStartWorkoutFromRoutine = async (routine: WorkoutTemplate) => {
     if (activeWorkout) {
       Alert.alert(
         'Active Workout',
@@ -81,14 +86,14 @@ export default function WorkoutScreen() {
             style: 'destructive',
             onPress: async () => {
               endWorkout();
-              await createTemplateWorkout(templateId);
+              await createTemplateWorkout(routine.id);
             }
           },
         ]
       );
       return;
     }
-    await createTemplateWorkout(templateId);
+    await createTemplateWorkout(routine.id);
   };
 
   const createTemplateWorkout = async (templateId: string) => {
