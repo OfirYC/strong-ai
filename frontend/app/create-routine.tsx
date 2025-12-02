@@ -215,7 +215,22 @@ export default function CreateRoutineScreen() {
                     <SetHeader exerciseKind={exerciseKind} />
 
                     {exercise.sets.map((set, setIndex) => (
-                      <View key={setIndex} style={styles.setRowWrapper}>
+                      <Swipeable
+                        key={setIndex}
+                        renderRightActions={() => (
+                          <View style={styles.deleteSetAction}>
+                            <Ionicons name="trash" size={20} color="#FFFFFF" />
+                          </View>
+                        )}
+                        onSwipeableOpen={(direction) => {
+                          if (direction === 'right') {
+                            removeSet(exerciseIndex, setIndex);
+                          }
+                        }}
+                        rightThreshold={40}
+                        overshootRight={false}
+                        friction={2}
+                      >
                         <SetRowInput
                           set={set}
                           setIndex={setIndex}
@@ -223,13 +238,7 @@ export default function CreateRoutineScreen() {
                           onUpdateSet={(field, value) => updateSet(exerciseIndex, setIndex, field, value)}
                           showCompleteButton={false}
                         />
-                        <TouchableOpacity 
-                          style={styles.removeSetButton}
-                          onPress={() => removeSet(exerciseIndex, setIndex)}
-                        >
-                          <Ionicons name="close-circle" size={22} color="#FF3B30" />
-                        </TouchableOpacity>
-                      </View>
+                      </Swipeable>
                     ))}
                   </View>
                 )}
