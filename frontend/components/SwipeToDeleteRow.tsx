@@ -1,81 +1,71 @@
-import React, { useRef } from 'react';
+import React, { useRef, useCallback } from 'react';
 import {
   View,
   StyleSheet,
   Animated,
   PanResponder,
-  Dimensions,
   LayoutChangeEvent,
+  Text,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-
-const SCREEN_WIDTH = Dimensions.get('window').width;
 
 interface SwipeToDeleteRowProps {
   children: React.ReactNode;
   onDelete: () => void;
 }
 
-/**
- * Swipe-to-delete row component with smooth animation
- * - Shows trash icon on swipe
- * - Expands to fill row when past midpoint
- * - Deletes on release if past midpoint
- * - Cancels if released before midpoint
- */
 export default function SwipeToDeleteRow({ children, onDelete }: SwipeToDeleteRowProps) {
   const translateX = useRef(new Animated.Value(0)).current;
-  const rowWidthRef = useRef(SCREEN_WIDTH - 40);
-  const onDeleteRef = useRef(onDelete);
-  
-  // Keep onDelete ref updated
-  onDeleteRef.current = onDelete;
+  const rowWidth = useRef(300);
 
-  const handleLayout = (event: LayoutChangeEvent) => {
-    rowWidthRef.current = event.nativeEvent.layout.width;
-  };
+  const onLayout = useCallback((e: LayoutChangeEvent) => {
+    rowWidth.current = e.nativeEvent.layout.width;
+  }, []);
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        // Only respond to horizontal swipes (left)
-        return gestureState.dx < -10 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
+      onMoveShouldSetPanResponder: (_, gesture) => {
+        // Activate on horizontal left swipe
+        return gesture.dx < -5 && Math.abs(gesture.dx) > Math.abs(gesture.dy * 2);
       },
-      onPanResponderMove: (_, gestureState) => {
-        // Only allow left swipe (negative dx), clamp to row width
-        if (gestureState.dx < 0) {
-          const clampedX = Math.max(gestureState.dx, -rowWidthRef.current);
-          translateX.setValue(clampedX);
+      onPanResponderGrant: () => {
+        // Reset any ongoing animation
+        translateX.stopAnimation();
+        translateX.setOffset(0);
+        translateX.setValue(0);
+      },
+      onPanResponderMove: (_, gesture) => {
+        // Allow swiping left (negative values only)
+        if (gesture.dx <= 0) {
+          translateX.setValue(gesture.dx);
         }
       },
-      onPanResponderRelease: (_, gestureState) => {
-        const rowWidth = rowWidthRef.current;
-        const midpoint = -rowWidth / 2;
+      onPanResponderRelease: (_, gesture) => {
+        translateX.flattenOffset();
+        const threshold = -rowWidth.current * 0.4; // 40% of width
         
-        if (gestureState.dx < midpoint) {
-          // Past midpoint - animate to full delete and trigger
+        if (gesture.dx < threshold) {
+          // Swipe far enough - delete
           Animated.timing(translateX, {
-            toValue: -rowWidth,
-            duration: 200,
+            toValue: -rowWidth.current,
+            duration: 150,
             useNativeDriver: true,
           }).start(() => {
-            onDeleteRef.current();
-            // Reset position after delete
+            onDelete();
             translateX.setValue(0);
           });
         } else {
-          // Before midpoint - snap back
+          // Not far enough - bounce back
           Animated.spring(translateX, {
             toValue: 0,
             useNativeDriver: true,
-            tension: 100,
-            friction: 10,
+            bounciness: 8,
           }).start();
         }
       },
       onPanResponderTerminate: () => {
-        // Snap back if gesture is terminated
+        translateX.flattenOffset();
         Animated.spring(translateX, {
           toValue: 0,
           useNativeDriver: true,
@@ -84,40 +74,35 @@ export default function SwipeToDeleteRow({ children, onDelete }: SwipeToDeleteRo
     })
   ).current;
 
-  // Scale up the trash icon when past midpoint
+  // Icon scale animation
   const iconScale = translateX.interpolate({
-    inputRange: [-SCREEN_WIDTH, -SCREEN_WIDTH / 4, 0],
-    outputRange: [1.3, 1, 1],
+    inputRange: [-200, -100, 0],
+    outputRange: [1.2, 1, 0.8],
     extrapolate: 'clamp',
   });
 
-  // Fade in "Delete" text when past midpoint
+  // Text opacity animation
   const textOpacity = translateX.interpolate({
-    inputRange: [-SCREEN_WIDTH, -SCREEN_WIDTH / 4, -SCREEN_WIDTH / 4 + 20, 0],
-    outputRange: [1, 1, 0, 0],
+    inputRange: [-150, -100, 0],
+    outputRange: [1, 0.5, 0],
     extrapolate: 'clamp',
   });
 
   return (
-    <View style={styles.container} onLayout={handleLayout}>
-      {/* Delete background - full width, always visible behind */}
+    <View style={styles.container} onLayout={onLayout}>
+      {/* Red background */}
       <View style={styles.deleteBackground}>
-        <Animated.View style={[styles.iconContainer, { transform: [{ scale: iconScale }] }]}>
-          <Ionicons name="trash" size={22} color="#FFFFFF" />
+        <Animated.View style={{ transform: [{ scale: iconScale }] }}>
+          <Ionicons name="trash" size={22} color="white" />
         </Animated.View>
         <Animated.Text style={[styles.deleteText, { opacity: textOpacity }]}>
           Delete
         </Animated.Text>
       </View>
 
-      {/* Swipeable content */}
+      {/* Content that slides */}
       <Animated.View
-        style={[
-          styles.content,
-          {
-            transform: [{ translateX }],
-          },
-        ]}
+        style={[styles.content, { transform: [{ translateX }] }]}
         {...panResponder.panHandlers}
       >
         {children}
@@ -128,28 +113,23 @@ export default function SwipeToDeleteRow({ children, onDelete }: SwipeToDeleteRo
 
 const styles = StyleSheet.create({
   container: {
-    position: 'relative',
     marginBottom: 8,
-    overflow: 'hidden',
     borderRadius: 8,
+    overflow: 'hidden',
   },
   deleteBackground: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#FF3B30',
-    borderRadius: 8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    paddingRight: 20,
-  },
-  iconContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingRight: 16,
+    borderRadius: 8,
   },
   deleteText: {
-    color: '#FFFFFF',
-    fontSize: 14,
+    color: 'white',
     fontWeight: '600',
+    fontSize: 14,
     marginLeft: 8,
   },
   content: {
