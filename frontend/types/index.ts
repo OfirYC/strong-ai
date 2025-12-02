@@ -165,10 +165,17 @@ export interface PRRecord {
   date: string;
 }
 
-// Helper to format duration in mm:ss
+// Helper to format duration in mm:ss.cc (with centiseconds support)
 export function formatDuration(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
+  const totalCentiseconds = Math.round(seconds * 100);
+  const mins = Math.floor(totalCentiseconds / 6000);
+  const secs = Math.floor((totalCentiseconds % 6000) / 100);
+  const centis = totalCentiseconds % 100;
+  
+  // Only show centiseconds if they exist
+  if (centis > 0) {
+    return `${mins}:${secs.toString().padStart(2, '0')}.${centis.toString().padStart(2, '0')}`;
+  }
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
