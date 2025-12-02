@@ -216,7 +216,9 @@ export default function RoutineDetailModal({
             <Text style={styles.startButtonText}>Start Workout</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+          </SafeAreaView>
+        </TouchableOpacity>
+      </TouchableOpacity>
     </Modal>
   );
 }
