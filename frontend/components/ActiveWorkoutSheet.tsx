@@ -262,15 +262,6 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
     );
   };
 
-  // Render the delete action for swipeable sets
-  const renderSetDeleteAction = () => {
-    return (
-      <View style={styles.deleteSetAction}>
-        <Ionicons name="trash" size={20} color="#FFFFFF" />
-      </View>
-    );
-  };
-
   const handleSaveAndFinish = async () => {
     if (!activeWorkout) return;
 
