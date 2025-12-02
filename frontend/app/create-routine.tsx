@@ -282,7 +282,6 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#D1D1D6',
-    backgroundColor: '#FFFFFF',
   },
   headerTitle: {
     fontSize: 18,
@@ -324,7 +323,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   exerciseCard: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
