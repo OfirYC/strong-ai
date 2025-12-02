@@ -142,7 +142,7 @@ export default function WorkoutScreen() {
                 <TouchableOpacity
                   key={template.id}
                   style={styles.templateCard}
-                  onPress={() => handleStartTemplate(template.id)}
+                  onPress={() => handleStartTemplate(template)}
                 >
                   <View style={styles.templateInfo}>
                     <Text style={styles.templateName}>{template.name}</Text>
