@@ -13,6 +13,7 @@ import Button from '../../components/Button';
 import api from '../../utils/api';
 import { useWorkoutStore } from '../../store/workoutStore';
 import { WorkoutTemplate } from '../../types';
+import RoutineDetailModal from '../../components/RoutineDetailModal';
 
 export default function WorkoutScreen() {
   const { activeWorkout, startWorkout, endWorkout } = useWorkoutStore();
