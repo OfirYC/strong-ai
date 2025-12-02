@@ -636,7 +636,13 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
                           {exercise.sets.map((set, setIndex) => (
                             <Swipeable
                               key={setIndex}
-                              renderRightActions={() => renderSetDeleteAction(exerciseIndex, setIndex)}
+                              renderRightActions={renderSetDeleteAction}
+                              onSwipeableOpen={(direction) => {
+                                if (direction === 'right') {
+                                  removeSet(exerciseIndex, setIndex);
+                                }
+                              }}
+                              rightThreshold={40}
                               overshootRight={false}
                               friction={2}
                             >
