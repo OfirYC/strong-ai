@@ -197,7 +197,7 @@ export default function RoutineDetailModal({
                     </Text>
                   </View>
                   
-                  <TouchableOpacity style={styles.infoButton}>
+                  <TouchableOpacity style={styles.infoButton} onPress={() => }>
                     <Ionicons name="help-circle" size={28} color="#007AFF" />
                   </TouchableOpacity>
                 </View>
