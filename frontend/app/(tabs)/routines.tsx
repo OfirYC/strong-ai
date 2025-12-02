@@ -101,7 +101,7 @@ export default function RoutinesScreen() {
     <View style={styles.templateCard}>
       <TouchableOpacity
         style={styles.templateInfo}
-        onPress={() => router.push(`/routine/${item.id}`)}
+        onPress={() => handleRoutinePress(item)}
       >
         <Text style={styles.templateName}>{item.name}</Text>
         <Text style={styles.templateDetail}>
