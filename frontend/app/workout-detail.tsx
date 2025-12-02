@@ -267,6 +267,17 @@ export default function WorkoutDetailScreen() {
               <Text style={styles.metricValue}>{summary.pr_count} PRs</Text>
             </View>
           </View>
+
+          {/* View Routine Button */}
+          {routine && (
+            <TouchableOpacity 
+              style={styles.viewRoutineButton}
+              onPress={() => setShowRoutineModal(true)}
+            >
+              <Ionicons name="list-outline" size={20} color="#007AFF" />
+              <Text style={styles.viewRoutineText}>View Routine</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Exercise Summary List (2-column) */}
