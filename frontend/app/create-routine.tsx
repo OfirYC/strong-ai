@@ -352,13 +352,14 @@ const styles = StyleSheet.create({
   setsContainer: {
     marginBottom: 12,
   },
-  setRowWrapper: {
-    flexDirection: 'row',
+  deleteSetAction: {
+    backgroundColor: '#FF3B30',
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
-  },
-  removeSetButton: {
-    padding: 4,
+    width: 50,
+    marginBottom: 8,
+    borderTopRightRadius: 8,
+    borderBottomRightRadius: 8,
   },
   addSetButton: {
     flexDirection: 'row',
