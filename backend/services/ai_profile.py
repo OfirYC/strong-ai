@@ -90,7 +90,7 @@ async def generate_profile_insights(profile: UserProfile) -> ProfileInsights:
         raise ValueError("Not enough information in profile to generate insights")
     
     # Build the prompt with all available profile data
-    user_content = f"""Please analyze this user's training profile and extract structured insights.
+    user_content = f"""Please analyze this user's training profile and extract structured insights. It is important you think it thoroughly and deeply, not just extract keywords in a shallow manner.
 
 Training Age: {profile.training_age or 'Not specified'}
 
