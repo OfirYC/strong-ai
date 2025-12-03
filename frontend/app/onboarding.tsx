@@ -42,7 +42,7 @@ export default function OnboardingScreen() {
       setLoading(true);
       await api.put('/profile', {
         sex: sex || null,
-        date_of_birth: dateOfBirth ? new Date(dateOfBirth).toISOString() : null,
+        date_of_birth: dateOfBirth ? dateOfBirth.toISOString() : null,
         height_cm: heightCm ? parseFloat(heightCm) : null,
         weight_kg: weightKg ? parseFloat(weightKg) : null,
         training_age: trainingAge || null,
