@@ -39,10 +39,13 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.section}>
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => router.push('/profile-settings')}
+          >
             <View style={styles.menuItemLeft}>
-              <Ionicons name="settings-outline" size={24} color="#FFFFFF" />
-              <Text style={styles.menuItemText}>Settings</Text>
+              <Ionicons name="person-outline" size={24} color="#007AFF" />
+              <Text style={styles.menuItemText}>Profile Settings</Text>
             </View>
             <Ionicons name="chevron-forward" size={24} color="#8E8E93" />
           </TouchableOpacity>
