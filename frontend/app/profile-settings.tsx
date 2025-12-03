@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import Button from '../components/Button';
 import api from '../utils/api';
 
@@ -24,7 +25,8 @@ export default function ProfileSettingsScreen() {
 
   // Form state
   const [sex, setSex] = useState('');
-  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState<Date>(new Date(1990, 0, 1));
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [heightCm, setHeightCm] = useState('');
   const [weightKg, setWeightKg] = useState('');
   const [trainingAge, setTrainingAge] = useState('');
@@ -45,11 +47,9 @@ export default function ProfileSettingsScreen() {
       const profile = response.data;
 
       setSex(profile.sex || '');
-      setDateOfBirth(
-        profile.date_of_birth
-          ? new Date(profile.date_of_birth).toISOString().split('T')[0]
-          : ''
-      );
+      if (profile.date_of_birth) {
+        setDateOfBirth(new Date(profile.date_of_birth));
+      }
       setHeightCm(profile.height_cm?.toString() || '');
       setWeightKg(profile.weight_kg?.toString() || '');
       setTrainingAge(profile.training_age || '');
@@ -71,7 +71,7 @@ export default function ProfileSettingsScreen() {
       setSaving(true);
       await api.put('/profile', {
         sex: sex || null,
-        date_of_birth: dateOfBirth ? new Date(dateOfBirth).toISOString() : null,
+        date_of_birth: dateOfBirth ? dateOfBirth.toISOString() : null,
         height_cm: heightCm ? parseFloat(heightCm) : null,
         weight_kg: weightKg ? parseFloat(weightKg) : null,
         training_age: trainingAge || null,
@@ -148,14 +148,31 @@ export default function ProfileSettingsScreen() {
               ))}
             </View>
 
-            <Text style={styles.label}>Date of Birth (YYYY-MM-DD)</Text>
-            <TextInput
-              style={styles.input}
-              value={dateOfBirth}
-              onChangeText={setDateOfBirth}
-              placeholder="1990-01-01"
-              placeholderTextColor="#8E8E93"
-            />
+            <Text style={styles.label}>Date of Birth</Text>
+            <TouchableOpacity 
+              style={styles.datePickerButton}
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Text style={styles.datePickerText}>
+                {dateOfBirth.toLocaleDateString()}
+              </Text>
+              <Ionicons name="calendar-outline" size={20} color="#007AFF" />
+            </TouchableOpacity>
+            
+            {showDatePicker && (
+              <DateTimePicker
+                value={dateOfBirth}
+                mode="date"
+                display="spinner"
+                onChange={(event, selectedDate) => {
+                  setShowDatePicker(Platform.OS === 'ios');
+                  if (selectedDate) {
+                    setDateOfBirth(selectedDate);
+                  }
+                }}
+                maximumDate={new Date()}
+              />
+            )}
 
             <Text style={styles.label}>Height (cm)</Text>
             <TextInput
@@ -224,9 +241,21 @@ export default function ProfileSettingsScreen() {
             />
           </View>
 
-          {/* Physiology Section */}
+          {/* About You Section - Reordered */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Physiology & Constraints</Text>
+            <Text style={styles.sectionTitle}>About You</Text>
+
+            <Text style={styles.label}>Background Story</Text>
+            <TextInput
+              style={[styles.input, styles.textArea, styles.textAreaLarge]}
+              value={backgroundStory}
+              onChangeText={setBackgroundStory}
+              placeholder="Tell us about your fitness journey - how you started training, phases, current goals, military prep, etc."
+              placeholderTextColor="#8E8E93"
+              multiline
+              numberOfLines={6}
+              textAlignVertical="top"
+            />
 
             <Text style={styles.label}>Injury History</Text>
             <TextInput
@@ -234,18 +263,6 @@ export default function ProfileSettingsScreen() {
               value={injuryHistory}
               onChangeText={setInjuryHistory}
               placeholder="Any injuries or conditions we should know about?"
-              placeholderTextColor="#8E8E93"
-              multiline
-              numberOfLines={3}
-              textAlignVertical="top"
-            />
-
-            <Text style={styles.label}>Weaknesses</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              value={weaknesses}
-              onChangeText={setWeaknesses}
-              placeholder="What areas do you want to improve?"
               placeholderTextColor="#8E8E93"
               multiline
               numberOfLines={3}
@@ -263,20 +280,16 @@ export default function ProfileSettingsScreen() {
               numberOfLines={3}
               textAlignVertical="top"
             />
-          </View>
 
-          {/* Background Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Background Story</Text>
-
+            <Text style={styles.label}>Weaknesses</Text>
             <TextInput
-              style={[styles.input, styles.textArea, styles.textAreaLarge]}
-              value={backgroundStory}
-              onChangeText={setBackgroundStory}
-              placeholder="Tell us about your fitness journey - how you started training, phases, current goals, military prep, etc."
+              style={[styles.input, styles.textArea]}
+              value={weaknesses}
+              onChangeText={setWeaknesses}
+              placeholder="What areas do you want to improve?"
               placeholderTextColor="#8E8E93"
               multiline
-              numberOfLines={8}
+              numberOfLines={3}
               textAlignVertical="top"
             />
           </View>
@@ -362,6 +375,21 @@ const styles = StyleSheet.create({
     color: '#1C1C1E',
     borderWidth: 1,
     borderColor: '#E5E5EA',
+  },
+  datePickerButton: {
+    backgroundColor: '#F5F5F7',
+    borderRadius: 10,
+    padding: 14,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  datePickerText: {
+    fontSize: 16,
+    color: '#1C1C1E',
   },
   textArea: {
     minHeight: 100,
