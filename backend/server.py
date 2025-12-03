@@ -10,12 +10,13 @@ from datetime import datetime
 from bson import ObjectId
 
 from models import (
-    User, UserCreate, UserLogin, UserResponse, UserProfile, ProfileUpdate, UserContext,
+    User, UserCreate, UserLogin, UserResponse, UserProfile, ProfileUpdate, UserContext, ProfileInsights,
     Exercise, ExerciseCreate, ExerciseUpdate,
     WorkoutTemplate, WorkoutTemplateCreate,
     WorkoutSession, WorkoutSessionCreate, WorkoutSessionUpdate,
     PRRecord, WorkoutSummary, WorkoutExerciseSummary
 )
+from services.ai_profile import generate_profile_insights
 from auth import get_password_hash, verify_password, create_access_token, decode_access_token
 from seed_exercises_new import EXERCISES
 
