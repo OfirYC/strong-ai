@@ -17,7 +17,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import Button from '../components/Button';
 import api from '../utils/api';
 
-const STEPS = ['Basics', 'Training', 'Physiology', 'Background'];
+const STEPS = ['Basics', 'Training', 'About You', 'Done'];
 
 export default function OnboardingScreen() {
   const router = useRouter();
