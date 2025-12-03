@@ -119,14 +119,31 @@ export default function OnboardingScreen() {
         ))}
       </View>
 
-      <Text style={styles.label}>Date of Birth (YYYY-MM-DD)</Text>
-      <TextInput
-        style={styles.input}
-        value={dateOfBirth}
-        onChangeText={setDateOfBirth}
-        placeholder="1990-01-01"
-        placeholderTextColor="#8E8E93"
-      />
+      <Text style={styles.label}>Date of Birth</Text>
+      <TouchableOpacity 
+        style={styles.datePickerButton}
+        onPress={() => setShowDatePicker(true)}
+      >
+        <Text style={styles.datePickerText}>
+          {dateOfBirth.toLocaleDateString()}
+        </Text>
+        <Ionicons name="calendar-outline" size={20} color="#007AFF" />
+      </TouchableOpacity>
+      
+      {showDatePicker && (
+        <DateTimePicker
+          value={dateOfBirth}
+          mode="date"
+          display="spinner"
+          onChange={(event, selectedDate) => {
+            setShowDatePicker(Platform.OS === 'ios');
+            if (selectedDate) {
+              setDateOfBirth(selectedDate);
+            }
+          }}
+          maximumDate={new Date()}
+        />
+      )}
 
       <Text style={styles.label}>Height (cm)</Text>
       <TextInput
