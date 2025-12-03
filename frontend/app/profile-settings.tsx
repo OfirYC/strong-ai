@@ -395,6 +395,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1C1C1E',
   },
+  datePickerContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 8,
+    marginTop: 8,
+  },
   textArea: {
     minHeight: 100,
     paddingTop: 14,
