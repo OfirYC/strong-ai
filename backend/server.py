@@ -181,12 +181,17 @@ async def get_user_context(user_id: str = Depends(get_current_user)):
         profile.get("weight_kg"),
     ])
     
+    # Get insights if they exist
+    insights_data = profile.get("insights")
+    insights = ProfileInsights(**insights_data) if insights_data else None
+    
     return UserContext(
         basic_info=basic_info,
         training_context=training_context,
         physiology=physiology,
         background_story=profile.get("background_story"),
-        is_profile_complete=is_complete
+        is_profile_complete=is_complete,
+        insights=insights
     )
 
 
