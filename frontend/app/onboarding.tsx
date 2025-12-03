@@ -26,7 +26,8 @@ export default function OnboardingScreen() {
 
   // Form state
   const [sex, setSex] = useState('');
-  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState<Date>(new Date(1990, 0, 1));
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [heightCm, setHeightCm] = useState('');
   const [weightKg, setWeightKg] = useState('');
   const [trainingAge, setTrainingAge] = useState('');
