@@ -44,7 +44,8 @@ export default function RegisterScreen() {
       setLoading(true);
       const response = await api.post('/auth/register', { email, password });
       await setUser(response.data);
-      router.replace('/(tabs)/workout');
+      // New users need to complete onboarding
+      router.replace('/onboarding');
     } catch (error: any) {
       Alert.alert('Error', error.response?.data?.detail || 'Registration failed');
     } finally {
