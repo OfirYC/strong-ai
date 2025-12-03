@@ -292,3 +292,44 @@ class PRRecord(BaseModel):
     class Config:
         populate_by_name = True
         json_encoders = {ObjectId: str}
+
+
+# Planned Workout Models
+class PlannedWorkoutCreate(BaseModel):
+    """Create a planned workout"""
+    date: str  # YYYY-MM-DD format
+    name: str
+    template_id: Optional[str] = None
+    type: Optional[str] = None  # e.g. "strength", "run", "mobility"
+    notes: Optional[str] = None
+    order: int = 0
+
+
+class PlannedWorkoutUpdate(BaseModel):
+    """Update a planned workout"""
+    date: Optional[str] = None
+    name: Optional[str] = None
+    template_id: Optional[str] = None
+    type: Optional[str] = None
+    notes: Optional[str] = None
+    order: Optional[int] = None
+    status: Optional[str] = None  # "planned", "in_progress", "completed", "skipped"
+
+
+class PlannedWorkout(BaseModel):
+    """Planned workout for a specific date"""
+    id: Optional[str] = Field(default=None)
+    user_id: str
+    date: str  # YYYY-MM-DD format
+    name: str
+    template_id: Optional[str] = None
+    type: Optional[str] = None
+    notes: Optional[str] = None
+    status: str = "planned"  # "planned", "in_progress", "completed", "skipped"
+    workout_session_id: Optional[str] = None
+    order: int = 0
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Config:
+        populate_by_name = True
+        json_encoders = {ObjectId: str}
