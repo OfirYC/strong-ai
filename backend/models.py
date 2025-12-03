@@ -88,9 +88,9 @@ class ProfileUpdate(BaseModel):
 
 class UserContext(BaseModel):
     """Aggregated user context for AI and UI logic"""
-    basic_info: Dict[str, Optional[any]] = {}
-    training_context: Dict[str, Optional[str]] = {}
-    physiology: Dict[str, Optional[str]] = {}
+    basic_info: dict = {}
+    training_context: dict = {}
+    physiology: dict = {}
     background_story: Optional[str] = None
     is_profile_complete: bool = False
 
