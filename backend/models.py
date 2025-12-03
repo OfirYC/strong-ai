@@ -31,11 +31,35 @@ class UserLogin(BaseModel):
     password: str
 
 
+class UserProfile(BaseModel):
+    """User profile information"""
+    # Basic info
+    sex: Optional[str] = None  # "male", "female", "other", null
+    date_of_birth: Optional[datetime] = None
+    height_cm: Optional[float] = None
+    weight_kg: Optional[float] = None
+    
+    # Training context
+    training_age: Optional[str] = None  # "new", "1-2y", "2-5y", "5y+"
+    goals: Optional[str] = None
+    
+    # Physiology / constraints
+    injury_history: Optional[str] = None
+    weaknesses: Optional[str] = None
+    strengths: Optional[str] = None
+    
+    # Background
+    background_story: Optional[str] = None
+
+
 class User(BaseModel):
     id: Optional[str] = Field(alias="_id", default=None)
     email: EmailStr
     password_hash: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # Profile fields
+    profile: UserProfile = Field(default_factory=UserProfile)
 
     class Config:
         populate_by_name = True
@@ -46,6 +70,29 @@ class UserResponse(BaseModel):
     id: str
     email: str
     token: str
+
+
+class ProfileUpdate(BaseModel):
+    """Update user profile"""
+    sex: Optional[str] = None
+    date_of_birth: Optional[datetime] = None
+    height_cm: Optional[float] = None
+    weight_kg: Optional[float] = None
+    training_age: Optional[str] = None
+    goals: Optional[str] = None
+    injury_history: Optional[str] = None
+    weaknesses: Optional[str] = None
+    strengths: Optional[str] = None
+    background_story: Optional[str] = None
+
+
+class UserContext(BaseModel):
+    """Aggregated user context for AI and UI logic"""
+    basic_info: Dict[str, Optional[any]] = {}
+    training_context: Dict[str, Optional[str]] = {}
+    physiology: Dict[str, Optional[str]] = {}
+    background_story: Optional[str] = None
+    is_profile_complete: bool = False
 
 
 # Exercise Models
