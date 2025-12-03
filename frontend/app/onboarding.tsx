@@ -417,6 +417,12 @@ const styles = StyleSheet.create({
     color: '#1C1C1E',
     marginBottom: 24,
   },
+  description: {
+    fontSize: 16,
+    color: '#8E8E93',
+    lineHeight: 24,
+    marginBottom: 16,
+  },
   label: {
     fontSize: 16,
     fontWeight: '600',
