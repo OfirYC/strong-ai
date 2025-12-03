@@ -10,7 +10,7 @@ from datetime import datetime
 from bson import ObjectId
 
 from models import (
-    User, UserCreate, UserLogin, UserResponse,
+    User, UserCreate, UserLogin, UserResponse, UserProfile, ProfileUpdate, UserContext,
     Exercise, ExerciseCreate, ExerciseUpdate,
     WorkoutTemplate, WorkoutTemplateCreate,
     WorkoutSession, WorkoutSessionCreate, WorkoutSessionUpdate,
