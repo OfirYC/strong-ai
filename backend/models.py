@@ -112,6 +112,7 @@ class UserContext(BaseModel):
     physiology: dict = {}
     background_story: Optional[str] = None
     is_profile_complete: bool = False
+    insights: Optional[ProfileInsights] = None
 
 
 # Exercise Models
