@@ -160,18 +160,22 @@ export default function ProfileSettingsScreen() {
             </TouchableOpacity>
             
             {showDatePicker && (
-              <DateTimePicker
-                value={dateOfBirth}
-                mode="date"
-                display="spinner"
-                onChange={(event, selectedDate) => {
-                  setShowDatePicker(Platform.OS === 'ios');
-                  if (selectedDate) {
-                    setDateOfBirth(selectedDate);
-                  }
-                }}
-                maximumDate={new Date()}
-              />
+              <View style={styles.datePickerContainer}>
+                <DateTimePicker
+                  value={dateOfBirth}
+                  mode="date"
+                  display="spinner"
+                  onChange={(event, selectedDate) => {
+                    setShowDatePicker(Platform.OS === 'ios');
+                    if (selectedDate) {
+                      setDateOfBirth(selectedDate);
+                    }
+                  }}
+                  maximumDate={new Date()}
+                  textColor="#1C1C1E"
+                  themeVariant="light"
+                />
+              </View>
             )}
 
             <Text style={styles.label}>Height (cm)</Text>
