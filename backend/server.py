@@ -98,6 +98,97 @@ async def login(credentials: UserLogin):
     return UserResponse(id=user_id, email=user_doc["email"], token=token)
 
 
+# ============= PROFILE ROUTES =============
+@api_router.get("/profile", response_model=UserProfile)
+async def get_profile(user_id: str = Depends(get_current_user)):
+    """Get user profile"""
+    user_doc = await db.users.find_one({"_id": ObjectId(user_id)})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Return profile, or default empty profile if not exists
+    profile_data = user_doc.get("profile", {})
+    return UserProfile(**profile_data)
+
+
+@api_router.put("/profile", response_model=UserProfile)
+async def update_profile(
+    profile_data: ProfileUpdate,
+    user_id: str = Depends(get_current_user)
+):
+    """Update user profile"""
+    # Build update dict with only provided fields
+    update_dict = {}
+    for field, value in profile_data.dict(exclude_unset=True).items():
+        if value is not None:
+            update_dict[f"profile.{field}"] = value
+    
+    if update_dict:
+        await db.users.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$set": update_dict}
+        )
+    
+    # Return updated profile
+    user_doc = await db.users.find_one({"_id": ObjectId(user_id)})
+    profile_data = user_doc.get("profile", {})
+    return UserProfile(**profile_data)
+
+
+@api_router.get("/profile/context", response_model=UserContext)
+async def get_user_context(user_id: str = Depends(get_current_user)):
+    """Get aggregated user context for AI and UI logic"""
+    user_doc = await db.users.find_one({"_id": ObjectId(user_id)})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    profile = user_doc.get("profile", {})
+    
+    # Calculate age from date_of_birth if available
+    age = None
+    if profile.get("date_of_birth"):
+        from datetime import datetime
+        dob = profile["date_of_birth"]
+        if isinstance(dob, str):
+            dob = datetime.fromisoformat(dob.replace('Z', '+00:00'))
+        age = (datetime.utcnow() - dob).days // 365
+    
+    # Build context object
+    basic_info = {
+        "sex": profile.get("sex"),
+        "age": age,
+        "height_cm": profile.get("height_cm"),
+        "weight_kg": profile.get("weight_kg"),
+    }
+    
+    training_context = {
+        "training_age": profile.get("training_age"),
+        "goals": profile.get("goals"),
+    }
+    
+    physiology = {
+        "injury_history": profile.get("injury_history"),
+        "weaknesses": profile.get("weaknesses"),
+        "strengths": profile.get("strengths"),
+    }
+    
+    # Check if profile is complete (at least basic info filled)
+    is_complete = all([
+        profile.get("sex"),
+        profile.get("date_of_birth"),
+        profile.get("height_cm"),
+        profile.get("weight_kg"),
+    ])
+    
+    return UserContext(
+        basic_info=basic_info,
+        training_context=training_context,
+        physiology=physiology,
+        background_story=profile.get("background_story"),
+        is_profile_complete=is_complete
+    )
+
+
 # ============= EXERCISE ROUTES =============
 @api_router.get("/exercises")
 async def get_exercises(
