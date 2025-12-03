@@ -195,6 +195,34 @@ async def get_user_context(user_id: str = Depends(get_current_user)):
     )
 
 
+@api_router.post("/profile/insights/generate", response_model=dict)
+async def generate_insights(user_id: str = Depends(get_current_user)):
+    """Generate AI-powered insights from user's profile"""
+    user_doc = await db.users.find_one({"_id": ObjectId(user_id)})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    profile_data = user_doc.get("profile", {})
+    profile = UserProfile(**profile_data)
+    
+    try:
+        # Generate insights using AI
+        insights = await generate_profile_insights(profile)
+        
+        # Save insights to database
+        await db.users.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$set": {"profile.insights": insights.dict()}}
+        )
+        
+        return {"insights": insights.dict()}
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate insights: {str(e)}")
+
+
 # ============= EXERCISE ROUTES =============
 @api_router.get("/exercises")
 async def get_exercises(
