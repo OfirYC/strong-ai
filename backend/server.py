@@ -117,7 +117,7 @@ async def update_profile(
     profile_data: ProfileUpdate,
     user_id: str = Depends(get_current_user)
 ):
-    """Update user profile"""
+    """Update user profile and auto-generate insights"""
     # Build update dict with only provided fields
     update_dict = {}
     for field, value in profile_data.dict(exclude_unset=True).items():
@@ -130,10 +130,29 @@ async def update_profile(
             {"$set": update_dict}
         )
     
-    # Return updated profile
+    # Get updated profile
     user_doc = await db.users.find_one({"_id": ObjectId(user_id)})
-    profile_data = user_doc.get("profile", {})
-    return UserProfile(**profile_data)
+    profile_dict = user_doc.get("profile", {})
+    profile = UserProfile(**profile_dict)
+    
+    # Try to auto-generate insights if profile has enough info
+    try:
+        insights = await generate_profile_insights(profile)
+        # Save insights to database
+        await db.users.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$set": {"profile.insights": insights.dict()}}
+        )
+        # Update profile with insights
+        profile.insights = insights
+    except ValueError:
+        # Not enough info yet, skip insights generation
+        pass
+    except Exception as e:
+        # Log error but don't fail the profile update
+        print(f"Failed to auto-generate insights: {e}")
+    
+    return profile
 
 
 @api_router.get("/profile/context", response_model=UserContext)
