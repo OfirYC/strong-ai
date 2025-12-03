@@ -216,9 +216,21 @@ export default function OnboardingScreen() {
 
   const renderPhysiologyStep = () => (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Help us understand your body</Text>
+      <Text style={styles.stepTitle}>Tell us about yourself (Optional)</Text>
 
-      <Text style={styles.label}>Injury History (Optional)</Text>
+      <Text style={styles.label}>Background Story</Text>
+      <TextInput
+        style={[styles.input, styles.textArea, styles.textAreaLarge]}
+        value={backgroundStory}
+        onChangeText={setBackgroundStory}
+        placeholder="Tell us about your fitness journey - how you started training, phases, current goals, military prep, etc."
+        placeholderTextColor="#8E8E93"
+        multiline
+        numberOfLines={6}
+        textAlignVertical="top"
+      />
+
+      <Text style={styles.label}>Injury History</Text>
       <TextInput
         style={[styles.input, styles.textArea]}
         value={injuryHistory}
@@ -230,19 +242,7 @@ export default function OnboardingScreen() {
         textAlignVertical="top"
       />
 
-      <Text style={styles.label}>Weaknesses (Optional)</Text>
-      <TextInput
-        style={[styles.input, styles.textArea]}
-        value={weaknesses}
-        onChangeText={setWeaknesses}
-        placeholder="What areas do you want to improve?"
-        placeholderTextColor="#8E8E93"
-        multiline
-        numberOfLines={3}
-        textAlignVertical="top"
-      />
-
-      <Text style={styles.label}>Strengths (Optional)</Text>
+      <Text style={styles.label}>Strengths</Text>
       <TextInput
         style={[styles.input, styles.textArea]}
         value={strengths}
@@ -253,24 +253,27 @@ export default function OnboardingScreen() {
         numberOfLines={3}
         textAlignVertical="top"
       />
+
+      <Text style={styles.label}>Weaknesses</Text>
+      <TextInput
+        style={[styles.input, styles.textArea]}
+        value={weaknesses}
+        onChangeText={setWeaknesses}
+        placeholder="What areas do you want to improve?"
+        placeholderTextColor="#8E8E93"
+        multiline
+        numberOfLines={3}
+        textAlignVertical="top"
+      />
     </View>
   );
 
   const renderBackgroundStep = () => (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Your fitness journey (Optional)</Text>
-
-      <Text style={styles.label}>Background Story</Text>
-      <TextInput
-        style={[styles.input, styles.textArea, styles.textAreaLarge]}
-        value={backgroundStory}
-        onChangeText={setBackgroundStory}
-        placeholder="Tell us about your fitness journey - how you started training, phases, current goals, military prep, etc."
-        placeholderTextColor="#8E8E93"
-        multiline
-        numberOfLines={8}
-        textAlignVertical="top"
-      />
+      <Text style={styles.stepTitle}>Almost done!</Text>
+      <Text style={styles.description}>
+        You've completed all the essential information. You can always update your profile later in settings.
+      </Text>
     </View>
   );
 
