@@ -31,6 +31,22 @@ class UserLogin(BaseModel):
     password: str
 
 
+class TrainingPhase(BaseModel):
+    """A phase in the user's training history"""
+    label: str  # e.g. "Room lifting phase"
+    description: str  # e.g. "Dec 2020–2022: lifting in room, calisthenics, building base"
+
+
+class ProfileInsights(BaseModel):
+    """AI-generated insights from user's freeform profile text"""
+    injury_tags: List[str] = []  # e.g. ["shin stress fractures", "posterior tibial irritation"]
+    current_issues: List[str] = []  # e.g. ["posterior tib discomfort", "hip flexor tightness"]
+    strength_tags: List[str] = []  # e.g. ["high work capacity", "EMOM resilience"]
+    weak_point_tags: List[str] = []  # e.g. ["tends to overload shins", "barefoot overuse risk"]
+    training_phases: List[TrainingPhase] = []
+    psych_profile: Optional[str] = None  # e.g. "high grit, tends to overdo volume"
+
+
 class UserProfile(BaseModel):
     """User profile information"""
     # Basic info
@@ -50,6 +66,9 @@ class UserProfile(BaseModel):
     
     # Background
     background_story: Optional[str] = None
+    
+    # AI-generated insights
+    insights: Optional[ProfileInsights] = None
 
 
 class User(BaseModel):
