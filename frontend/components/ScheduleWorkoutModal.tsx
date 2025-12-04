@@ -165,7 +165,7 @@ export default function ScheduleWorkoutModal({
                 <DateTimePicker
                   value={selectedDate}
                   mode="date"
-                  display="default"
+                  display="spinner"
                   onChange={(event, date) => {
                     setShowDatePicker(false);
                     if (date) setSelectedDate(date);
