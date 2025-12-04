@@ -973,6 +973,7 @@ def expand_recurring_workouts(planned_workouts: List[dict], start_date: str, end
     """
     Expand recurring workouts into individual instances for a date range.
     Returns a list of workout instances with their scheduled dates.
+    Each instance resets to 'planned' status (status is determined by linked workout sessions).
     """
     from datetime import date
     
@@ -1008,6 +1009,9 @@ def expand_recurring_workouts(planned_workouts: List[dict], start_date: str, end
                     instance = pw.copy()
                     instance["date"] = current_date.isoformat()
                     instance["recurrence_parent_id"] = str(pw["_id"])
+                    # Reset status to planned for each instance (actual status comes from workout sessions)
+                    instance["status"] = "planned"
+                    instance["workout_session_id"] = None
                     expanded.append(instance)
                     current_date += timedelta(days=1)
                     
@@ -1017,7 +1021,8 @@ def expand_recurring_workouts(planned_workouts: List[dict], start_date: str, end
                 if not recurrence_days:
                     continue
                 
-                # Find the first occurrence
+                # Start from the earliest date that matches one of the recurrence days
+                # Move current_date to the first matching weekday if needed
                 while current_date <= actual_end:
                     # Check if current_date's weekday is in recurrence_days
                     # weekday() returns 0=Monday, 6=Sunday (matches our format)
@@ -1025,6 +1030,9 @@ def expand_recurring_workouts(planned_workouts: List[dict], start_date: str, end
                         instance = pw.copy()
                         instance["date"] = current_date.isoformat()
                         instance["recurrence_parent_id"] = str(pw["_id"])
+                        # Reset status to planned for each instance
+                        instance["status"] = "planned"
+                        instance["workout_session_id"] = None
                         expanded.append(instance)
                     current_date += timedelta(days=1)
                     
@@ -1041,6 +1049,9 @@ def expand_recurring_workouts(planned_workouts: List[dict], start_date: str, end
                             instance = pw.copy()
                             instance["date"] = occurrence_date.isoformat()
                             instance["recurrence_parent_id"] = str(pw["_id"])
+                            # Reset status to planned for each instance
+                            instance["status"] = "planned"
+                            instance["workout_session_id"] = None
                             expanded.append(instance)
                     except ValueError:
                         # Day doesn't exist in this month (e.g., Feb 31), skip
