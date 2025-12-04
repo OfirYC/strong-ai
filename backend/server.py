@@ -1119,6 +1119,97 @@ async def enrich_planned_workouts_with_sessions(planned_workouts: List[dict], us
     return enriched
 
 
+async def get_unscheduled_workouts_for_date(user_id: str, date_str: str) -> List[dict]:
+    """
+    Get workout sessions for a specific date that weren't scheduled (no planned_workout_id).
+    Returns them in PlannedWorkout format for consistency.
+    """
+    from datetime import datetime
+    start_of_day = datetime.fromisoformat(date_str + "T00:00:00")
+    end_of_day = datetime.fromisoformat(date_str + "T23:59:59")
+    
+    # Find workout sessions without planned_workout_id
+    sessions = await db.workouts.find({
+        "user_id": user_id,
+        "started_at": {"$gte": start_of_day, "$lte": end_of_day},
+        "$or": [
+            {"planned_workout_id": None},
+            {"planned_workout_id": {"$exists": False}}
+        ]
+    }).to_list(100)
+    
+    # Convert to PlannedWorkout format
+    unscheduled = []
+    for session in sessions:
+        unscheduled.append({
+            "id": str(session["_id"]),
+            "user_id": user_id,
+            "date": date_str,
+            "name": session.get("name", "Quick Start Workout"),
+            "template_id": session.get("template_id"),
+            "type": None,
+            "notes": session.get("notes"),
+            "status": "completed" if session.get("ended_at") else "in_progress",
+            "workout_session_id": str(session["_id"]),
+            "order": 999,  # Put unscheduled at the end
+            "is_recurring": False,
+            "recurrence_type": None,
+            "recurrence_days": None,
+            "recurrence_end_date": None,
+            "recurrence_parent_id": None,
+            "created_at": session.get("created_at", datetime.utcnow())
+        })
+    
+    return unscheduled
+
+
+async def get_unscheduled_workouts_for_range(user_id: str, start_date: str, end_date: str) -> List[dict]:
+    """
+    Get workout sessions for a date range that weren't scheduled.
+    Returns them in PlannedWorkout format grouped by date.
+    """
+    from datetime import datetime
+    start = datetime.fromisoformat(start_date + "T00:00:00")
+    end = datetime.fromisoformat(end_date + "T23:59:59")
+    
+    # Find workout sessions without planned_workout_id in the range
+    sessions = await db.workouts.find({
+        "user_id": user_id,
+        "started_at": {"$gte": start, "$lte": end},
+        "$or": [
+            {"planned_workout_id": None},
+            {"planned_workout_id": {"$exists": False}}
+        ]
+    }).to_list(1000)
+    
+    # Convert to PlannedWorkout format
+    unscheduled = []
+    for session in sessions:
+        # Extract date from started_at
+        workout_date = session["started_at"].date().isoformat()
+        
+        unscheduled.append({
+            "id": str(session["_id"]),
+            "user_id": user_id,
+            "date": workout_date,
+            "name": session.get("name", "Quick Start Workout"),
+            "template_id": session.get("template_id"),
+            "type": None,
+            "notes": session.get("notes"),
+            "status": "completed" if session.get("ended_at") else "in_progress",
+            "workout_session_id": str(session["_id"]),
+            "order": 999,  # Put unscheduled at the end
+            "is_recurring": False,
+            "recurrence_type": None,
+            "recurrence_days": None,
+            "recurrence_end_date": None,
+            "recurrence_parent_id": None,
+            "created_at": session.get("created_at", datetime.utcnow())
+        })
+    
+    return unscheduled
+
+
 # ============= PLANNED WORKOUT ROUTES =============
 @api_router.post("/planned-workouts", response_model=PlannedWorkout)
 async def create_planned_workout(
