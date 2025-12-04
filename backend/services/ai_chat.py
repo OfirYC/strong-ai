@@ -1239,6 +1239,10 @@ async def generate_ai_chat_response(
     Returns:
         Updated message list including AI response
     """
+    import uuid
+    request_id = str(uuid.uuid4())[:8]
+    logger.info(f"[REQ-{request_id}] Starting AI chat for user {user_id} with {len(messages)} messages")
+    
     # Fetch user context for system prompt
     user_doc = await db.users.find_one({"_id": ObjectId(user_id)})
     
