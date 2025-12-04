@@ -133,7 +133,14 @@ export default function CalendarModal({ visible, onClose, onDateSelect }: Calend
       return;
     }
 
-    // No template - show alert with notes/type
+    // If no template but has a workout session (completed/in-progress), navigate to detail page
+    if (workout.workout_session_id) {
+      onClose(); // Close the calendar modal first
+      router.push(`/workout-detail?workoutId=${workout.workout_session_id}`);
+      return;
+    }
+
+    // Fallback: No template and no workout session - show alert with notes/type
     const details = [];
     if (workout.type) {
       details.push(`Type: ${workout.type}`);
