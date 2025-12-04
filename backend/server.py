@@ -675,6 +675,16 @@ async def update_workout(
         await check_and_create_prs(user_id, workout_id)
     
     workout = await db.workouts.find_one({"_id": ObjectId(workout_id)})
+    
+    # If workout is completed and linked to a planned workout, update its status
+    if workout_data.ended_at and workout.get("planned_workout_id"):
+        planned_id = workout["planned_workout_id"]
+        if ObjectId.is_valid(planned_id):
+            await db.planned_workouts.update_one(
+                {"_id": ObjectId(planned_id), "user_id": user_id},
+                {"$set": {"status": "completed"}}
+            )
+    
     return WorkoutSession(**{**workout, "id": str(workout["_id"])})
 
 
