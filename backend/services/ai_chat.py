@@ -549,13 +549,23 @@ async def generate_ai_chat_response(
     """
     # Fetch user context for system prompt
     user_doc = await db.users.find_one({"_id": ObjectId(user_id)})
-    profile_doc = await db.profiles.find_one({"user_id": user_id})
-    insights_doc = await db.profile_insights.find_one({"user_id": user_id})
+    
+    # Check if profile is nested in user document or separate collection
+    profile_data = user_doc.get("profile", {}) if user_doc else {}
+    if not profile_data:
+        profile_doc = await db.profiles.find_one({"user_id": user_id})
+        profile_data = profile_doc if profile_doc else {}
+    
+    # Check if insights are nested or separate
+    insights_data = profile_data.get("insights", {})
+    if not insights_data:
+        insights_doc = await db.profile_insights.find_one({"user_id": user_id})
+        insights_data = insights_doc if insights_doc else {}
     
     user_context = {
         "user": user_doc or {},
-        "profile": profile_doc or {},
-        "insights": insights_doc or {}
+        "profile": profile_data,
+        "insights": insights_data
     }
     
     # Build system prompt
