@@ -688,6 +688,27 @@ async def update_workout(
     return WorkoutSession(**{**workout, "id": str(workout["_id"])})
 
 
+@api_router.delete("/workouts/{workout_id}")
+async def delete_workout(
+    workout_id: str,
+    user_id: str = Depends(get_current_user)
+):
+    """Delete a workout session"""
+    if not ObjectId.is_valid(workout_id):
+        raise HTTPException(status_code=400, detail="Invalid workout ID")
+    
+    result = await db.workouts.delete_one({
+        "_id": ObjectId(workout_id),
+        "user_id": user_id
+    })
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Workout not found")
+    
+    return {"message": "Workout deleted successfully"}
+
+
+
 @api_router.get("/workouts/{workout_id}/detail", response_model=WorkoutSummary)
 async def get_workout_detail(
     workout_id: str,
