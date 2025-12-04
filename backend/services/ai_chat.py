@@ -587,34 +587,39 @@ async def execute_tool(tool_name: str, arguments: Dict[str, Any], db, user_id: s
         
         elif tool_name == "get_exercises":
             # Build query filter
-            query = {}
-            
             search = arguments.get("search")
             body_part = arguments.get("body_part")
             category = arguments.get("category")
             limit = arguments.get("limit", 50)
             
-            if search:
-                query["name"] = {"$regex": search, "$options": "i"}
-            
-            if body_part:
-                query["$or"] = [
-                    {"primary_body_parts": {"$regex": body_part, "$options": "i"}},
-                    {"secondary_body_parts": {"$regex": body_part, "$options": "i"}}
-                ]
-            
-            if category:
-                query["category"] = {"$regex": category, "$options": "i"}
-            
-            # Fetch exercises (both global and user's custom)
-            exercises = await db.exercises.find({
+            # Build flexible query - search by name takes priority
+            # If search is provided, just search by name (ignore body_part filter)
+            # This makes it easier to find exercises like "Romanian Deadlift" which has Back as primary
+            base_query = {
                 "$or": [
                     {"user_id": {"$exists": False}},
                     {"user_id": None},
                     {"user_id": user_id}
-                ],
-                **query
-            }).limit(limit).to_list(limit)
+                ]
+            }
+            
+            if search:
+                # Search by name only - more flexible
+                base_query["name"] = {"$regex": search, "$options": "i"}
+            elif body_part:
+                # Only filter by body part if no search term
+                base_query["$and"] = [
+                    {"$or": [
+                        {"primary_body_parts": {"$regex": body_part, "$options": "i"}},
+                        {"secondary_body_parts": {"$regex": body_part, "$options": "i"}}
+                    ]}
+                ]
+            
+            if category:
+                base_query["category"] = {"$regex": category, "$options": "i"}
+            
+            # Fetch exercises
+            exercises = await db.exercises.find(base_query).limit(limit).to_list(limit)
             
             # Build compact response
             result = []
