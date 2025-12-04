@@ -458,12 +458,13 @@ const styles = StyleSheet.create({
   plannedWorkoutContent: {
     flex: 1,
     marginRight: 12,
+    justifyContent: 'center',
   },
   plannedWorkoutHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   plannedWorkoutName: {
     fontSize: 18,
