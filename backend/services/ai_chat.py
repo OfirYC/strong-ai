@@ -938,11 +938,16 @@ async def execute_tool(tool_name: str, arguments: Dict[str, Any], db, user_id: s
             logger.info(f"[DEBUG] Delete result: deleted_count={result.deleted_count}")
             
             if result.deleted_count == 0:
-                return json.dumps({"error": f"Planned workout not found or already deleted. workout_id={workout_id}"})
+                # Don't return error - just say it's already gone
+                return json.dumps({
+                    "success": True,
+                    "already_deleted": True,
+                    "message": f"Workout {workout_id} was already deleted or doesn't exist. No action needed."
+                })
             
             return json.dumps({
                 "success": True,
-                "message": f"Deleted planned workout {workout_id}"
+                "message": f"Successfully deleted planned workout {workout_id}"
             })
         
         elif tool_name == "update_template":
