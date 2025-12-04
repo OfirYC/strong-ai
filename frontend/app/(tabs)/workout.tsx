@@ -211,17 +211,55 @@ export default function WorkoutScreen() {
       return;
     }
 
-    // If already in progress, resume it
+    // If already in progress and it's the current active workout, just return (do nothing, modal already visible)
+    if (plannedWorkout.status === 'in_progress' && 
+        plannedWorkout.workout_session_id && 
+        activeWorkout?.id === plannedWorkout.workout_session_id) {
+      // It's already the active workout, user can see the bottom sheet
+      return;
+    }
+
+    // If already in progress but it's a different workout, resume it
     if (plannedWorkout.status === 'in_progress' && plannedWorkout.workout_session_id) {
+      // Check if there's a different active workout
+      if (activeWorkout && activeWorkout.id !== plannedWorkout.workout_session_id) {
+        Alert.alert(
+          'Active Workout',
+          'You already have an Active Workout. Do you want to discard it and resume this one?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'Discard & Resume', 
+              style: 'destructive',
+              onPress: async () => {
+                try {
+                  endWorkout();
+                  const response = await api.get(`/workouts/${plannedWorkout.workout_session_id}`);
+                  startWorkout(response.data);
+                } catch (error) {
+                  console.error('Failed to resume workout:', error);
+                  Alert.alert('Error', 'Failed to resume workout');
+                }
+              }
+            },
+          ]
+        );
+        return;
+      }
+
+      // No active workout, just resume this one
       try {
         const response = await api.get(`/workouts/${plannedWorkout.workout_session_id}`);
         startWorkout(response.data);
         return;
       } catch (error) {
         console.error('Failed to resume workout:', error);
+        Alert.alert('Error', 'Failed to resume workout');
+        return;
       }
     }
 
+    // Starting a new workout (status is 'planned')
     // Check for active workout
     if (activeWorkout) {
       Alert.alert(
