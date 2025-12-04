@@ -303,6 +303,12 @@ class PlannedWorkoutCreate(BaseModel):
     type: Optional[str] = None  # e.g. "strength", "run", "mobility"
     notes: Optional[str] = None
     order: int = 0
+    
+    # Recurring schedule fields
+    is_recurring: bool = False
+    recurrence_type: Optional[str] = None  # "daily", "weekly", "monthly"
+    recurrence_days: Optional[List[int]] = None  # For weekly: [0=Monday, 1=Tuesday, ..., 6=Sunday]
+    recurrence_end_date: Optional[str] = None  # YYYY-MM-DD format or None for indefinite
 
 
 class PlannedWorkoutUpdate(BaseModel):
@@ -329,6 +335,13 @@ class PlannedWorkout(BaseModel):
     workout_session_id: Optional[str] = None
     order: int = 0
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # Recurring schedule fields
+    is_recurring: bool = False
+    recurrence_type: Optional[str] = None  # "daily", "weekly", "monthly"
+    recurrence_days: Optional[List[int]] = None  # For weekly: [0=Monday, 1=Tuesday, ..., 6=Sunday]
+    recurrence_end_date: Optional[str] = None  # YYYY-MM-DD format
+    recurrence_parent_id: Optional[str] = None  # Links instance to parent recurring workout
 
     class Config:
         populate_by_name = True
