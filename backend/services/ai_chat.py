@@ -548,8 +548,9 @@ async def generate_ai_chat_response(
     # Build system prompt
     system_prompt = build_system_prompt(user_context)
     
-    # Filter out any existing system messages from client
-    user_messages = [m for m in messages if m.role != "system"]
+    # Filter out any existing system messages and tool messages from client
+    # Tool messages should never come from the client - they're internal to processing
+    user_messages = [m for m in messages if m.role not in ["system", "tool"]]
     
     # Convert to OpenAI format
     openai_messages = [
