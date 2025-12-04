@@ -1171,7 +1171,8 @@ WORKOUT DELETION (IMPORTANT):
 - To skip ONE instance of a recurring workout, use update_planned_workout with status="skipped" instead
 
 AVAILABLE TOOLS:
-- get_exercises: Fetch available exercises with IDs (search by name is most reliable)
+- get_exercises: Search for exercises by name
+- create_exercise: Create a new exercise if it doesn't exist (use when get_exercises returns empty)
 - get_user_templates: See user's existing workout routines with template IDs
 - get_user_context: Get full user profile and training history
 - get_workout_history: View recent completed workouts
@@ -1183,6 +1184,7 @@ AVAILABLE TOOLS:
 - update_template: Edit a template's exercises (affects ALL workouts using it)
 
 WORKFLOW FOR COMMON REQUESTS:
+- "Schedule a workout" → get_exercises → if not found, create_exercise → create_planned_workout with exercises
 - "Delete my chest workout" → get_schedule → use "deletable_id" from result → delete_planned_workout(workout_id=deletable_id)
 - "Change tomorrow's workout to legs" → get_schedule → get_exercises (legs) → update_planned_workout with exercises
 - "Add more sets to my Push Day template" → get_user_templates → update_template
