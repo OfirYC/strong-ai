@@ -365,16 +365,42 @@ const styles = StyleSheet.create({
     height: 20,
   },
   footer: {
+    flexDirection: 'row',
     padding: 16,
+    gap: 12,
     borderTopWidth: 1,
     borderTopColor: '#E5E5EA',
     backgroundColor: '#FFFFFF',
   },
+  scheduleButton: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#007AFF',
+  },
+  buttonIcon: {
+    marginRight: 6,
+  },
+  scheduleButtonText: {
+    color: '#007AFF',
+    fontSize: 17,
+    fontWeight: '600',
+  },
   startButton: {
+    flex: 1,
     backgroundColor: '#007AFF',
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  startButtonWithSchedule: {
+    flex: 1,
   },
   startButtonText: {
     color: '#FFFFFF',
