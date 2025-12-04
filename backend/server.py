@@ -1400,6 +1400,30 @@ async def delete_planned_workout(
     return {"message": "Planned workout deleted"}
 
 
+# ============= AI CHAT ROUTES =============
+@api_router.post("/ai/chat", response_model=ChatResponse)
+async def chat_with_ai(
+    request: ChatRequest,
+    user_id: str = Depends(get_current_user)
+):
+    """
+    Chat with AI coach assistant.
+    Maintains conversation context and can use tools to fetch/update data.
+    """
+    try:
+        # Generate AI response with tool support
+        updated_messages = await generate_ai_chat_response(
+            user_id=user_id,
+            messages=request.messages,
+            db=db
+        )
+        
+        return ChatResponse(messages=updated_messages)
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI chat error: {str(e)}")
+
+
 # ============= SEED DATA =============
 @api_router.post("/seed")
 async def seed_exercises(force: bool = False):
