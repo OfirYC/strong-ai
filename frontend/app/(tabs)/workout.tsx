@@ -251,50 +251,98 @@ export default function WorkoutScreen() {
           <Text style={styles.title}>Start Workout</Text>
         </View>
 
-          <Button
-            title="Quick Start"
-            onPress={handleStartEmptyWorkout}
-            loading={loading}
-            style={styles.quickStartButton}
-          />
-
+        {/* Today's Workouts Section */}
+        {todaysWorkouts.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Recent Routines</Text>
-            {templates.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Ionicons name="list-outline" size={64} color="#3A3A3C" />
-                <Text style={styles.emptyText}>No routines yet</Text>
-                <Text style={styles.emptySubtext}>
-                  Create a routine in the Routines tab
-                </Text>
-              </View>
-            ) : (
-              templates.map((template) => (
-                <TouchableOpacity
-                  key={template.id}
-                  style={styles.templateCard}
-                  onPress={() => handleStartTemplate(template)}
-                >
-                  <View style={styles.templateInfo}>
-                    <Text style={styles.templateName}>{template.name}</Text>
-                    <Text style={styles.templateDetail}>
-                      {template.exercises.length} exercises
-                    </Text>
+            <Text style={styles.sectionTitle}>Today's Workouts</Text>
+            {todaysWorkouts.map((plannedWorkout) => (
+              <TouchableOpacity
+                key={plannedWorkout.id}
+                style={[
+                  styles.plannedWorkoutCard,
+                  plannedWorkout.status === 'completed' && styles.completedCard,
+                  plannedWorkout.status === 'skipped' && styles.skippedCard,
+                ]}
+                onPress={() => handleStartPlannedWorkout(plannedWorkout)}
+                disabled={plannedWorkout.status === 'completed' || plannedWorkout.status === 'skipped'}
+              >
+                <View style={styles.plannedWorkoutContent}>
+                  <View style={styles.plannedWorkoutHeader}>
+                    <Text style={styles.plannedWorkoutName}>{plannedWorkout.name}</Text>
+                    <View style={[styles.statusBadge, getStatusBadgeStyle(plannedWorkout.status)]}>
+                      <Ionicons 
+                        name={getStatusIcon(plannedWorkout.status) as any} 
+                        size={14} 
+                        color={getStatusBadgeStyle(plannedWorkout.status).color}
+                        style={styles.statusIcon}
+                      />
+                      <Text style={[styles.statusText, { color: getStatusBadgeStyle(plannedWorkout.status).color }]}>
+                        {plannedWorkout.status.replace('_', ' ')}
+                      </Text>
+                    </View>
                   </View>
-                  <Ionicons name="chevron-forward" size={24} color="#8E8E93" />
-                </TouchableOpacity>
-              ))
-            )}
+                  {plannedWorkout.notes && (
+                    <Text style={styles.plannedWorkoutNotes}>{plannedWorkout.notes}</Text>
+                  )}
+                  {plannedWorkout.type && (
+                    <Text style={styles.plannedWorkoutType}>{plannedWorkout.type}</Text>
+                  )}
+                </View>
+                {plannedWorkout.status === 'planned' && (
+                  <Ionicons name="play-circle-outline" size={32} color="#007AFF" />
+                )}
+                {plannedWorkout.status === 'in_progress' && (
+                  <Ionicons name="play-circle" size={32} color="#FF9500" />
+                )}
+              </TouchableOpacity>
+            ))}
           </View>
-        </ScrollView>
+        )}
 
-        <RoutineDetailModal
-          visible={showRoutineModal}
-          routine={selectedRoutine}
-          onClose={() => setShowRoutineModal(false)}
-          onStartWorkout={handleStartWorkoutFromRoutine}
+        <Button
+          title="Quick Start"
+          onPress={handleStartEmptyWorkout}
+          loading={loading}
+          style={styles.quickStartButton}
         />
-      </SafeAreaView>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Recent Routines</Text>
+          {templates.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="list-outline" size={64} color="#3A3A3C" />
+              <Text style={styles.emptyText}>No routines yet</Text>
+              <Text style={styles.emptySubtext}>
+                Create a routine in the Routines tab
+              </Text>
+            </View>
+          ) : (
+            templates.map((template) => (
+              <TouchableOpacity
+                key={template.id}
+                style={styles.templateCard}
+                onPress={() => handleStartTemplate(template)}
+              >
+                <View style={styles.templateInfo}>
+                  <Text style={styles.templateName}>{template.name}</Text>
+                  <Text style={styles.templateDetail}>
+                    {template.exercises.length} exercises
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={24} color="#8E8E93" />
+              </TouchableOpacity>
+            ))
+          )}
+        </View>
+      </ScrollView>
+
+      <RoutineDetailModal
+        visible={showRoutineModal}
+        routine={selectedRoutine}
+        onClose={() => setShowRoutineModal(false)}
+        onStartWorkout={handleStartWorkoutFromRoutine}
+      />
+    </SafeAreaView>
   );
 }
 
