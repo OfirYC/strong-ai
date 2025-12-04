@@ -1049,24 +1049,29 @@ When the user wants to change a scheduled workout's exercises:
 3. To change which template a workout uses:
    - Use update_planned_workout with a different 'template_id'
 
-WORKOUT DELETION:
-- Use delete_planned_workout to permanently remove a workout from schedule
-- This is different from marking as "skipped" (use update_planned_workout with status="skipped" for that)
+WORKOUT DELETION (IMPORTANT):
+- When using get_schedule, each workout has TWO IDs:
+  - "id": The workout instance ID
+  - "deletable_id": Use THIS ID for delete_planned_workout!
+- For recurring workouts: deletable_id = parent ID (deletes the ENTIRE recurring series)
+- For one-time workouts: deletable_id = same as id
+- ALWAYS use the "deletable_id" field when calling delete_planned_workout
+- To skip ONE instance of a recurring workout, use update_planned_workout with status="skipped" instead
 
 AVAILABLE TOOLS:
 - get_exercises: Fetch available exercises with IDs (can filter by body_part, category, search)
 - get_user_templates: See user's existing workout routines with template IDs
 - get_user_context: Get full user profile and training history
 - get_workout_history: View recent completed workouts
-- get_schedule: Check scheduled workouts (use to find workout_id for modifications)
+- get_schedule: Check scheduled workouts - returns "deletable_id" for delete operations
 - update_profile_insights: Update user profile with new information
 - create_planned_workout: Schedule workouts (with template_id OR exercises array)
 - update_planned_workout: Modify scheduled workout (date, name, exercises, template_id, status)
-- delete_planned_workout: Permanently remove a workout from schedule
+- delete_planned_workout: Permanently remove a workout - USE "deletable_id" from get_schedule!
 - update_template: Edit a template's exercises (affects ALL workouts using it)
 
 WORKFLOW FOR COMMON REQUESTS:
-- "Delete my chest workout" → get_schedule to find workout_id → delete_planned_workout
+- "Delete my chest workout" → get_schedule → use "deletable_id" from result → delete_planned_workout(workout_id=deletable_id)
 - "Change tomorrow's workout to legs" → get_schedule → get_exercises (legs) → update_planned_workout with exercises
 - "Add more sets to my Push Day template" → get_user_templates → update_template
 - "Skip today's workout" → get_schedule → update_planned_workout with status="skipped"
