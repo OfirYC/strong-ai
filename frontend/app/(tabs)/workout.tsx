@@ -64,6 +64,14 @@ export default function WorkoutScreen() {
     }, [])
   );
 
+  // Watch for active workout changes to refresh today's workouts
+  useEffect(() => {
+    // If active workout just ended (became null), refresh today's workouts
+    if (!activeWorkout) {
+      loadTodaysWorkouts();
+    }
+  }, [activeWorkout]);
+
   const loadTemplates = async () => {
     try {
       const response = await api.get('/templates');
