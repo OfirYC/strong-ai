@@ -148,6 +148,97 @@ export default function WorkoutScreen() {
     }
   };
 
+  const handleStartPlannedWorkout = async (plannedWorkout: PlannedWorkout) => {
+    // If already in progress, resume it
+    if (plannedWorkout.status === 'in_progress' && plannedWorkout.workout_session_id) {
+      try {
+        const response = await api.get(`/workouts/${plannedWorkout.workout_session_id}`);
+        startWorkout(response.data);
+        return;
+      } catch (error) {
+        console.error('Failed to resume workout:', error);
+      }
+    }
+
+    // If completed or skipped, don't allow starting again
+    if (plannedWorkout.status === 'completed' || plannedWorkout.status === 'skipped') {
+      return;
+    }
+
+    // Check for active workout
+    if (activeWorkout) {
+      Alert.alert(
+        'Active Workout',
+        'You already have an Active Workout. Do you want to discard it and start a new one?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Discard & Start New', 
+            style: 'destructive',
+            onPress: async () => {
+              endWorkout();
+              await createPlannedWorkoutSession(plannedWorkout);
+            }
+          },
+        ]
+      );
+      return;
+    }
+
+    await createPlannedWorkoutSession(plannedWorkout);
+  };
+
+  const createPlannedWorkoutSession = async (plannedWorkout: PlannedWorkout) => {
+    try {
+      setLoading(true);
+      const payload: any = { 
+        planned_workout_id: plannedWorkout.id,
+        name: plannedWorkout.name
+      };
+      
+      // If it has a template, use it
+      if (plannedWorkout.template_id) {
+        payload.template_id = plannedWorkout.template_id;
+      }
+      
+      const response = await api.post('/workouts', payload);
+      startWorkout(response.data);
+      
+      // Reload today's workouts to reflect status change
+      await loadTodaysWorkouts();
+    } catch (error: any) {
+      Alert.alert('Error', 'Failed to start workout');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStatusBadgeStyle = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return { backgroundColor: '#34C759', color: '#FFFFFF' };
+      case 'in_progress':
+        return { backgroundColor: '#FF9500', color: '#FFFFFF' };
+      case 'skipped':
+        return { backgroundColor: '#8E8E93', color: '#FFFFFF' };
+      default:
+        return { backgroundColor: '#007AFF', color: '#FFFFFF' };
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return 'checkmark-circle';
+      case 'in_progress':
+        return 'play-circle';
+      case 'skipped':
+        return 'close-circle';
+      default:
+        return 'time-outline';
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView 
