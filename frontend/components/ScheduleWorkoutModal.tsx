@@ -274,7 +274,7 @@ export default function ScheduleWorkoutModal({
                     <DateTimePicker
                       value={endDate}
                       mode="date"
-                      display="default"
+                      display="spinner"
                       minimumDate={selectedDate}
                       onChange={(event, date) => {
                         setShowEndDatePicker(false);
