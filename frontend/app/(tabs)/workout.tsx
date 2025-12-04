@@ -77,7 +77,30 @@ export default function WorkoutScreen() {
     try {
       const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
       const response = await api.get(`/planned-workouts?date=${today}`);
-      setTodaysWorkouts(response.data);
+      const plannedWorkouts: PlannedWorkout[] = response.data;
+      
+      // Enrich with actual workout session data if exists
+      const enriched: EnrichedPlannedWorkout[] = await Promise.all(
+        plannedWorkouts.map(async (pw) => {
+          if (pw.workout_session_id) {
+            try {
+              const workoutResponse = await api.get(`/workouts/${pw.workout_session_id}`);
+              const workout = workoutResponse.data;
+              return {
+                ...pw,
+                actualName: workout.name,
+                actualNotes: workout.notes,
+              };
+            } catch (error) {
+              console.error(`Failed to load workout session ${pw.workout_session_id}:`, error);
+              return pw;
+            }
+          }
+          return pw;
+        })
+      );
+      
+      setTodaysWorkouts(enriched);
     } catch (error) {
       console.error('Failed to load today\'s workouts:', error);
     }
