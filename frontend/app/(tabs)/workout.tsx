@@ -50,6 +50,7 @@ export default function WorkoutScreen() {
   const [selectedRoutine, setSelectedRoutine] = useState<WorkoutTemplate | null>(null);
   const [showRoutineModal, setShowRoutineModal] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
 
   // Load templates and today's workouts on mount
   useEffect(() => {
