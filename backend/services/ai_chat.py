@@ -1377,15 +1377,30 @@ async def generate_ai_chat_response(
                 })
             
             # Continue to next round to let AI process tool results
+            logger.info(f"[REQ-{request_id}] === ROUND {round_num + 1} END - continuing to next round ===")
             continue
         else:
             # No more tool calls - we have our final response
+            final_content = assistant_message.content or ""
+            logger.info(f"[REQ-{request_id}] === ROUND {round_num + 1} END - no tool calls, final response ===")
             break
+    
+    # Log the final response we're sending back
+    logger.info(f"[REQ-{request_id}] === FINAL RESPONSE ===")
+    logger.info(f"[REQ-{request_id}] Final content length: {len(final_content)}")
+    logger.info(f"[REQ-{request_id}] Final content: {final_content[:500] if final_content else 'EMPTY/NONE'}")
+    
+    # Check for empty response and provide a fallback
+    if not final_content or final_content.strip() == "":
+        logger.warning(f"[REQ-{request_id}] WARNING: Empty response from AI! Setting fallback message.")
+        final_content = "I apologize, but I wasn't able to generate a proper response. Could you please try again?"
     
     # Add final assistant response to user_messages
     user_messages.append(ChatMessage(
         role="assistant",
-        content=assistant_message.content or ""
+        content=final_content
     ))
+    
+    logger.info(f"[REQ-{request_id}] Returning {len(user_messages)} messages to client")
     
     return user_messages
