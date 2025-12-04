@@ -740,8 +740,29 @@ async def execute_tool(tool_name: str, arguments: Dict[str, Any], db, user_id: s
             if "date" not in arguments or "name" not in arguments:
                 return json.dumps({"error": "date and name are required"})
             
+            workout_date = arguments["date"]
+            workout_name = arguments["name"]
+            
+            # Check for existing workout with same name on same date (prevent duplicates)
+            existing = await db.planned_workouts.find_one({
+                "user_id": user_id,
+                "date": workout_date,
+                "name": workout_name
+            })
+            
+            if existing:
+                return json.dumps({
+                    "already_exists": True,
+                    "id": str(existing["_id"]),
+                    "template_id": existing.get("template_id"),
+                    "message": f"Workout '{workout_name}' already exists for {workout_date}. Use update_planned_workout to modify it."
+                })
+            
             template_id = arguments.get("template_id")
             exercises = arguments.get("exercises")
+            
+            # If exercises are provided but no template_id, create a new template first
+            if exercises and not template_id:
             
             # If exercises are provided but no template_id, create a new template first
             if exercises and not template_id:
