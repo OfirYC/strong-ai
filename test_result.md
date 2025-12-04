@@ -198,8 +198,8 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Routine Detail Modal - UI Implementation"
-    - "Routine Detail Modal - Integration"
+    - "PlannedWorkout Models with Recurring Support"
+    - "Planned Workout API Endpoints"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -207,18 +207,30 @@ test_plan:
 agent_communication:
   - agent: "main"
     message: |
-      Implementation complete! Created the RoutineDetailModal component with all requested features:
-      1. Displays routine name, exercises with thumbnails, sets, and muscle groups
-      2. Shows last performed date (if available)
-      3. Has a "Start Workout" button
-      4. Dismissible by tapping outside via transparent backdrop
-      5. Integrated into workout.tsx screen
+      Backend Implementation Complete for Workout Scheduling:
       
-      The modal was already implemented in the previous session, I just needed to integrate it
-      into the workout screen. The modal uses the existing design patterns and styling consistent
-      with WorkoutCompleteModal.
+      ✅ Models Updated:
+      - PlannedWorkout now supports recurring schedules (daily/weekly/monthly)
+      - WorkoutSession links to PlannedWorkout via planned_workout_id
       
-      User will test the frontend manually.
+      ✅ API Endpoints Created:
+      - POST /api/planned-workouts - Create workout schedule
+      - GET /api/planned-workouts?date=YYYY-MM-DD - Get workouts for specific day (expanded)
+      - GET /api/planned-workouts?start_date=X&end_date=Y - Get range (expanded)
+      - GET /api/planned-workouts/{id} - Get specific workout
+      - PUT /api/planned-workouts/{id} - Update workout
+      - DELETE /api/planned-workouts/{id} - Delete workout
+      
+      ✅ Recurring Logic:
+      - expand_recurring_workouts() function generates individual instances
+      - Supports daily, weekly (with day selection), and monthly patterns
+      - Respects end dates for finite schedules
+      
+      ✅ Status Management:
+      - Starting a workout from schedule sets status to "in_progress"
+      - Completing a workout sets status to "completed"
+      
+      Ready for backend testing!
 
   - task: "Routine Detail Modal - History Tab Integration"
     implemented: true
