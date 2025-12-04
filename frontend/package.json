@@ -22,7 +22,7 @@
     "@shopify/flash-list": "^2.2.0",
     "axios": "^1.13.2",
     "date-fns": "^4.1.0",
-    "expo": "^54.0.25",
+    "expo": "^54.0.26",
     "expo-blur": "~14.1.5",
     "expo-constants": "~17.1.7",
     "expo-font": "~13.3.2",
