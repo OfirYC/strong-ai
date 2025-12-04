@@ -1141,11 +1141,14 @@ async def get_unscheduled_workouts_for_date(user_id: str, date_str: str) -> List
     # Convert to PlannedWorkout format
     unscheduled = []
     for session in sessions:
+        # Ensure name is never None
+        workout_name = session.get("name") or "Quick Start Workout"
+        
         unscheduled.append({
             "id": str(session["_id"]),
             "user_id": user_id,
             "date": date_str,
-            "name": session.get("name", "Quick Start Workout"),
+            "name": workout_name,
             "template_id": session.get("template_id"),
             "type": None,
             "notes": session.get("notes"),
