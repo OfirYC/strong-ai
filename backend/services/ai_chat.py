@@ -581,7 +581,7 @@ async def execute_tool(tool_name: str, arguments: Dict[str, Any], db, user_id: s
                 template_doc = {
                     "user_id": user_id,
                     "name": arguments["name"],
-                    "notes": arguments.get("notes") or f"Created by AI Coach",
+                    "notes": arguments.get("notes") or "Created by AI Coach",
                     "exercises": template_exercises,
                     "created_at": datetime.utcnow(),
                     "updated_at": datetime.utcnow()
