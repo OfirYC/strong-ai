@@ -763,9 +763,6 @@ async def execute_tool(tool_name: str, arguments: Dict[str, Any], db, user_id: s
             
             # If exercises are provided but no template_id, create a new template first
             if exercises and not template_id:
-            
-            # If exercises are provided but no template_id, create a new template first
-            if exercises and not template_id:
                 # Build template exercises
                 template_exercises = []
                 for i, ex in enumerate(exercises):
