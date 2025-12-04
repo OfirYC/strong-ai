@@ -1147,9 +1147,9 @@ async def get_planned_workouts(
     date: Optional[str] = None
 ):
     """
-    Get planned workouts for a user.
-    - If 'date' is provided, returns workouts for that specific day (expanded if recurring)
-    - If 'start_date' and 'end_date' are provided, returns workouts in that range (expanded)
+    Get planned workouts for a user, including unscheduled workouts that happened on the date.
+    - If 'date' is provided, returns workouts for that specific day (expanded if recurring + actual sessions)
+    - If 'start_date' and 'end_date' are provided, returns workouts in that range (expanded + actual sessions)
     - Otherwise, returns all planned workouts (not expanded)
     """
     query = {"user_id": user_id}
@@ -1161,15 +1161,27 @@ async def get_planned_workouts(
     for w in workouts:
         w["id"] = str(w["_id"])
     
-    # If specific date or date range requested, expand recurring workouts
+    # If specific date or date range requested, expand recurring workouts and add unscheduled sessions
     if date:
         expanded = expand_recurring_workouts(workouts, date, date)
         enriched = await enrich_planned_workouts_with_sessions(expanded, user_id)
-        return [PlannedWorkout(**w) for w in enriched]
+        
+        # Also fetch actual workout sessions for this date that weren't scheduled
+        unscheduled = await get_unscheduled_workouts_for_date(user_id, date)
+        
+        # Merge both lists
+        all_workouts = enriched + unscheduled
+        return [PlannedWorkout(**w) for w in all_workouts]
     elif start_date and end_date:
         expanded = expand_recurring_workouts(workouts, start_date, end_date)
         enriched = await enrich_planned_workouts_with_sessions(expanded, user_id)
-        return [PlannedWorkout(**w) for w in enriched]
+        
+        # Also fetch unscheduled workout sessions in this range
+        unscheduled = await get_unscheduled_workouts_for_range(user_id, start_date, end_date)
+        
+        # Merge both lists
+        all_workouts = enriched + unscheduled
+        return [PlannedWorkout(**w) for w in all_workouts]
     else:
         # Return base workouts without expansion
         return [PlannedWorkout(**w) for w in workouts]
