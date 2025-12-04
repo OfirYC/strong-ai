@@ -343,6 +343,20 @@ export default function WorkoutScreen() {
         routine={selectedRoutine}
         onClose={() => setShowRoutineModal(false)}
         onStartWorkout={handleStartWorkoutFromRoutine}
+        onSchedule={(routine) => {
+          setSelectedRoutine(routine);
+          setShowScheduleModal(true);
+        }}
+      />
+
+      <ScheduleWorkoutModal
+        visible={showScheduleModal}
+        routine={selectedRoutine}
+        onClose={() => setShowScheduleModal(false)}
+        onScheduled={() => {
+          loadTodaysWorkouts();
+          setShowScheduleModal(false);
+        }}
       />
     </SafeAreaView>
   );
