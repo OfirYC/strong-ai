@@ -6,7 +6,7 @@ import os
 import logging
 from pathlib import Path
 from typing import List, Optional, Dict
-from datetime import datetime
+from datetime import datetime, timedelta
 from bson import ObjectId
 
 from models import (
@@ -168,7 +168,7 @@ async def get_user_context(user_id: str = Depends(get_current_user)):
     # Calculate age from date_of_birth if available
     age = None
     if profile.get("date_of_birth"):
-        from datetime import datetime
+        from datetime import datetime, timedelta
         dob = profile["date_of_birth"]
         if isinstance(dob, str):
             dob = datetime.fromisoformat(dob.replace('Z', '+00:00'))
