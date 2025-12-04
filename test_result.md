@@ -254,6 +254,31 @@ test_plan:
 agent_communication:
   - agent: "main"
     message: |
+      AI Chat Workout Creation Enhancement Complete:
+      
+      ✅ NEW AI TOOLS ADDED:
+      - get_exercises: Fetches available exercises with IDs (can filter by body part, category, search)
+      - get_user_templates: Fetches user's existing workout templates
+      
+      ✅ UPDATED create_planned_workout TOOL:
+      - Now accepts EITHER template_id OR exercises array
+      - When exercises array is provided, auto-creates a reusable template
+      - Links the template to the planned workout
+      
+      ✅ SYSTEM PROMPT UPDATED:
+      - Detailed instructions for workout creation workflow
+      - AI must use get_exercises first before creating workouts with exercises
+      - AI is instructed to NEVER create planned workouts without template_id or exercises
+      - AI knows that providing exercises creates a reusable template
+      
+      ✅ CALENDAR MODAL FIX:
+      - Added workout_session_id check in handleWorkoutClick
+      - Now navigates to workout-detail page for completed workouts without templates
+      
+      This ensures all AI-created workouts have viewable exercise details in the calendar modal.
+      
+  - agent: "main"
+    message: |
       Backend Implementation Complete for Workout Scheduling:
       
       ✅ Models Updated:
