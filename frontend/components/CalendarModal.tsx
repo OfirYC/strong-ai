@@ -340,6 +340,17 @@ export default function CalendarModal({ visible, onClose, onDateSelect }: Calend
           </SafeAreaView>
         </TouchableOpacity>
       </TouchableOpacity>
+
+      {/* Routine Detail Modal */}
+      <RoutineDetailModal
+        visible={showRoutineModal}
+        routine={selectedRoutine}
+        onClose={() => setShowRoutineModal(false)}
+        onStartWorkout={() => {
+          setShowRoutineModal(false);
+          onClose();
+        }}
+      />
     </Modal>
   );
 }
