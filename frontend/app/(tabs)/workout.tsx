@@ -276,6 +276,13 @@ export default function WorkoutScreen() {
     }
   };
 
+  const todaysWorkoutsOrder = {
+  in_progress: 0,
+  completed: 1,
+  planned: 2,
+  skipped: 3,
+};
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView 
@@ -292,7 +299,7 @@ export default function WorkoutScreen() {
         {todaysWorkouts.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Today's Workouts</Text>
-            {todaysWorkouts.map((plannedWorkout) => (
+            {todaysWorkout.sort((a, b) => todaysWorkoutsOrder[a.status] - todaysWorkoutsOrder[b.status]).map((plannedWorkout) => (
               <TouchableOpacity
                 key={plannedWorkout.id}
                 style={[
