@@ -118,14 +118,15 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
             isUser ? styles.userContent : styles.assistantContent
           ]}
         >
-          <Text
-            style={[
-              styles.messageText,
-              isUser ? styles.userText : styles.assistantText
-            ]}
-          >
-            {message.content}
-          </Text>
+          {isUser ? (
+            <Text style={styles.userText}>
+              {message.content}
+            </Text>
+          ) : (
+            <Markdown style={markdownStyles}>
+              {message.content}
+            </Markdown>
+          )}
         </View>
       </View>
     );
@@ -213,14 +214,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F2F2F7',
-    paddingVertical: '10vh',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: '5vh',
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5EA',
