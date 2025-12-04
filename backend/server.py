@@ -1420,19 +1420,33 @@ async def chat_with_ai(
     """
     Chat with AI coach assistant.
     Maintains conversation context and can use tools to fetch/update data.
+    Uses per-user locking to prevent duplicate concurrent requests.
     """
-    try:
-        # Generate AI response with tool support
-        updated_messages = await generate_ai_chat_response(
-            user_id=user_id,
-            messages=request.messages,
-            db=db
+    # Check if there's already an active request for this user
+    if user_id in ai_chat_active:
+        logger.warning(f"Duplicate AI chat request blocked for user {user_id}")
+        raise HTTPException(
+            status_code=429, 
+            detail="Another AI request is already in progress. Please wait."
         )
-        
-        return ChatResponse(messages=updated_messages)
     
-    except Exception as e:
-        import traceback
+    # Get lock for this user
+    lock = get_ai_lock(user_id)
+    
+    async with lock:
+        ai_chat_active.add(user_id)
+        try:
+            # Generate AI response with tool support
+            updated_messages = await generate_ai_chat_response(
+                user_id=user_id,
+                messages=request.messages,
+                db=db
+            )
+            
+            return ChatResponse(messages=updated_messages)
+        
+        except Exception as e:
+            import traceback
         print(f"AI chat error: {str(e)}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"AI chat error: {str(e)}")
