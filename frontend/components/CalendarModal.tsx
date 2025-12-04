@@ -34,6 +34,7 @@ interface CalendarModalProps {
 }
 
 export default function CalendarModal({ visible, onClose, onDateSelect }: CalendarModalProps) {
+  const router = useRouter();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [workoutsByDate, setWorkoutsByDate] = useState<{ [key: string]: PlannedWorkout[] }>({});
