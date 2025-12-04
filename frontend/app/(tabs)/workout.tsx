@@ -301,7 +301,7 @@ export default function WorkoutScreen() {
                   plannedWorkout.status === 'skipped' && styles.skippedCard,
                 ]}
                 onPress={() => handleStartPlannedWorkout(plannedWorkout)}
-                disabled={plannedWorkout.status === 'completed' || plannedWorkout.status === 'skipped'}
+                disabled={plannedWorkout.status === 'skipped'}
               >
                 <View style={styles.plannedWorkoutContent}>
                   <View style={styles.plannedWorkoutHeader}>
