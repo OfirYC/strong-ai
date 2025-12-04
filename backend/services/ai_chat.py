@@ -721,35 +721,6 @@ async def execute_tool(tool_name: str, arguments: Dict[str, Any], db, user_id: s
                 "exercises": results,
                 "message": f"Processed {len(results)} exercises"
             })
-            elif body_part:
-                # Only filter by body part if no search term
-                base_query["$and"] = [
-                    {"$or": [
-                        {"primary_body_parts": {"$regex": body_part, "$options": "i"}},
-                        {"secondary_body_parts": {"$regex": body_part, "$options": "i"}}
-                    ]}
-                ]
-            
-            if category:
-                base_query["category"] = {"$regex": category, "$options": "i"}
-            
-            # Fetch exercises
-            exercises = await db.exercises.find(base_query).limit(limit).to_list(limit)
-            
-            # Build compact response
-            result = []
-            for ex in exercises:
-                result.append({
-                    "id": str(ex["_id"]),
-                    "name": ex.get("name"),
-                    "exercise_kind": ex.get("exercise_kind"),
-                    "primary_body_parts": ex.get("primary_body_parts", []),
-                    "secondary_body_parts": ex.get("secondary_body_parts", []),
-                    "category": ex.get("category"),
-                    "is_custom": ex.get("is_custom", False)
-                })
-            
-            return json.dumps(result)
         
         elif tool_name == "get_user_templates":
             # Fetch user's workout templates
