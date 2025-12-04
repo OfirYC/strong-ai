@@ -1068,6 +1068,57 @@ def expand_recurring_workouts(planned_workouts: List[dict], start_date: str, end
     return expanded
 
 
+async def enrich_planned_workouts_with_sessions(planned_workouts: List[dict], user_id: str) -> List[dict]:
+    """
+    Enrich planned workouts with actual workout session data.
+    For recurring workouts, checks if there's a completed workout for each specific date.
+    """
+    enriched = []
+    
+    for pw in planned_workouts:
+        # If it's a recurring workout instance (has recurrence_parent_id)
+        # Check if there's an actual workout session for this specific date
+        if pw.get("recurrence_parent_id"):
+            # Find workout sessions that match this date and are linked to the parent
+            pw_date = pw["date"]
+            
+            # Find workout sessions for this date that might be linked to this recurring workout
+            # Check both by planned_workout_id matching the parent ID and by date matching
+            workout_session = await db.workouts.find_one({
+                "user_id": user_id,
+                "$or": [
+                    {"planned_workout_id": pw.get("recurrence_parent_id")},
+                    {"planned_workout_id": str(pw.get("_id"))} if pw.get("_id") else {}
+                ]
+            })
+            
+            # More specific: find workout sessions that started on this specific date
+            if not workout_session:
+                # Check for workouts started on this date (regardless of planned_workout_id)
+                from datetime import datetime
+                start_of_day = datetime.fromisoformat(pw_date + "T00:00:00")
+                end_of_day = datetime.fromisoformat(pw_date + "T23:59:59")
+                
+                # Look for workouts with matching name and date
+                workout_session = await db.workouts.find_one({
+                    "user_id": user_id,
+                    "name": pw.get("name"),
+                    "started_at": {"$gte": start_of_day, "$lte": end_of_day}
+                })
+            
+            # Update status based on found session
+            if workout_session:
+                if workout_session.get("ended_at"):
+                    pw["status"] = "completed"
+                else:
+                    pw["status"] = "in_progress"
+                pw["workout_session_id"] = str(workout_session["_id"])
+        
+        enriched.append(pw)
+    
+    return enriched
+
+
 # ============= PLANNED WORKOUT ROUTES =============
 @api_router.post("/planned-workouts", response_model=PlannedWorkout)
 async def create_planned_workout(
