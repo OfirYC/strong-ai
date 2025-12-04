@@ -683,7 +683,7 @@ def build_system_prompt(user_context: Dict[str, Any]) -> str:
             if isinstance(dob, str):
                 dob = datetime.fromisoformat(dob.replace('Z', '+00:00'))
             age = str((datetime.utcnow() - dob).days // 365)
-        except:
+        except Exception:
             pass
     
     height = profile.get("height_cm")
