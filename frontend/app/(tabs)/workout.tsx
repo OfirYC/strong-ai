@@ -419,4 +419,65 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
   },
+  plannedWorkoutCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: '#007AFF',
+  },
+  completedCard: {
+    opacity: 0.6,
+    borderColor: '#34C759',
+  },
+  skippedCard: {
+    opacity: 0.5,
+    borderColor: '#8E8E93',
+  },
+  plannedWorkoutContent: {
+    flex: 1,
+    marginRight: 12,
+  },
+  plannedWorkoutHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  plannedWorkoutName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1C1C1E',
+    flex: 1,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 8,
+  },
+  statusIcon: {
+    marginRight: 4,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'capitalize',
+  },
+  plannedWorkoutNotes: {
+    fontSize: 14,
+    color: '#636366',
+    marginBottom: 4,
+  },
+  plannedWorkoutType: {
+    fontSize: 12,
+    color: '#8E8E93',
+    textTransform: 'capitalize',
+  },
 });
