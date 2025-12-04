@@ -1373,8 +1373,8 @@ async def generate_ai_chat_response(
         
         # Check if tool calls were made
         if assistant_message.tool_calls:
-            # Limit tool calls per round to prevent excessive API calls
-            tool_calls_to_process = assistant_message.tool_calls[:max_tools_per_round]
+            # Process ALL tool calls (no limit)
+            tool_calls_to_process = assistant_message.tool_calls
             
             logger.info(f"[REQ-{request_id}] ROUND {round_num + 1} - Processing {len(tool_calls_to_process)} tool calls: {[tc.function.name for tc in tool_calls_to_process]}")
             
