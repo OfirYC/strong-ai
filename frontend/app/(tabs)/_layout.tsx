@@ -1,13 +1,17 @@
 import React, { useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useWorkoutStore } from '../../store/workoutStore';
+import { useAuthStore } from '../../store/authStore';
 import ActiveWorkoutSheet from '../../components/ActiveWorkoutSheet';
+import AIChatModal from '../../components/AIChatModal';
 
 export default function TabLayout() {
   const { activeWorkout } = useWorkoutStore();
+  const { user } = useAuthStore();
   const [sheetExpanded, setSheetExpanded] = useState(false);
+  const [showAIChat, setShowAIChat] = useState(false);
 
   return (
     <View style={styles.container}>
