@@ -16,6 +16,7 @@ import { useWorkoutStore } from '../../store/workoutStore';
 import { WorkoutTemplate } from '../../types';
 import RoutineDetailModal from '../../components/RoutineDetailModal';
 import ScheduleWorkoutModal from '../../components/ScheduleWorkoutModal';
+import CalendarModal from '../../components/CalendarModal';
 
 interface PlannedWorkout {
   id: string;
