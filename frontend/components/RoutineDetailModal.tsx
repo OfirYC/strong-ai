@@ -35,6 +35,7 @@ export default function RoutineDetailModal({
   routine,
   onClose,
   onStartWorkout,
+  onSchedule,
   onEdit,
 }: RoutineDetailModalProps) {
   const [exerciseDetails, setExerciseDetails] = useState<{ [key: string]: Exercise }>({});
