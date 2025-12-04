@@ -1174,12 +1174,12 @@ async def generate_ai_chat_response(
             tool_name = tool_call.function.name
             arguments = json.loads(tool_call.function.arguments)
             
-            print(f"[AI TOOL CALL] Tool: {tool_name}, Arguments: {arguments}")
+            logger.info(f"[AI TOOL CALL] Tool: {tool_name}, Arguments: {arguments}")
             
             # Execute tool
             tool_result = await execute_tool(tool_name, arguments, db, user_id)
             
-            print(f"[AI TOOL RESULT] {tool_name}: {tool_result[:200]}...")
+            logger.info(f"[AI TOOL RESULT] {tool_name}: {tool_result[:200]}...")
             
             # Store for second call
             tool_calls_data.append({
