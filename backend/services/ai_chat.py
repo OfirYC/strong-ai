@@ -48,6 +48,36 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "get_exercises",
+            "description": "Fetches available exercises from the database. Use this BEFORE creating a planned workout so you can select the correct exercise IDs. You can filter by body part, category, or search by name.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "search": {
+                        "type": "string",
+                        "description": "Search query to filter exercises by name (optional)"
+                    },
+                    "body_part": {
+                        "type": "string",
+                        "description": "Filter by primary body part (e.g., 'Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core')"
+                    },
+                    "category": {
+                        "type": "string",
+                        "description": "Filter by category (e.g., 'Strength', 'Cardio')"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of exercises to return",
+                        "default": 50
+                    }
+                },
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "get_workout_history",
             "description": "Retrieves recent completed workout sessions with summaries. Use this to see what workouts the user has done recently.",
             "parameters": {
