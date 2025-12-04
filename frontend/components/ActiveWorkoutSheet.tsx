@@ -458,7 +458,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
         ]
       );
     } else {
-      // Regular workout - show standard cancel dialog
+      // Unscheduled workout (quick start or template without scheduling) - delete it entirely
       Alert.alert(
         'Cancel Workout',
         'Are you sure you want to cancel this workout? All progress will be lost.',
@@ -467,7 +467,13 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
           { 
             text: 'Cancel Workout', 
             style: 'destructive',
-            onPress: () => {
+            onPress: async () => {
+              // Delete the workout session from database
+              try {
+                await api.delete(`/workouts/${activeWorkout?.id}`);
+              } catch (error) {
+                console.error('Failed to delete workout:', error);
+              }
               endWorkout();
               collapse();
             }
