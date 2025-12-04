@@ -268,19 +268,19 @@ export default function ScheduleWorkoutModal({
                           })}
                         </Text>
                       </TouchableOpacity>
-                      {showEndDatePicker && (
-                        <DateTimePicker
-                          value={endDate}
-                          mode="date"
-                          display="default"
-                          minimumDate={selectedDate}
-                          onChange={(event, date) => {
-                            setShowEndDatePicker(false);
-                            if (date) setEndDate(date);
-                          }}
-                        />
-                      )}
                     </View>
+                  )}
+                  {showEndDatePicker && (
+                    <DateTimePicker
+                      value={endDate}
+                      mode="date"
+                      display="default"
+                      minimumDate={selectedDate}
+                      onChange={(event, date) => {
+                        setShowEndDatePicker(false);
+                        if (date) setEndDate(date);
+                      }}
+                    />
                   )}
                 </>
               )}
