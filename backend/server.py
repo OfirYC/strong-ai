@@ -17,6 +17,7 @@ from models import (
     PRRecord, WorkoutSummary, WorkoutExerciseSummary,
     PlannedWorkout, PlannedWorkoutCreate, PlannedWorkoutUpdate
 )
+from services.ai_chat import ChatRequest, ChatResponse, generate_ai_chat_response
 from services.ai_profile import generate_profile_insights
 from auth import get_password_hash, verify_password, create_access_token, decode_access_token
 from seed_exercises_new import EXERCISES
