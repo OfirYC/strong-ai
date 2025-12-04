@@ -1200,15 +1200,6 @@ When deleting workouts, use the "deletable_id" from get_schedule results."""
 
 
 async def generate_ai_chat_response(
-- "Add more sets to my Push Day template" → get_user_templates → update_template
-- "Skip today's workout" → get_schedule → update_planned_workout with status="skipped"
-
-Use these tools proactively to provide personalized, context-aware coaching."""
-
-    return prompt
-
-
-async def generate_ai_chat_response(
     user_id: str,
     messages: List[ChatMessage],
     db
