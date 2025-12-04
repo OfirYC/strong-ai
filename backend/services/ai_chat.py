@@ -597,7 +597,7 @@ async def generate_ai_chat_response(
     
     # Call OpenAI with tools
     response = client.chat.completions.create(
-        model="openai/gpt-4o-mini",
+        model="openai/gpt-5.1",
         messages=openai_messages,
         tools=TOOLS,
         temperature=0.7
@@ -666,7 +666,7 @@ async def generate_ai_chat_response(
         
         # Make final call
         final_response = client.chat.completions.create(
-            model="openai/gpt-4o-mini",
+            model="openai/gpt-5.1",
             messages=openai_messages_with_tools,
             temperature=0.7
         )

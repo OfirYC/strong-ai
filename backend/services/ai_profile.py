@@ -122,7 +122,7 @@ Return the data as valid JSON matching the schema."""
     try:
         # Call OpenAI with function calling for structured output
         response = client.chat.completions.create(
-            model="openai/gpt-4o-mini",  # Using GPT-4 mini via OpenRouter
+            model="openai/gpt-5.1",  # Using GPT-4 mini via OpenRouter
             messages=[
                 {
                     "role": "system",
