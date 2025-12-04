@@ -447,12 +447,20 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 24,
   },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
     color: '#1C1C1E',
+    flex: 1,
+  },
+  calendarButton: {
+    padding: 8,
+    marginLeft: 12,
   },
   quickStartButton: {
     marginBottom: 32,
