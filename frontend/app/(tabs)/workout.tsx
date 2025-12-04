@@ -249,6 +249,14 @@ export default function WorkoutScreen() {
               style: 'destructive',
               onPress: async () => {
                 try {
+                  // Delete the old workout if it's unscheduled
+                  if (!activeWorkout.planned_workout_id) {
+                    try {
+                      await api.delete(`/workouts/${activeWorkout.id}`);
+                    } catch (error) {
+                      console.error('Failed to delete workout:', error);
+                    }
+                  }
                   endWorkout();
                   const response = await api.get(`/workouts/${plannedWorkout.workout_session_id}`);
                   startWorkout(response.data);
