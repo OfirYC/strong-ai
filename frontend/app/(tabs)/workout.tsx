@@ -15,6 +15,7 @@ import api from '../../utils/api';
 import { useWorkoutStore } from '../../store/workoutStore';
 import { WorkoutTemplate } from '../../types';
 import RoutineDetailModal from '../../components/RoutineDetailModal';
+import ScheduleWorkoutModal from '../../components/ScheduleWorkoutModal';
 
 interface PlannedWorkout {
   id: string;
