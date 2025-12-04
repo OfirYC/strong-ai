@@ -1164,10 +1164,12 @@ async def get_planned_workouts(
     # If specific date or date range requested, expand recurring workouts
     if date:
         expanded = expand_recurring_workouts(workouts, date, date)
-        return [PlannedWorkout(**w) for w in expanded]
+        enriched = await enrich_planned_workouts_with_sessions(expanded, user_id)
+        return [PlannedWorkout(**w) for w in enriched]
     elif start_date and end_date:
         expanded = expand_recurring_workouts(workouts, start_date, end_date)
-        return [PlannedWorkout(**w) for w in expanded]
+        enriched = await enrich_planned_workouts_with_sessions(expanded, user_id)
+        return [PlannedWorkout(**w) for w in enriched]
     else:
         # Return base workouts without expansion
         return [PlannedWorkout(**w) for w in workouts]
