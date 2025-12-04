@@ -81,6 +81,25 @@ export default function TabLayout() {
           onFinishWorkout={() => {}}
         />
       )}
+
+      {/* Floating AI Chat Button */}
+      {user && (
+        <TouchableOpacity
+          style={styles.aiButton}
+          onPress={() => setShowAIChat(true)}
+          activeOpacity={0.8}
+        >
+          <View style={styles.aiButtonGradient}>
+            <Ionicons name="sparkles" size={24} color="#FFFFFF" />
+          </View>
+        </TouchableOpacity>
+      )}
+
+      {/* AI Chat Modal */}
+      <AIChatModal
+        visible={showAIChat}
+        onClose={() => setShowAIChat(false)}
+      />
     </View>
   );
 }
