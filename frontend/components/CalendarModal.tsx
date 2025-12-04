@@ -111,6 +111,30 @@ export default function CalendarModal({ visible, onClose, onDateSelect }: Calend
     setSelectedDate(today);
   };
 
+  const handleWorkoutClick = async (workout: PlannedWorkout) => {
+    // Only show details for workouts with a template
+    if (!workout.template_id) {
+      Alert.alert(
+        workout.name,
+        workout.notes || 'No additional details available',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    try {
+      setLoadingTemplate(true);
+      const response = await api.get(`/templates/${workout.template_id}`);
+      setSelectedRoutine(response.data);
+      setShowRoutineModal(true);
+    } catch (error) {
+      console.error('Failed to load template:', error);
+      Alert.alert('Error', 'Failed to load workout details');
+    } finally {
+      setLoadingTemplate(false);
+    }
+  };
+
   const handleDatePress = (dateStr: string) => {
     setSelectedDate(dateStr);
     const workouts = workoutsByDate[dateStr] || [];
