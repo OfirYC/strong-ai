@@ -1345,8 +1345,7 @@ async def generate_ai_chat_response(
     logger.info(f"[REQ-{request_id}] OpenAI messages count: {len(openai_messages)}")
     
     # Call OpenAI with tools - support multiple rounds of tool calls
-    max_tool_rounds = 3  # Limit rounds to prevent timeouts
-    max_tools_per_round = 4  # Limit tools per round
+    max_tool_rounds = 5  # Allow more rounds since we simplified tool usage
     current_messages = openai_messages.copy()
     final_content = ""
     
