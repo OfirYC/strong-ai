@@ -55,26 +55,13 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "get_exercises",
-            "description": "Fetches available exercises from the database. Use this BEFORE creating a planned workout so you can select the correct exercise IDs. You can filter by body part, category, or search by name.",
+            "description": "Fetches ALL available exercises from the database in ONE call. Call this ONCE without any filters to get the full list, then pick what you need from the results. Do NOT call this multiple times for individual exercises.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "search": {
-                        "type": "string",
-                        "description": "Search query to filter exercises by name (optional)"
-                    },
                     "body_part": {
                         "type": "string",
-                        "description": "Filter by primary body part (e.g., 'Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core')"
-                    },
-                    "category": {
-                        "type": "string",
-                        "description": "Filter by category (e.g., 'Strength', 'Cardio')"
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "description": "Maximum number of exercises to return",
-                        "default": 50
+                        "description": "Optional: Filter by body part (e.g., 'Chest', 'Back', 'Legs')"
                     }
                 },
                 "required": []
@@ -84,8 +71,36 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "create_exercises_batch",
+            "description": "Creates multiple new exercises at once. Use this to create ALL missing exercises in a single call instead of one by one.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "exercises": {
+                        "type": "array",
+                        "description": "Array of exercises to create",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {"type": "string", "description": "Exercise name"},
+                                "exercise_kind": {"type": "string", "enum": ["Barbell", "Dumbbell", "Cable", "Machine", "Bodyweight", "Kettlebell", "Band", "Other"]},
+                                "primary_body_parts": {"type": "array", "items": {"type": "string"}},
+                                "secondary_body_parts": {"type": "array", "items": {"type": "string"}},
+                                "category": {"type": "string", "enum": ["Strength", "Cardio", "Mobility", "Core", "Full Body"]}
+                            },
+                            "required": ["name", "exercise_kind", "primary_body_parts", "category"]
+                        }
+                    }
+                },
+                "required": ["exercises"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "create_exercise",
-            "description": "Creates a new exercise in the database. Use this when get_exercises doesn't find an exercise you need. The exercise will be available for all future workouts.",
+            "description": "Creates a single new exercise. Prefer create_exercises_batch when creating multiple exercises.",
             "parameters": {
                 "type": "object",
                 "properties": {
