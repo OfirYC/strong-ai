@@ -507,4 +507,36 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '600',
   },
+  datePickerBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  datePickerContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    width: '90%',
+    maxWidth: 400,
+  },
+  datePickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5EA',
+  },
+  datePickerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1C1C1E',
+  },
+  datePickerDone: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#007AFF',
+  },
 });
