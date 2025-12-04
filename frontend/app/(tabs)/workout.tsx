@@ -225,7 +225,7 @@ export default function WorkoutScreen() {
     await createPlannedWorkoutSession(plannedWorkout);
   };
 
-  const createPlannedWorkoutSession = async (plannedWorkout: PlannedWorkout) => {
+  const createPlannedWorkoutSession = async (plannedWorkout: EnrichedPlannedWorkout) => {
     try {
       setLoading(true);
       const payload: any = { 
