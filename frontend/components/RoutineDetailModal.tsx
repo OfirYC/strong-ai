@@ -220,10 +220,24 @@ export default function RoutineDetailModal({
           <View style={styles.bottomSpacer} />
         </ScrollView>
 
-        {/* Start Workout Button */}
+        {/* Action Buttons */}
         <View style={styles.footer}>
+          {onSchedule && (
+            <TouchableOpacity 
+              style={styles.scheduleButton}
+              onPress={() => {
+                if (routine) {
+                  onSchedule(routine);
+                  onClose();
+                }
+              }}
+            >
+              <Ionicons name="calendar-outline" size={20} color="#007AFF" style={styles.buttonIcon} />
+              <Text style={styles.scheduleButtonText}>Schedule</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity 
-            style={styles.startButton}
+            style={[styles.startButton, onSchedule && styles.startButtonWithSchedule]}
             onPress={handleStartWorkout}
           >
             <Text style={styles.startButtonText}>Start Workout</Text>
