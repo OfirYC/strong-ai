@@ -739,6 +739,66 @@ async def execute_tool(tool_name: str, arguments: Dict[str, Any], db, user_id: s
                 if field in arguments:
                     update_fields[field] = arguments[field]
             
+            # Handle template_id change
+            if "template_id" in arguments:
+                update_fields["template_id"] = arguments["template_id"]
+            
+            # Handle exercises array - create new template if provided
+            exercises = arguments.get("exercises")
+            if exercises:
+                # Get the planned workout to use its name for the new template
+                existing_workout = await db.planned_workouts.find_one({
+                    "_id": ObjectId(workout_id),
+                    "user_id": user_id
+                })
+                
+                if not existing_workout:
+                    return json.dumps({"error": "Planned workout not found"})
+                
+                workout_name = arguments.get("name") or existing_workout.get("name", "Workout")
+                
+                # Build template exercises
+                template_exercises = []
+                for i, ex in enumerate(exercises):
+                    exercise_id = ex.get("exercise_id")
+                    if not exercise_id:
+                        continue
+                    
+                    num_sets = ex.get("sets", 3)
+                    reps = ex.get("reps", 10)
+                    weight = ex.get("weight")
+                    notes = ex.get("notes")
+                    
+                    sets = []
+                    for _ in range(num_sets):
+                        set_item = {"reps": reps, "is_warmup": False}
+                        if weight:
+                            set_item["weight"] = weight
+                        sets.append(set_item)
+                    
+                    template_exercises.append({
+                        "exercise_id": exercise_id,
+                        "order": i,
+                        "sets": sets,
+                        "notes": notes,
+                        "default_sets": num_sets,
+                        "default_reps": reps,
+                        "default_weight": weight
+                    })
+                
+                # Create new template
+                template_doc = {
+                    "user_id": user_id,
+                    "name": f"{workout_name} (Modified)",
+                    "notes": "Created from workout modification",
+                    "exercises": template_exercises,
+                    "created_at": datetime.utcnow(),
+                    "updated_at": datetime.utcnow()
+                }
+                
+                template_result = await db.templates.insert_one(template_doc)
+                update_fields["template_id"] = str(template_result.inserted_id)
+            
             if not update_fields:
                 return json.dumps({"error": "No fields to update"})
             
@@ -751,9 +811,103 @@ async def execute_tool(tool_name: str, arguments: Dict[str, Any], db, user_id: s
             if result.matched_count == 0:
                 return json.dumps({"error": "Planned workout not found"})
             
+            message = f"Updated planned workout {workout_id}"
+            if exercises:
+                message += f". Created new template with {len(exercises)} exercises."
+            
             return json.dumps({
                 "success": True,
-                "message": f"Updated planned workout {workout_id}"
+                "message": message,
+                "template_id": update_fields.get("template_id")
+            })
+        
+        elif tool_name == "delete_planned_workout":
+            workout_id = arguments.get("workout_id")
+            
+            if not workout_id or not ObjectId.is_valid(workout_id):
+                return json.dumps({"error": "Valid workout_id is required"})
+            
+            # Delete from database
+            result = await db.planned_workouts.delete_one({
+                "_id": ObjectId(workout_id),
+                "user_id": user_id
+            })
+            
+            if result.deleted_count == 0:
+                return json.dumps({"error": "Planned workout not found or already deleted"})
+            
+            return json.dumps({
+                "success": True,
+                "message": f"Deleted planned workout {workout_id}"
+            })
+        
+        elif tool_name == "update_template":
+            template_id = arguments.get("template_id")
+            
+            if not template_id or not ObjectId.is_valid(template_id):
+                return json.dumps({"error": "Valid template_id is required"})
+            
+            # Build update document
+            update_fields = {"updated_at": datetime.utcnow()}
+            
+            if "name" in arguments:
+                update_fields["name"] = arguments["name"]
+            
+            if "notes" in arguments:
+                update_fields["notes"] = arguments["notes"]
+            
+            # Handle exercises array
+            exercises = arguments.get("exercises")
+            if exercises:
+                template_exercises = []
+                for i, ex in enumerate(exercises):
+                    exercise_id = ex.get("exercise_id")
+                    if not exercise_id:
+                        continue
+                    
+                    num_sets = ex.get("sets", 3)
+                    reps = ex.get("reps", 10)
+                    weight = ex.get("weight")
+                    notes = ex.get("notes")
+                    
+                    sets = []
+                    for _ in range(num_sets):
+                        set_item = {"reps": reps, "is_warmup": False}
+                        if weight:
+                            set_item["weight"] = weight
+                        sets.append(set_item)
+                    
+                    template_exercises.append({
+                        "exercise_id": exercise_id,
+                        "order": i,
+                        "sets": sets,
+                        "notes": notes,
+                        "default_sets": num_sets,
+                        "default_reps": reps,
+                        "default_weight": weight
+                    })
+                
+                update_fields["exercises"] = template_exercises
+            
+            if len(update_fields) == 1:  # Only updated_at
+                return json.dumps({"error": "No fields to update"})
+            
+            # Update in database
+            result = await db.templates.update_one(
+                {"_id": ObjectId(template_id), "user_id": user_id},
+                {"$set": update_fields}
+            )
+            
+            if result.matched_count == 0:
+                return json.dumps({"error": "Template not found"})
+            
+            message = f"Updated template {template_id}"
+            if exercises:
+                message += f" with {len(exercises)} exercises"
+            
+            return json.dumps({
+                "success": True,
+                "message": message
             })
         
         else:
