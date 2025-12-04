@@ -420,6 +420,15 @@ export default function WorkoutScreen() {
           setShowScheduleModal(false);
         }}
       />
+
+      <CalendarModal
+        visible={showCalendarModal}
+        onClose={() => setShowCalendarModal(false)}
+        onDateSelect={(date, workouts) => {
+          setShowCalendarModal(false);
+          // Optional: navigate to that date or show workouts
+        }}
+      />
     </SafeAreaView>
   );
 }
