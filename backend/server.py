@@ -949,6 +949,221 @@ async def check_and_create_prs(user_id: str, workout_id: str):
             )
 
 
+# ============= PLANNED WORKOUT HELPER FUNCTIONS =============
+def expand_recurring_workouts(planned_workouts: List[dict], start_date: str, end_date: str) -> List[dict]:
+    """
+    Expand recurring workouts into individual instances for a date range.
+    Returns a list of workout instances with their scheduled dates.
+    """
+    from datetime import date
+    
+    start = date.fromisoformat(start_date)
+    end = date.fromisoformat(end_date)
+    
+    expanded = []
+    
+    for pw in planned_workouts:
+        if not pw.get("is_recurring", False):
+            # Non-recurring workout - only add if in range
+            pw_date = date.fromisoformat(pw["date"])
+            if start <= pw_date <= end:
+                expanded.append(pw)
+        else:
+            # Recurring workout - expand to all occurrences
+            recurrence_type = pw.get("recurrence_type")
+            recurrence_end_str = pw.get("recurrence_end_date")
+            
+            # Determine the actual end date for this recurrence
+            actual_end = end
+            if recurrence_end_str:
+                recurrence_end = date.fromisoformat(recurrence_end_str)
+                actual_end = min(end, recurrence_end)
+            
+            # Start from the workout's initial date
+            pw_start_date = date.fromisoformat(pw["date"])
+            current_date = max(start, pw_start_date)
+            
+            if recurrence_type == "daily":
+                # Generate daily occurrences
+                while current_date <= actual_end:
+                    instance = pw.copy()
+                    instance["date"] = current_date.isoformat()
+                    instance["recurrence_parent_id"] = str(pw["_id"])
+                    expanded.append(instance)
+                    current_date += timedelta(days=1)
+                    
+            elif recurrence_type == "weekly":
+                # Generate weekly occurrences based on selected days
+                recurrence_days = pw.get("recurrence_days", [])
+                if not recurrence_days:
+                    continue
+                
+                # Find the first occurrence
+                while current_date <= actual_end:
+                    # Check if current_date's weekday is in recurrence_days
+                    # weekday() returns 0=Monday, 6=Sunday (matches our format)
+                    if current_date.weekday() in recurrence_days:
+                        instance = pw.copy()
+                        instance["date"] = current_date.isoformat()
+                        instance["recurrence_parent_id"] = str(pw["_id"])
+                        expanded.append(instance)
+                    current_date += timedelta(days=1)
+                    
+            elif recurrence_type == "monthly":
+                # Generate monthly occurrences (same day each month)
+                original_day = pw_start_date.day
+                current_date = max(start, pw_start_date)
+                
+                while current_date <= actual_end:
+                    # Try to create occurrence on the same day of month
+                    try:
+                        occurrence_date = date(current_date.year, current_date.month, original_day)
+                        if start <= occurrence_date <= actual_end:
+                            instance = pw.copy()
+                            instance["date"] = occurrence_date.isoformat()
+                            instance["recurrence_parent_id"] = str(pw["_id"])
+                            expanded.append(instance)
+                    except ValueError:
+                        # Day doesn't exist in this month (e.g., Feb 31), skip
+                        pass
+                    
+                    # Move to next month
+                    if current_date.month == 12:
+                        current_date = date(current_date.year + 1, 1, 1)
+                    else:
+                        current_date = date(current_date.year, current_date.month + 1, 1)
+    
+    # Sort by date and order
+    expanded.sort(key=lambda x: (x["date"], x.get("order", 0)))
+    return expanded
+
+
+# ============= PLANNED WORKOUT ROUTES =============
+@api_router.post("/planned-workouts", response_model=PlannedWorkout)
+async def create_planned_workout(
+    workout_data: PlannedWorkoutCreate,
+    user_id: str = Depends(get_current_user)
+):
+    """Create a new planned workout (one-time or recurring)"""
+    planned_workout = PlannedWorkout(
+        user_id=user_id,
+        **workout_data.dict()
+    )
+    
+    result = await db.planned_workouts.insert_one(
+        planned_workout.dict(by_alias=True, exclude={"id"})
+    )
+    
+    planned_workout_dict = await db.planned_workouts.find_one({"_id": result.inserted_id})
+    return PlannedWorkout(**{**planned_workout_dict, "id": str(planned_workout_dict["_id"])})
+
+
+@api_router.get("/planned-workouts", response_model=List[PlannedWorkout])
+async def get_planned_workouts(
+    user_id: str = Depends(get_current_user),
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    date: Optional[str] = None
+):
+    """
+    Get planned workouts for a user.
+    - If 'date' is provided, returns workouts for that specific day (expanded if recurring)
+    - If 'start_date' and 'end_date' are provided, returns workouts in that range (expanded)
+    - Otherwise, returns all planned workouts (not expanded)
+    """
+    query = {"user_id": user_id}
+    
+    # Fetch base planned workouts
+    workouts = await db.planned_workouts.find(query).to_list(1000)
+    
+    # Convert ObjectId to string
+    for w in workouts:
+        w["id"] = str(w["_id"])
+    
+    # If specific date or date range requested, expand recurring workouts
+    if date:
+        expanded = expand_recurring_workouts(workouts, date, date)
+        return [PlannedWorkout(**w) for w in expanded]
+    elif start_date and end_date:
+        expanded = expand_recurring_workouts(workouts, start_date, end_date)
+        return [PlannedWorkout(**w) for w in expanded]
+    else:
+        # Return base workouts without expansion
+        return [PlannedWorkout(**w) for w in workouts]
+
+
+@api_router.get("/planned-workouts/{workout_id}", response_model=PlannedWorkout)
+async def get_planned_workout(
+    workout_id: str,
+    user_id: str = Depends(get_current_user)
+):
+    """Get a specific planned workout"""
+    if not ObjectId.is_valid(workout_id):
+        raise HTTPException(status_code=400, detail="Invalid workout ID")
+    
+    workout = await db.planned_workouts.find_one({
+        "_id": ObjectId(workout_id),
+        "user_id": user_id
+    })
+    
+    if not workout:
+        raise HTTPException(status_code=404, detail="Planned workout not found")
+    
+    return PlannedWorkout(**{**workout, "id": str(workout["_id"])})
+
+
+@api_router.put("/planned-workouts/{workout_id}", response_model=PlannedWorkout)
+async def update_planned_workout(
+    workout_id: str,
+    workout_data: PlannedWorkoutUpdate,
+    user_id: str = Depends(get_current_user)
+):
+    """Update a planned workout"""
+    if not ObjectId.is_valid(workout_id):
+        raise HTTPException(status_code=400, detail="Invalid workout ID")
+    
+    # Check if workout exists and belongs to user
+    existing = await db.planned_workouts.find_one({
+        "_id": ObjectId(workout_id),
+        "user_id": user_id
+    })
+    
+    if not existing:
+        raise HTTPException(status_code=404, detail="Planned workout not found")
+    
+    # Update only provided fields
+    update_data = {k: v for k, v in workout_data.dict(exclude_unset=True).items() if v is not None}
+    
+    if update_data:
+        await db.planned_workouts.update_one(
+            {"_id": ObjectId(workout_id)},
+            {"$set": update_data}
+        )
+    
+    updated = await db.planned_workouts.find_one({"_id": ObjectId(workout_id)})
+    return PlannedWorkout(**{**updated, "id": str(updated["_id"])})
+
+
+@api_router.delete("/planned-workouts/{workout_id}")
+async def delete_planned_workout(
+    workout_id: str,
+    user_id: str = Depends(get_current_user)
+):
+    """Delete a planned workout"""
+    if not ObjectId.is_valid(workout_id):
+        raise HTTPException(status_code=400, detail="Invalid workout ID")
+    
+    result = await db.planned_workouts.delete_one({
+        "_id": ObjectId(workout_id),
+        "user_id": user_id
+    })
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Planned workout not found")
+    
+    return {"message": "Planned workout deleted"}
+
+
 # ============= SEED DATA =============
 @api_router.post("/seed")
 async def seed_exercises(force: bool = False):
