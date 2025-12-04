@@ -65,6 +65,16 @@ export default function WorkoutScreen() {
     }
   };
 
+  const loadTodaysWorkouts = async () => {
+    try {
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      const response = await api.get(`/planned-workouts?date=${today}`);
+      setTodaysWorkouts(response.data);
+    } catch (error) {
+      console.error('Failed to load today\'s workouts:', error);
+    }
+  };
+
   const handleStartEmptyWorkout = async () => {
     if (activeWorkout) {
       Alert.alert(
