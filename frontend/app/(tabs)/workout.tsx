@@ -184,6 +184,14 @@ export default function WorkoutScreen() {
             text: 'Discard & Start New', 
             style: 'destructive',
             onPress: async () => {
+              // Delete the old workout if it's unscheduled
+              if (!activeWorkout.planned_workout_id) {
+                try {
+                  await api.delete(`/workouts/${activeWorkout.id}`);
+                } catch (error) {
+                  console.error('Failed to delete workout:', error);
+                }
+              }
               endWorkout();
               await createTemplateWorkout(routine.id);
             }
