@@ -4,8 +4,9 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
+import asyncio
 from pathlib import Path
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Set
 from datetime import datetime, timedelta
 from bson import ObjectId
 
@@ -35,6 +36,16 @@ app = FastAPI(title="Strong Workout Tracker API")
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
+
+# Lock to prevent concurrent AI chat requests per user
+ai_chat_locks: Dict[str, asyncio.Lock] = {}
+ai_chat_active: Set[str] = set()
+
+def get_ai_lock(user_id: str) -> asyncio.Lock:
+    """Get or create a lock for the user."""
+    if user_id not in ai_chat_locks:
+        ai_chat_locks[user_id] = asyncio.Lock()
+    return ai_chat_locks[user_id]
 
 # Configure logging
 logging.basicConfig(
