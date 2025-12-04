@@ -7,10 +7,13 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../utils/api';
+import RoutineDetailModal from './RoutineDetailModal';
+import { WorkoutTemplate } from '../types';
 
 interface PlannedWorkout {
   id: string;
