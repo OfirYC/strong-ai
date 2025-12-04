@@ -68,11 +68,21 @@ export default function WorkoutScreen() {
 
   // Watch for active workout changes to refresh today's workouts
   useEffect(() => {
-    // If active workout just ended (became null), refresh today's workouts
-    if (!activeWorkout) {
+    // Refresh when workout starts or ends
+    loadTodaysWorkouts();
+  }, [activeWorkout?.id]); // Watch the workout ID specifically
+
+  // Poll for updates while there's an active workout (to catch name/notes changes)
+  useEffect(() => {
+    if (!activeWorkout) return;
+
+    // Refresh every 5 seconds while workout is active
+    const interval = setInterval(() => {
       loadTodaysWorkouts();
-    }
-  }, [activeWorkout]);
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [activeWorkout?.id]);
 
   const loadTemplates = async () => {
     try {
