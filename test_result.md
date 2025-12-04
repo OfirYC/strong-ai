@@ -112,41 +112,83 @@ user_problem_statement: |
   - Frontend: Calendar modal showing monthly view with workout indicators
   - Frontend: "Schedule this workout" button in RoutineDetailModal
 
-frontend:
-  - task: "Routine Detail Modal - UI Implementation"
+backend:
+  - task: "PlannedWorkout Models with Recurring Support"
     implemented: true
-    working: "pending_user_test"
-    file: "frontend/components/RoutineDetailModal.tsx"
+    working: "NA"
+    file: "backend/models.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
-      - working: true
+      - working: "NA"
         agent: "main"
         comment: |
-          Created RoutineDetailModal component with:
-          - Exercise list with thumbnails and muscle groups
-          - Last performed date tracking
-          - Start Workout button
-          - Modal dismissible by tapping outside (transparent backdrop)
-          - Follows existing app design patterns
-  
-  - task: "Routine Detail Modal - Integration"
+          Updated PlannedWorkout models to support recurring schedules:
+          - Added is_recurring, recurrence_type (daily/weekly/monthly)
+          - Added recurrence_days for weekly schedules (array of weekday indices)
+          - Added recurrence_end_date for finite recurring schedules
+          - Added recurrence_parent_id to link expanded instances
+          - Updated WorkoutSession to include planned_workout_id field
+          - Updated WorkoutSessionCreate to accept planned_workout_id
+
+  - task: "Planned Workout API Endpoints"
     implemented: true
-    working: "pending_user_test"
+    working: "NA"
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: |
+          Created full CRUD API for planned workouts:
+          - POST /api/planned-workouts - Create planned workout (one-time or recurring)
+          - GET /api/planned-workouts - Get workouts with optional date/range filtering
+          - GET /api/planned-workouts/{id} - Get specific planned workout
+          - PUT /api/planned-workouts/{id} - Update planned workout
+          - DELETE /api/planned-workouts/{id} - Delete planned workout
+          - Added expand_recurring_workouts helper function to generate instances
+          - Updated workout creation to link to planned workout and set status to "in_progress"
+          - Updated workout completion to set planned workout status to "completed"
+
+frontend:
+  - task: "Today's Workouts Section"
+    implemented: false
+    working: "NA"
     file: "frontend/app/(tabs)/workout.tsx"
     stuck_count: 0
     priority: "high"
     needs_retesting: false
     status_history:
-      - working: true
+      - working: "NA"
         agent: "main"
-        comment: |
-          Integrated RoutineDetailModal into workout.tsx:
-          - Added modal state management (selectedRoutine, showRoutineModal)
-          - Updated handleStartTemplate to open modal instead of starting immediately
-          - Created handleStartWorkoutFromRoutine to handle the "Start Workout" button
-          - Modal shows when user clicks a routine card
+        comment: "Not yet implemented"
+  
+  - task: "Schedule Workout Modal"
+    implemented: false
+    working: "NA"
+    file: "frontend/components/ScheduleWorkoutModal.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Not yet implemented"
+  
+  - task: "Calendar View Modal"
+    implemented: false
+    working: "NA"
+    file: "frontend/components/CalendarModal.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Not yet implemented"
 
 metadata:
   created_by: "main_agent"
