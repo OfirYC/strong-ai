@@ -162,16 +162,39 @@ export default function ScheduleWorkoutModal({
                   </Text>
                 </TouchableOpacity>
               </View>
+
+              {/* Date Picker Modal */}
               {showDatePicker && (
-                <DateTimePicker
-                  value={selectedDate}
-                  mode="date"
-                  display="spinner"
-                  onChange={(event, date) => {
-                    setShowDatePicker(false);
-                    if (date) setSelectedDate(date);
-                  }}
-                />
+                <Modal
+                  visible={showDatePicker}
+                  transparent={true}
+                  animationType="fade"
+                  onRequestClose={() => setShowDatePicker(false)}
+                >
+                  <TouchableOpacity 
+                    style={styles.datePickerBackdrop}
+                    activeOpacity={1}
+                    onPress={() => setShowDatePicker(false)}
+                  >
+                    <View style={styles.datePickerContainer}>
+                      <View style={styles.datePickerHeader}>
+                        <Text style={styles.datePickerTitle}>Select Date</Text>
+                        <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                          <Text style={styles.datePickerDone}>Done</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <DateTimePicker
+                        value={selectedDate}
+                        mode="date"
+                        display="inline"
+                        onChange={(event, date) => {
+                          if (date) setSelectedDate(date);
+                        }}
+                        themeVariant="light"
+                      />
+                    </View>
+                  </TouchableOpacity>
+                </Modal>
               )}
 
               {/* Recurring Toggle */}
