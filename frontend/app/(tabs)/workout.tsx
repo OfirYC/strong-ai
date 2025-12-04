@@ -35,10 +35,16 @@ interface PlannedWorkout {
   recurrence_parent_id?: string;
 }
 
+interface EnrichedPlannedWorkout extends PlannedWorkout {
+  actualName?: string;
+  actualNotes?: string;
+}
+
 export default function WorkoutScreen() {
+  const router = useRouter();
   const { activeWorkout, startWorkout, endWorkout } = useWorkoutStore();
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([]);
-  const [todaysWorkouts, setTodaysWorkouts] = useState<PlannedWorkout[]>([]);
+  const [todaysWorkouts, setTodaysWorkouts] = useState<EnrichedPlannedWorkout[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedRoutine, setSelectedRoutine] = useState<WorkoutTemplate | null>(null);
   const [showRoutineModal, setShowRoutineModal] = useState(false);
