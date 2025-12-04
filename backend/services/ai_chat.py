@@ -1107,9 +1107,10 @@ When creating a scheduled workout, you MUST follow this process:
    - If they want to schedule an existing routine, use its template_id
 
 2. IF CREATING A NEW WORKOUT WITH EXERCISES:
-   a. Call get_exercises to fetch available exercises with their IDs
-   b. Select appropriate exercises based on the user's goals/injuries
-   c. Use create_planned_workout with the 'exercises' array (NOT just name/notes)
+   a. Call get_exercises to search for the exercises you need
+   b. If an exercise doesn't exist (empty result), use create_exercise to add it to the database
+   c. Use the returned exercise IDs in your workout
+   d. Use create_planned_workout with the 'exercises' array
    
    Example exercises array format:
    [
@@ -1124,10 +1125,16 @@ When creating a scheduled workout, you MUST follow this process:
    
 4. ALWAYS inform the user that a new template was created and can be reused
 
-CRITICAL EXERCISE SELECTION RULES:
-- ONLY use exercises that get_exercises actually returns with valid IDs
-- If an exercise search returns empty [], DO NOT promise that exercise to the user
-- When searching, try simple names first (e.g., "Deadlift" not "Romanian Deadlift")
+EXERCISE CREATION RULES:
+- If get_exercises returns empty [] for an exercise you need, CREATE IT using create_exercise
+- When creating an exercise, provide accurate:
+  - name: Standard exercise name (e.g., "Hip Thrust", "Romanian Deadlift")
+  - exercise_kind: Barbell, Dumbbell, Cable, Machine, Bodyweight, Kettlebell, Band, or Other
+  - primary_body_parts: Main muscles worked (e.g., ["Glutes"], ["Back", "Legs"])
+  - secondary_body_parts: Supporting muscles (optional)
+  - category: Strength, Cardio, Mobility, Core, or Full Body
+- The exercise will be available for all future workouts once created
+- If create_exercise returns "exists": true, just use the returned ID
 - If you can't find a specific exercise, substitute with a similar one that EXISTS
 - NEVER create a workout with exercise_ids you haven't verified exist
 - Tell the user which exercises you're using based on what's AVAILABLE, not what's ideal
