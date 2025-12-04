@@ -491,6 +491,7 @@ def build_system_prompt(user_context: Dict[str, Any]) -> str:
     current_issues = insights.get("current_issues", [])
     strength_tags = insights.get("strength_tags", [])
     weak_point_tags = insights.get("weak_point_tags", [])
+    psych_profile = insights.get("psych_profile", "")
     
     prompt = f"""You are an expert strength and conditioning coach assistant inside a workout tracking app. You help users with:
 - Workout planning and programming
@@ -509,6 +510,7 @@ USER PROFILE CONTEXT:
 - Current Issues: {', '.join(current_issues) if current_issues else 'None'}
 - Strengths: {', '.join(strength_tags) if strength_tags else 'Not specified'}
 - Weak Points: {', '.join(weak_point_tags) if weak_point_tags else 'Not specified'}
+- Psychological Profile: {psych_profile if psych_profile else 'Not specified'}
 
 IMPORTANT GUIDELINES:
 1. Always consider the user's injuries and current issues when giving advice
