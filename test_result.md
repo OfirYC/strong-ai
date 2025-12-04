@@ -103,10 +103,14 @@
 #====================================================================================================
 
 user_problem_statement: |
-  Implement a routine detail modal that shows routine information before starting a workout.
-  When a user clicks on a routine, instead of immediately starting the workout, a modal should open
-  displaying the routine details (name, exercises, sets, reps, weights, last performed date) with
-  a "Start Workout" button. The modal should be dismissible by tapping outside.
+  Implement a comprehensive per-day workout scheduling system with recurring support:
+  - Backend: PlannedWorkout model with recurring fields (daily/weekly/monthly patterns)
+  - Backend: Full CRUD API endpoints for planned workouts with date range expansion
+  - Backend: Link WorkoutSession to PlannedWorkout and auto-update status
+  - Frontend: "Today's Workouts" section on workout.tsx tab showing scheduled workouts for current day
+  - Frontend: Schedule modal with date picker, recurring options, and end date
+  - Frontend: Calendar modal showing monthly view with workout indicators
+  - Frontend: "Schedule this workout" button in RoutineDetailModal
 
 frontend:
   - task: "Routine Detail Modal - UI Implementation"
