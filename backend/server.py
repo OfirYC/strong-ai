@@ -1421,6 +1421,9 @@ async def chat_with_ai(
         return ChatResponse(messages=updated_messages)
     
     except Exception as e:
+        import traceback
+        print(f"AI chat error: {str(e)}")
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"AI chat error: {str(e)}")
 
 
