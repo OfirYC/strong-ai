@@ -425,8 +425,8 @@ export default function WorkoutScreen() {
         visible={showCalendarModal}
         onClose={() => setShowCalendarModal(false)}
         onDateSelect={(date, workouts) => {
-          setShowCalendarModal(false);
-          // Optional: navigate to that date or show workouts
+          // Just update selection, don't close the modal
+          // The modal will show the workouts for the selected date
         }}
       />
     </SafeAreaView>
