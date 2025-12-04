@@ -16,10 +16,10 @@ export default function Index() {
   const checkProfileAndRedirect = async () => {
     if (!isLoading) {
       if (user) {
-        // Check if profile is complete
+        // Check if profile is complete with timeout
         setCheckingProfile(true);
         try {
-          const response = await api.get('/profile/context');
+          const response = await api.get('/profile/context', { timeout: 10000 });
           const userContext = response.data;
           
           if (!userContext.is_profile_complete) {
