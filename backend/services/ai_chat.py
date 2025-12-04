@@ -239,23 +239,36 @@ async def execute_tool(tool_name: str, arguments: Dict[str, Any], db, user_id: s
             if not user_doc:
                 return json.dumps({"error": "User not found"})
             
-            profile_doc = await db.profiles.find_one({"user_id": user_id})
-            insights_doc = await db.profile_insights.find_one({"user_id": user_id})
+            # Check if profile is nested in user document or separate collection
+            profile_data = user_doc.get("profile", {})
+            if not profile_data:
+                # Fall back to separate profiles collection
+                profile_doc = await db.profiles.find_one({"user_id": user_id})
+                profile_data = profile_doc if profile_doc else {}
+            
+            # Check if insights are nested or separate
+            insights_data = profile_data.get("insights", {})
+            if not insights_data:
+                # Fall back to separate insights collection
+                insights_doc = await db.profile_insights.find_one({"user_id": user_id})
+                insights_data = insights_doc if insights_doc else {}
             
             # Build context
             context = {
                 "user": {
                     "email": user_doc.get("email")
                 },
-                "profile": profile_doc if profile_doc else {},
-                "insights": insights_doc if insights_doc else {}
+                "profile": profile_data,
+                "insights": insights_data
             }
             
             # Clean up MongoDB IDs
-            for key in ["profile", "insights"]:
-                if context[key] and "_id" in context[key]:
-                    context[key]["id"] = str(context[key]["_id"])
-                    del context[key]["_id"]
+            if context["profile"] and "_id" in context["profile"]:
+                context["profile"]["id"] = str(context["profile"]["_id"])
+                del context["profile"]["_id"]
+            if context["insights"] and "_id" in context["insights"]:
+                context["insights"]["id"] = str(context["insights"]["_id"])
+                del context["insights"]["_id"]
             
             return json.dumps(context, default=str)
         
