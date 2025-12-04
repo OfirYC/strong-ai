@@ -34,6 +34,9 @@ export default function CalendarModal({ visible, onClose, onDateSelect }: Calend
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [workoutsByDate, setWorkoutsByDate] = useState<{ [key: string]: PlannedWorkout[] }>({});
   const [loading, setLoading] = useState(false);
+  const [selectedRoutine, setSelectedRoutine] = useState<WorkoutTemplate | null>(null);
+  const [showRoutineModal, setShowRoutineModal] = useState(false);
+  const [loadingTemplate, setLoadingTemplate] = useState(false);
 
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'];
