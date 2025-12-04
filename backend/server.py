@@ -1191,11 +1191,14 @@ async def get_unscheduled_workouts_for_range(user_id: str, start_date: str, end_
         # Extract date from started_at
         workout_date = session["started_at"].date().isoformat()
         
+        # Ensure name is never None
+        workout_name = session.get("name") or "Quick Start Workout"
+        
         unscheduled.append({
             "id": str(session["_id"]),
             "user_id": user_id,
             "date": workout_date,
-            "name": session.get("name", "Quick Start Workout"),
+            "name": workout_name,
             "template_id": session.get("template_id"),
             "type": None,
             "notes": session.get("notes"),
