@@ -445,6 +445,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 2,
     borderColor: '#007AFF',
+    minHeight: 80,
   },
   completedCard: {
     opacity: 0.6,
