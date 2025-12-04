@@ -1155,7 +1155,8 @@ async def generate_ai_chat_response(
             })
     
     # Call OpenAI with tools - support multiple rounds of tool calls
-    max_tool_rounds = 5  # Prevent infinite loops
+    max_tool_rounds = 3  # Limit rounds to prevent timeouts
+    max_tools_per_round = 4  # Limit tools per round
     current_messages = openai_messages.copy()
     
     for round_num in range(max_tool_rounds):
@@ -1170,7 +1171,10 @@ async def generate_ai_chat_response(
         
         # Check if tool calls were made
         if assistant_message.tool_calls:
-            logger.info(f"[AI ROUND {round_num + 1}] Tool calls: {[tc.function.name for tc in assistant_message.tool_calls]}")
+            # Limit tool calls per round to prevent excessive API calls
+            tool_calls_to_process = assistant_message.tool_calls[:max_tools_per_round]
+            
+            logger.info(f"[AI ROUND {round_num + 1}] Tool calls: {[tc.function.name for tc in tool_calls_to_process]} (limited from {len(assistant_message.tool_calls)})")
             
             # Add assistant message with tool calls to conversation
             current_messages.append({
