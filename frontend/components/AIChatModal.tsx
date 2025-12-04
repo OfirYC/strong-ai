@@ -352,3 +352,94 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5E5EA',
   },
 });
+
+const markdownStyles = {
+  body: {
+    color: '#1C1C1E',
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  heading1: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1C1C1E',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  heading2: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#1C1C1E',
+    marginTop: 12,
+    marginBottom: 6,
+  },
+  heading3: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1C1C1E',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  strong: {
+    fontWeight: '700',
+    color: '#1C1C1E',
+  },
+  em: {
+    fontStyle: 'italic',
+  },
+  code_inline: {
+    backgroundColor: '#F2F2F7',
+    color: '#007AFF',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 4,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  code_block: {
+    backgroundColor: '#F2F2F7',
+    padding: 12,
+    borderRadius: 8,
+    marginVertical: 8,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  fence: {
+    backgroundColor: '#F2F2F7',
+    padding: 12,
+    borderRadius: 8,
+    marginVertical: 8,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  bullet_list: {
+    marginVertical: 8,
+  },
+  ordered_list: {
+    marginVertical: 8,
+  },
+  list_item: {
+    marginVertical: 4,
+  },
+  bullet_list_icon: {
+    color: '#007AFF',
+    fontSize: 16,
+  },
+  link: {
+    color: '#007AFF',
+    textDecorationLine: 'underline',
+  },
+  blockquote: {
+    backgroundColor: '#F2F2F7',
+    borderLeftWidth: 4,
+    borderLeftColor: '#007AFF',
+    paddingLeft: 12,
+    paddingVertical: 8,
+    marginVertical: 8,
+  },
+  paragraph: {
+    marginVertical: 4,
+  },
+  hr: {
+    backgroundColor: '#E5E5EA',
+    height: 1,
+    marginVertical: 12,
+  },
+};
