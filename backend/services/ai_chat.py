@@ -1271,6 +1271,10 @@ async def generate_ai_chat_response(
     # Tool messages should never come from the client - they're internal to processing
     user_messages = [m for m in messages if m.role not in ["system", "tool"]]
     
+    logger.info(f"[REQ-{request_id}] User messages count: {len(user_messages)}")
+    for i, msg in enumerate(user_messages):
+        logger.info(f"[REQ-{request_id}] Message {i}: role={msg.role}, content_preview={msg.content[:100] if msg.content else 'EMPTY'}...")
+    
     # Convert to OpenAI format
     openai_messages = [
         {"role": "system", "content": system_prompt}
@@ -1289,27 +1293,42 @@ async def generate_ai_chat_response(
                 "content": msg.content
             })
     
+    logger.info(f"[REQ-{request_id}] OpenAI messages count: {len(openai_messages)}")
+    
     # Call OpenAI with tools - support multiple rounds of tool calls
     max_tool_rounds = 3  # Limit rounds to prevent timeouts
     max_tools_per_round = 4  # Limit tools per round
     current_messages = openai_messages.copy()
+    final_content = ""
     
     for round_num in range(max_tool_rounds):
-        response = client.chat.completions.create(
-            model="openai/gpt-5.1",
-            messages=current_messages,
-            tools=TOOLS,
-            temperature=0.7
-        )
+        logger.info(f"[REQ-{request_id}] === ROUND {round_num + 1} START ===")
+        logger.info(f"[REQ-{request_id}] Sending {len(current_messages)} messages to OpenAI")
+        
+        try:
+            response = client.chat.completions.create(
+                model="openai/gpt-5.1",
+                messages=current_messages,
+                tools=TOOLS,
+                temperature=0.7
+            )
+            logger.info(f"[REQ-{request_id}] OpenAI response received")
+        except Exception as e:
+            logger.error(f"[REQ-{request_id}] OpenAI API ERROR: {str(e)}")
+            raise
         
         assistant_message = response.choices[0].message
+        
+        # Log the full assistant response
+        logger.info(f"[REQ-{request_id}] Assistant content: {assistant_message.content[:200] if assistant_message.content else 'NONE/EMPTY'}")
+        logger.info(f"[REQ-{request_id}] Assistant tool_calls: {len(assistant_message.tool_calls) if assistant_message.tool_calls else 0}")
         
         # Check if tool calls were made
         if assistant_message.tool_calls:
             # Limit tool calls per round to prevent excessive API calls
             tool_calls_to_process = assistant_message.tool_calls[:max_tools_per_round]
             
-            logger.info(f"[AI ROUND {round_num + 1}] Tool calls: {[tc.function.name for tc in tool_calls_to_process]} (limited from {len(assistant_message.tool_calls)})")
+            logger.info(f"[REQ-{request_id}] ROUND {round_num + 1} - Processing {len(tool_calls_to_process)} tool calls: {[tc.function.name for tc in tool_calls_to_process]}")
             
             # Add assistant message with tool calls to conversation
             current_messages.append({
@@ -1331,12 +1350,22 @@ async def generate_ai_chat_response(
             # Execute each tool call and add results
             for tool_call in tool_calls_to_process:
                 tool_name = tool_call.function.name
-                arguments = json.loads(tool_call.function.arguments)
+                try:
+                    arguments = json.loads(tool_call.function.arguments)
+                except json.JSONDecodeError as e:
+                    logger.error(f"[REQ-{request_id}] TOOL ARG PARSE ERROR: {tool_name} - {str(e)}")
+                    arguments = {}
                 
-                logger.info(f"[AI TOOL CALL] Tool: {tool_name}, Arguments: {arguments}")
+                logger.info(f"[REQ-{request_id}] TOOL CALL: {tool_name}")
+                logger.info(f"[REQ-{request_id}] TOOL ARGS: {json.dumps(arguments)[:500]}")
                 
                 # Execute tool
-                tool_result = await execute_tool(tool_name, arguments, db, user_id)
+                try:
+                    tool_result = await execute_tool(tool_name, arguments, db, user_id)
+                    logger.info(f"[REQ-{request_id}] TOOL RESULT: {tool_result[:300]}...")
+                except Exception as e:
+                    logger.error(f"[REQ-{request_id}] TOOL EXECUTION ERROR: {tool_name} - {str(e)}")
+                    tool_result = json.dumps({"error": str(e)})
                 
                 logger.info(f"[AI TOOL RESULT] {tool_name}: {tool_result[:200]}...")
                 
