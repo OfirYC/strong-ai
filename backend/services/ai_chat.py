@@ -160,7 +160,16 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "create_planned_workout",
-            "description": "Creates a new planned/scheduled workout for a specific date. Can create one-time or recurring schedules.",
+            "description": """Creates a new planned/scheduled workout for a specific date. 
+
+IMPORTANT: You must provide EITHER 'template_id' (for existing templates) OR 'exercises' array (to create a new template automatically).
+
+When you provide 'exercises', the system will:
+1. Create a new reusable workout template with those exercises
+2. Link it to the planned workout
+3. The user can then reuse this template in the future
+
+Always use get_exercises first to get the correct exercise IDs before creating a workout with exercises.""",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -170,7 +179,41 @@ TOOLS = [
                     },
                     "name": {
                         "type": "string",
-                        "description": "Workout name"
+                        "description": "Workout name (also used as template name if exercises are provided)"
+                    },
+                    "template_id": {
+                        "type": "string",
+                        "description": "ID of an existing workout template to use. Use this if the user wants to schedule an existing routine."
+                    },
+                    "exercises": {
+                        "type": "array",
+                        "description": "Array of exercises to include. When provided, a new template will be created automatically. Get exercise IDs from get_exercises first!",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "exercise_id": {
+                                    "type": "string",
+                                    "description": "ID of the exercise (from get_exercises)"
+                                },
+                                "sets": {
+                                    "type": "integer",
+                                    "description": "Number of sets (default: 3)"
+                                },
+                                "reps": {
+                                    "type": "integer",
+                                    "description": "Target reps per set (default: 10)"
+                                },
+                                "weight": {
+                                    "type": "number",
+                                    "description": "Target weight in kg (optional)"
+                                },
+                                "notes": {
+                                    "type": "string",
+                                    "description": "Notes for this exercise (optional)"
+                                }
+                            },
+                            "required": ["exercise_id"]
+                        }
                     },
                     "type": {
                         "type": "string",
@@ -201,6 +244,18 @@ TOOLS = [
                     }
                 },
                 "required": ["date", "name"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_user_templates",
+            "description": "Fetches the user's existing workout templates. Use this to see what routines the user has already created, so you can schedule them instead of creating new ones.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
             }
         }
     },
