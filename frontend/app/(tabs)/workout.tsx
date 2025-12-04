@@ -16,22 +16,43 @@ import { useWorkoutStore } from '../../store/workoutStore';
 import { WorkoutTemplate } from '../../types';
 import RoutineDetailModal from '../../components/RoutineDetailModal';
 
+interface PlannedWorkout {
+  id: string;
+  user_id: string;
+  date: string;
+  name: string;
+  template_id?: string;
+  type?: string;
+  notes?: string;
+  status: 'planned' | 'in_progress' | 'completed' | 'skipped';
+  workout_session_id?: string;
+  order: number;
+  is_recurring: boolean;
+  recurrence_type?: string;
+  recurrence_days?: number[];
+  recurrence_end_date?: string;
+  recurrence_parent_id?: string;
+}
+
 export default function WorkoutScreen() {
   const { activeWorkout, startWorkout, endWorkout } = useWorkoutStore();
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([]);
+  const [todaysWorkouts, setTodaysWorkouts] = useState<PlannedWorkout[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedRoutine, setSelectedRoutine] = useState<WorkoutTemplate | null>(null);
   const [showRoutineModal, setShowRoutineModal] = useState(false);
 
-  // Load templates on mount
+  // Load templates and today's workouts on mount
   useEffect(() => {
     loadTemplates();
+    loadTodaysWorkouts();
   }, []);
 
-  // Reload templates whenever the screen comes into focus
+  // Reload data whenever the screen comes into focus
   useFocusEffect(
     useCallback(() => {
       loadTemplates();
+      loadTodaysWorkouts();
     }, [])
   );
 
