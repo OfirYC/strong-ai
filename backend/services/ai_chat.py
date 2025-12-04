@@ -691,6 +691,50 @@ async def execute_tool(tool_name: str, arguments: Dict[str, Any], db, user_id: s
             
             return json.dumps(result)
         
+        elif tool_name == "create_exercise":
+            # Validate required fields
+            name = arguments.get("name")
+            exercise_kind = arguments.get("exercise_kind")
+            primary_body_parts = arguments.get("primary_body_parts", [])
+            category = arguments.get("category")
+            
+            if not name or not exercise_kind or not primary_body_parts or not category:
+                return json.dumps({"error": "name, exercise_kind, primary_body_parts, and category are required"})
+            
+            # Check if exercise already exists (case-insensitive)
+            existing = await db.exercises.find_one({
+                "name": {"$regex": f"^{name}$", "$options": "i"}
+            })
+            
+            if existing:
+                return json.dumps({
+                    "exists": True,
+                    "id": str(existing["_id"]),
+                    "name": existing["name"],
+                    "message": f"Exercise '{existing['name']}' already exists"
+                })
+            
+            # Create new exercise
+            exercise_doc = {
+                "name": name,
+                "exercise_kind": exercise_kind,
+                "primary_body_parts": primary_body_parts,
+                "secondary_body_parts": arguments.get("secondary_body_parts", []),
+                "category": category,
+                "is_custom": True,
+                "user_id": user_id,  # Created by this user
+                "created_at": datetime.utcnow()
+            }
+            
+            result = await db.exercises.insert_one(exercise_doc)
+            
+            return json.dumps({
+                "success": True,
+                "id": str(result.inserted_id),
+                "name": name,
+                "message": f"Created new exercise '{name}'"
+            })
+        
         elif tool_name == "create_planned_workout":
             # Validate required fields
             if "date" not in arguments or "name" not in arguments:
