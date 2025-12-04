@@ -294,17 +294,40 @@ export default function ScheduleWorkoutModal({
                       </TouchableOpacity>
                     </View>
                   )}
+
+                  {/* End Date Picker Modal */}
                   {showEndDatePicker && (
-                    <DateTimePicker
-                      value={endDate}
-                      mode="date"
-                      display="spinner"
-                      minimumDate={selectedDate}
-                      onChange={(event, date) => {
-                        setShowEndDatePicker(false);
-                        if (date) setEndDate(date);
-                      }}
-                    />
+                    <Modal
+                      visible={showEndDatePicker}
+                      transparent={true}
+                      animationType="fade"
+                      onRequestClose={() => setShowEndDatePicker(false)}
+                    >
+                      <TouchableOpacity 
+                        style={styles.datePickerBackdrop}
+                        activeOpacity={1}
+                        onPress={() => setShowEndDatePicker(false)}
+                      >
+                        <View style={styles.datePickerContainer}>
+                          <View style={styles.datePickerHeader}>
+                            <Text style={styles.datePickerTitle}>Select End Date</Text>
+                            <TouchableOpacity onPress={() => setShowEndDatePicker(false)}>
+                              <Text style={styles.datePickerDone}>Done</Text>
+                            </TouchableOpacity>
+                          </View>
+                          <DateTimePicker
+                            value={endDate}
+                            mode="date"
+                            display="inline"
+                            minimumDate={selectedDate}
+                            onChange={(event, date) => {
+                              if (date) setEndDate(date);
+                            }}
+                            themeVariant="light"
+                          />
+                        </View>
+                      </TouchableOpacity>
+                    </Modal>
                   )}
                 </>
               )}
