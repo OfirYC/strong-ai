@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import api from '../utils/api';
 import RoutineDetailModal from './RoutineDetailModal';
 import { WorkoutTemplate } from '../types';
@@ -21,6 +22,9 @@ interface PlannedWorkout {
   name: string;
   status: 'planned' | 'in_progress' | 'completed' | 'skipped';
   template_id?: string;
+  workout_session_id?: string;
+  type?: string;
+  notes?: string;
 }
 
 interface CalendarModalProps {
