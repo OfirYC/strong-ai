@@ -179,7 +179,18 @@ export default function WorkoutScreen() {
     }
   };
 
-  const handleStartPlannedWorkout = async (plannedWorkout: PlannedWorkout) => {
+  const handleStartPlannedWorkout = async (plannedWorkout: EnrichedPlannedWorkout) => {
+    // If completed, navigate to workout detail page
+    if (plannedWorkout.status === 'completed' && plannedWorkout.workout_session_id) {
+      router.push(`/workout-detail?id=${plannedWorkout.workout_session_id}`);
+      return;
+    }
+
+    // If skipped, don't allow any action
+    if (plannedWorkout.status === 'skipped') {
+      return;
+    }
+
     // If already in progress, resume it
     if (plannedWorkout.status === 'in_progress' && plannedWorkout.workout_session_id) {
       try {
@@ -189,11 +200,6 @@ export default function WorkoutScreen() {
       } catch (error) {
         console.error('Failed to resume workout:', error);
       }
-    }
-
-    // If completed or skipped, don't allow starting again
-    if (plannedWorkout.status === 'completed' || plannedWorkout.status === 'skipped') {
-      return;
     }
 
     // Check for active workout
