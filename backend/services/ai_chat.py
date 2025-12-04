@@ -1181,53 +1181,22 @@ IMPORTANT EFFICIENCY RULES:
 - Call get_exercises ONCE to get everything, don't search one by one
 - Use create_exercises_batch to create ALL missing exercises in ONE call
 - Call create_planned_workout exactly ONCE per workout
-- DO NOT call the same tool multiple times for the same purpose
-   
-   CRITICAL: Include ALL exercises you discussed with the user. Do NOT skip exercises just because they weren't in the database - CREATE THEM FIRST!
-   
-   Example exercises array format:
-   [
-     {{"exercise_id": "abc123", "sets": 4, "reps": 8, "weight": 60, "notes": "Focus on form"}},
-     {{"exercise_id": "def456", "sets": 3, "reps": 12}}
-   ]
-   
-3. TEMPLATE AUTO-CREATION: When you provide an exercises array, the system will:
-   - Automatically create a reusable workout template
-   - Link it to the planned workout
-   - The user can then reuse this template for future workouts
-   
-4. ALWAYS inform the user that a new template was created and can be reused
-5. NEVER call create_planned_workout twice for the same workout
+- Include ALL exercises you told the user about
 
-EXERCISE CREATION RULES:
-- If get_exercises returns empty [] for an exercise you need, YOU MUST CREATE IT using create_exercise
-- DO NOT skip exercises - if you told the user about 8 exercises, the workout must have 8 exercises
-- When creating an exercise, provide accurate:
-  - name: Standard exercise name (e.g., "Hip Thrust", "Romanian Deadlift")
-  - exercise_kind: Barbell, Dumbbell, Cable, Machine, Bodyweight, Kettlebell, Band, or Other
-  - primary_body_parts: Main muscles worked (e.g., ["Glutes"], ["Back", "Legs"])
-  - secondary_body_parts: Supporting muscles (optional)
-  - category: Strength, Cardio, Mobility, Core, or Full Body
-- The exercise will be available for all future workouts once created
-- If create_exercise returns "exists": true, just use the returned ID
+AVAILABLE TOOLS:
+- get_exercises: Get ALL available exercises in one call
+- create_exercises_batch: Create multiple missing exercises at once
+- create_exercise: Create a single exercise (prefer batch)
+- get_user_templates: See user's existing workout routines
+- create_planned_workout: Create a scheduled workout with exercises array
+- update_planned_workout: Modify a scheduled workout
+- delete_planned_workout: Remove a workout from schedule
+- get_schedule: Get scheduled workouts (use deletable_id for deletes)
+- update_profile_insights: Update user profile
 
-NEVER create a planned workout without either:
-- A template_id (for existing routines)
-- An exercises array (to auto-create a new template)
+When deleting workouts, use the "deletable_id" from get_schedule results."""
 
-This ensures all scheduled workouts have viewable exercise details.
-
-WORKOUT MODIFICATION WORKFLOW:
-When the user wants to change a scheduled workout's exercises:
-
-1. For ONE scheduled workout only:
-   - Use update_planned_workout with a new 'exercises' array
-   - This creates a NEW template and links it to that workout
-   - Original template stays unchanged (user may want it for other workouts)
-
-2. For ALL workouts using a template (permanent change):
-   - Use update_template with the template_id
-   - WARNING: This affects ALL future workouts using this template
+    return prompt
    - Only use when user explicitly wants to modify the template itself
 
 3. To change which template a workout uses:
