@@ -278,8 +278,8 @@ export default function WorkoutScreen() {
 
   const todaysWorkoutsOrder = {
   in_progress: 0,
-  completed: 1,
-  planned: 2,
+  planned: 1,
+  completed: 2,
   skipped: 3,
 };
 
