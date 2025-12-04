@@ -647,22 +647,8 @@ async def generate_ai_chat_response(
         
         final_message = final_response.choices[0].message
         
-        # Add assistant message with tool calls to user messages (for display)
-        user_messages.append(ChatMessage(
-            role="assistant",
-            content=assistant_message.content or "Using tools..."
-        ))
-        
-        # Add tool result messages (for display)
-        for tc in tool_calls_data:
-            user_messages.append(ChatMessage(
-                role="tool",
-                content=tc["result"],
-                tool_name=tc["function"]["name"],
-                tool_call_id=tc["id"]
-            ))
-        
-        # Add final response
+        # Don't add tool messages to user_messages - they're internal to AI processing
+        # Only add the final assistant response
         user_messages.append(ChatMessage(
             role="assistant",
             content=final_message.content or ""
