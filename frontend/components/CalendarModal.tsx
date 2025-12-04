@@ -226,7 +226,12 @@ export default function CalendarModal({ visible, onClose, onDateSelect }: Calend
       <View style={styles.selectedDateSection}>
         <Text style={styles.selectedDateTitle}>{formattedDate}</Text>
         {workouts.map((workout) => (
-          <View key={workout.id} style={styles.workoutItem}>
+          <TouchableOpacity
+            key={workout.id}
+            style={styles.workoutItem}
+            onPress={() => handleWorkoutClick(workout)}
+            disabled={loadingTemplate}
+          >
             <View style={[styles.workoutStatus, { backgroundColor: getStatusColor([workout]) }]} />
             <View style={styles.workoutInfo}>
               <Text style={styles.workoutName}>{workout.name}</Text>
@@ -234,7 +239,10 @@ export default function CalendarModal({ visible, onClose, onDateSelect }: Calend
                 {workout.status.replace('_', ' ')}
               </Text>
             </View>
-          </View>
+            {workout.template_id && (
+              <Ionicons name="chevron-forward" size={20} color="#8E8E93" />
+            )}
+          </TouchableOpacity>
         ))}
       </View>
     );
