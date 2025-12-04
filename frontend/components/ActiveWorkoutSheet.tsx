@@ -425,21 +425,56 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
   };
 
   const handleCancelWorkout = () => {
-    Alert.alert(
-      'Cancel Workout',
-      'Are you sure you want to cancel this workout? All progress will be lost.',
-      [
-        { text: 'Keep Workout', style: 'cancel' },
-        { 
-          text: 'Cancel Workout', 
-          style: 'destructive',
-          onPress: () => {
-            endWorkout();
-            collapse();
-          }
-        },
-      ]
-    );
+    // Check if this is a scheduled workout
+    if (activeWorkout?.planned_workout_id) {
+      Alert.alert(
+        'Cancel Scheduled Workout',
+        'This is a scheduled workout. What would you like to do?',
+        [
+          { text: 'Keep Training', style: 'cancel' },
+          { 
+            text: 'Continue Later Today', 
+            onPress: () => {
+              endWorkout();
+              collapse();
+            }
+          },
+          { 
+            text: 'Cancel for Today', 
+            style: 'destructive',
+            onPress: async () => {
+              // Mark the planned workout as skipped
+              try {
+                await api.put(`/planned-workouts/${activeWorkout.planned_workout_id}`, {
+                  status: 'skipped'
+                });
+              } catch (error) {
+                console.error('Failed to update planned workout status:', error);
+              }
+              endWorkout();
+              collapse();
+            }
+          },
+        ]
+      );
+    } else {
+      // Regular workout - show standard cancel dialog
+      Alert.alert(
+        'Cancel Workout',
+        'Are you sure you want to cancel this workout? All progress will be lost.',
+        [
+          { text: 'Keep Workout', style: 'cancel' },
+          { 
+            text: 'Cancel Workout', 
+            style: 'destructive',
+            onPress: () => {
+              endWorkout();
+              collapse();
+            }
+          },
+        ]
+      );
+    }
   };
 
   const formatTime = (seconds: number) => {
