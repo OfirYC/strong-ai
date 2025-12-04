@@ -470,16 +470,132 @@ async def execute_tool(tool_name: str, arguments: Dict[str, Any], db, user_id: s
             
             return json.dumps(updated or {}, default=str)
         
+        elif tool_name == "get_exercises":
+            # Build query filter
+            query = {}
+            
+            search = arguments.get("search")
+            body_part = arguments.get("body_part")
+            category = arguments.get("category")
+            limit = arguments.get("limit", 50)
+            
+            if search:
+                query["name"] = {"$regex": search, "$options": "i"}
+            
+            if body_part:
+                query["$or"] = [
+                    {"primary_body_parts": {"$regex": body_part, "$options": "i"}},
+                    {"secondary_body_parts": {"$regex": body_part, "$options": "i"}}
+                ]
+            
+            if category:
+                query["category"] = {"$regex": category, "$options": "i"}
+            
+            # Fetch exercises (both global and user's custom)
+            exercises = await db.exercises.find({
+                "$or": [
+                    {"user_id": {"$exists": False}},
+                    {"user_id": None},
+                    {"user_id": user_id}
+                ],
+                **query
+            }).limit(limit).to_list(limit)
+            
+            # Build compact response
+            result = []
+            for ex in exercises:
+                result.append({
+                    "id": str(ex["_id"]),
+                    "name": ex.get("name"),
+                    "exercise_kind": ex.get("exercise_kind"),
+                    "primary_body_parts": ex.get("primary_body_parts", []),
+                    "secondary_body_parts": ex.get("secondary_body_parts", []),
+                    "category": ex.get("category"),
+                    "is_custom": ex.get("is_custom", False)
+                })
+            
+            return json.dumps(result)
+        
+        elif tool_name == "get_user_templates":
+            # Fetch user's workout templates
+            templates = await db.templates.find({
+                "user_id": user_id
+            }).to_list(100)
+            
+            # Build compact response
+            result = []
+            for t in templates:
+                result.append({
+                    "id": str(t["_id"]),
+                    "name": t.get("name"),
+                    "notes": t.get("notes"),
+                    "exercise_count": len(t.get("exercises", []))
+                })
+            
+            return json.dumps(result)
+        
         elif tool_name == "create_planned_workout":
             # Validate required fields
             if "date" not in arguments or "name" not in arguments:
                 return json.dumps({"error": "date and name are required"})
+            
+            template_id = arguments.get("template_id")
+            exercises = arguments.get("exercises")
+            
+            # If exercises are provided but no template_id, create a new template first
+            if exercises and not template_id:
+                # Build template exercises
+                template_exercises = []
+                for i, ex in enumerate(exercises):
+                    exercise_id = ex.get("exercise_id")
+                    if not exercise_id:
+                        continue
+                    
+                    num_sets = ex.get("sets", 3)
+                    reps = ex.get("reps", 10)
+                    weight = ex.get("weight")
+                    notes = ex.get("notes")
+                    
+                    # Build sets array with the specified number of sets
+                    sets = []
+                    for _ in range(num_sets):
+                        set_item = {
+                            "reps": reps,
+                            "is_warmup": False
+                        }
+                        if weight:
+                            set_item["weight"] = weight
+                        sets.append(set_item)
+                    
+                    template_exercises.append({
+                        "exercise_id": exercise_id,
+                        "order": i,
+                        "sets": sets,
+                        "notes": notes,
+                        "default_sets": num_sets,
+                        "default_reps": reps,
+                        "default_weight": weight
+                    })
+                
+                # Create the template
+                template_doc = {
+                    "user_id": user_id,
+                    "name": arguments["name"],
+                    "notes": arguments.get("notes") or f"Created by AI Coach",
+                    "exercises": template_exercises,
+                    "created_at": datetime.utcnow(),
+                    "updated_at": datetime.utcnow()
+                }
+                
+                template_result = await db.templates.insert_one(template_doc)
+                template_id = str(template_result.inserted_id)
             
             # Build planned workout document
             planned_workout = {
                 "user_id": user_id,
                 "date": arguments["date"],
                 "name": arguments["name"],
+                "template_id": template_id,
                 "type": arguments.get("type"),
                 "notes": arguments.get("notes"),
                 "status": "planned",
@@ -497,10 +613,16 @@ async def execute_tool(tool_name: str, arguments: Dict[str, Any], db, user_id: s
             # Insert into database
             result = await db.planned_workouts.insert_one(planned_workout)
             
+            # Build success message
+            message = f"Created planned workout '{arguments['name']}' for {arguments['date']}"
+            if exercises and template_id:
+                message += f". Also created a new reusable template (ID: {template_id}) with {len(exercises)} exercises."
+            
             return json.dumps({
                 "success": True,
                 "id": str(result.inserted_id),
-                "message": f"Created planned workout '{arguments['name']}' for {arguments['date']}"
+                "template_id": template_id,
+                "message": message
             })
         
         elif tool_name == "update_planned_workout":
