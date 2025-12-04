@@ -519,18 +519,25 @@ async def execute_tool(tool_name: str, arguments: Dict[str, Any], db, user_id: s
             expanded = expand_recurring_workouts(planned_workouts, start_date, end_date)
             enriched = await enrich_planned_workouts_with_sessions(expanded, user_id)
             
-            # Build compact response
+            # Build compact response with clear deletable IDs
             schedule = []
             for pw in enriched:
+                is_recurring = pw.get("is_recurring", False)
+                # For recurring workouts, the deletable_id is the parent (deletes whole series)
+                # For one-time workouts, deletable_id is the workout's own id
+                deletable_id = pw.get("recurrence_parent_id") if is_recurring else pw.get("id")
+                
                 schedule.append({
                     "id": pw.get("id"),
+                    "deletable_id": deletable_id,  # Use THIS id for delete_planned_workout
                     "date": pw.get("date"),
                     "name": pw.get("name"),
                     "status": pw.get("status"),
                     "type": pw.get("type"),
                     "notes": pw.get("notes"),
                     "template_id": pw.get("template_id"),
-                    "is_recurring": pw.get("is_recurring", False)
+                    "is_recurring": is_recurring,
+                    "is_recurring_instance": is_recurring  # True = this is just one instance of a series
                 })
             
             return json.dumps(schedule)
