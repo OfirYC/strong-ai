@@ -836,20 +836,20 @@ async def execute_tool(tool_name: str, arguments: Dict[str, Any], db, user_id: s
         
         elif tool_name == "delete_planned_workout":
             workout_id = arguments.get("workout_id")
-            print(f"[DEBUG] delete_planned_workout called with workout_id: {workout_id}")
+            logger.info(f"[DEBUG] delete_planned_workout called with workout_id: {workout_id}")
             
             if not workout_id or not ObjectId.is_valid(workout_id):
-                print(f"[DEBUG] Invalid workout_id: {workout_id}")
+                logger.warning(f"[DEBUG] Invalid workout_id: {workout_id}")
                 return json.dumps({"error": f"Valid workout_id is required. Received: {workout_id}"})
             
             # Delete from database
-            print(f"[DEBUG] Attempting to delete workout with _id={workout_id}, user_id={user_id}")
+            logger.info(f"[DEBUG] Attempting to delete workout with _id={workout_id}, user_id={user_id}")
             result = await db.planned_workouts.delete_one({
                 "_id": ObjectId(workout_id),
                 "user_id": user_id
             })
             
-            print(f"[DEBUG] Delete result: deleted_count={result.deleted_count}")
+            logger.info(f"[DEBUG] Delete result: deleted_count={result.deleted_count}")
             
             if result.deleted_count == 0:
                 return json.dumps({"error": f"Planned workout not found or already deleted. workout_id={workout_id}"})
