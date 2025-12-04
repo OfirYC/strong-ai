@@ -1071,15 +1071,23 @@ def expand_recurring_workouts(planned_workouts: List[dict], start_date: str, end
 async def enrich_planned_workouts_with_sessions(planned_workouts: List[dict], user_id: str) -> List[dict]:
     """
     Enrich planned workouts with actual workout session data.
-    For recurring workouts, checks if there's a completed workout for each specific date.
+    Updates status, name, and notes from the actual workout session.
     """
     enriched = []
     
     for pw in planned_workouts:
+        workout_session = None
+        
+        # Check if this planned workout has a linked session already
+        if pw.get("workout_session_id"):
+            workout_session = await db.workouts.find_one({
+                "_id": ObjectId(pw["workout_session_id"]),
+                "user_id": user_id
+            })
+        
         # If it's a recurring workout instance (has recurrence_parent_id)
         # Check if there's an actual workout session for this specific date
-        if pw.get("recurrence_parent_id"):
-            # Find workout sessions that match this date and are linked to the parent
+        elif pw.get("recurrence_parent_id"):
             pw_date = pw["date"]
             
             # Find workout sessions for this date that might be linked to this recurring workout
@@ -1094,7 +1102,6 @@ async def enrich_planned_workouts_with_sessions(planned_workouts: List[dict], us
             
             # More specific: find workout sessions that started on this specific date
             if not workout_session:
-                # Check for workouts started on this date (regardless of planned_workout_id)
                 from datetime import datetime
                 start_of_day = datetime.fromisoformat(pw_date + "T00:00:00")
                 end_of_day = datetime.fromisoformat(pw_date + "T23:59:59")
@@ -1105,14 +1112,29 @@ async def enrich_planned_workouts_with_sessions(planned_workouts: List[dict], us
                     "name": pw.get("name"),
                     "started_at": {"$gte": start_of_day, "$lte": end_of_day}
                 })
+        
+        # Check for non-recurring scheduled workouts
+        elif pw.get("_id"):
+            workout_session = await db.workouts.find_one({
+                "user_id": user_id,
+                "planned_workout_id": str(pw["_id"])
+            })
+        
+        # Update with actual session data if found
+        if workout_session:
+            # Update status
+            if workout_session.get("ended_at"):
+                pw["status"] = "completed"
+            else:
+                pw["status"] = "in_progress"
             
-            # Update status based on found session
-            if workout_session:
-                if workout_session.get("ended_at"):
-                    pw["status"] = "completed"
-                else:
-                    pw["status"] = "in_progress"
-                pw["workout_session_id"] = str(workout_session["_id"])
+            # Update name and notes from actual session (for real-time changes)
+            if workout_session.get("name"):
+                pw["name"] = workout_session["name"]
+            if workout_session.get("notes"):
+                pw["notes"] = workout_session["notes"]
+            
+            pw["workout_session_id"] = str(workout_session["_id"])
         
         enriched.append(pw)
     
