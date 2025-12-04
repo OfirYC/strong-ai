@@ -638,15 +638,9 @@ async def execute_tool(tool_name: str, arguments: Dict[str, Any], db, user_id: s
             return json.dumps(updated or {}, default=str)
         
         elif tool_name == "get_exercises":
-            # Build query filter
-            search = arguments.get("search")
+            # Get ALL exercises - simplified to return everything
             body_part = arguments.get("body_part")
-            category = arguments.get("category")
-            limit = arguments.get("limit", 50)
             
-            # Build flexible query - search by name takes priority
-            # If search is provided, just search by name (ignore body_part filter)
-            # This makes it easier to find exercises like "Romanian Deadlift" which has Back as primary
             base_query = {
                 "$or": [
                     {"user_id": {"$exists": False}},
@@ -655,9 +649,78 @@ async def execute_tool(tool_name: str, arguments: Dict[str, Any], db, user_id: s
                 ]
             }
             
-            if search:
-                # Search by name only - more flexible
-                base_query["name"] = {"$regex": search, "$options": "i"}
+            if body_part:
+                base_query["$and"] = [
+                    {"$or": [
+                        {"primary_body_parts": {"$regex": body_part, "$options": "i"}},
+                        {"secondary_body_parts": {"$regex": body_part, "$options": "i"}}
+                    ]}
+                ]
+            
+            # Fetch ALL exercises (no limit by default)
+            exercises = await db.exercises.find(base_query).to_list(500)
+            
+            # Build compact response
+            result = []
+            for ex in exercises:
+                result.append({
+                    "id": str(ex["_id"]),
+                    "name": ex.get("name"),
+                    "exercise_kind": ex.get("exercise_kind"),
+                    "primary_body_parts": ex.get("primary_body_parts", []),
+                    "category": ex.get("category")
+                })
+            
+            return json.dumps(result)
+        
+        elif tool_name == "create_exercises_batch":
+            # Create multiple exercises at once
+            exercises_to_create = arguments.get("exercises", [])
+            
+            if not exercises_to_create:
+                return json.dumps({"error": "No exercises provided"})
+            
+            results = []
+            for ex_data in exercises_to_create:
+                name = ex_data.get("name")
+                if not name:
+                    continue
+                
+                # Check if exists
+                existing = await db.exercises.find_one({
+                    "name": {"$regex": f"^{name}$", "$options": "i"}
+                })
+                
+                if existing:
+                    results.append({
+                        "name": name,
+                        "id": str(existing["_id"]),
+                        "status": "exists"
+                    })
+                else:
+                    # Create new
+                    exercise_doc = {
+                        "name": name,
+                        "exercise_kind": ex_data.get("exercise_kind", "Other"),
+                        "primary_body_parts": ex_data.get("primary_body_parts", []),
+                        "secondary_body_parts": ex_data.get("secondary_body_parts", []),
+                        "category": ex_data.get("category", "Strength"),
+                        "is_custom": True,
+                        "user_id": user_id,
+                        "created_at": datetime.utcnow()
+                    }
+                    result = await db.exercises.insert_one(exercise_doc)
+                    results.append({
+                        "name": name,
+                        "id": str(result.inserted_id),
+                        "status": "created"
+                    })
+            
+            return json.dumps({
+                "success": True,
+                "exercises": results,
+                "message": f"Processed {len(results)} exercises"
+            })
             elif body_part:
                 # Only filter by body part if no search term
                 base_query["$and"] = [
