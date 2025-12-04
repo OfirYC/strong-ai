@@ -1,9 +1,15 @@
 """AI Chat service with tool support for workout coaching"""
 import json
+import sys
+import logging
 from typing import List, Optional, Dict, Any, Literal
 from datetime import datetime, timedelta
 from pydantic import BaseModel
 from bson import ObjectId
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Import existing OpenAI client from ai_profile
 from services.ai_profile import client
