@@ -263,7 +263,13 @@ Always use get_exercises first to get the correct exercise IDs before creating a
         "type": "function",
         "function": {
             "name": "update_planned_workout",
-            "description": "Updates an existing planned workout. Can modify date, name, type, notes, status, or order.",
+            "description": """Updates an existing planned workout. Can modify date, name, type, notes, status, template, or exercises.
+
+To change the workout's exercises, you can either:
+1. Provide a different template_id (to use an existing template)
+2. Provide a new exercises array (will create a new template and link it)
+
+If changing exercises, the old template remains unchanged (user may want to keep it for other workouts).""",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -278,6 +284,25 @@ Always use get_exercises first to get the correct exercise IDs before creating a
                     "name": {
                         "type": "string",
                         "description": "New workout name"
+                    },
+                    "template_id": {
+                        "type": "string",
+                        "description": "ID of a different existing template to use"
+                    },
+                    "exercises": {
+                        "type": "array",
+                        "description": "New exercises array - will create a new template automatically",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "exercise_id": {"type": "string"},
+                                "sets": {"type": "integer"},
+                                "reps": {"type": "integer"},
+                                "weight": {"type": "number"},
+                                "notes": {"type": "string"}
+                            },
+                            "required": ["exercise_id"]
+                        }
                     },
                     "type": {
                         "type": "string",
@@ -298,6 +323,83 @@ Always use get_exercises first to get the correct exercise IDs before creating a
                     }
                 },
                 "required": ["workout_id"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_planned_workout",
+            "description": "Permanently deletes a planned/scheduled workout from the user's schedule. Use this when the user wants to completely remove a workout from their schedule (not just skip it).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "workout_id": {
+                        "type": "string",
+                        "description": "ID of the planned workout to delete"
+                    }
+                },
+                "required": ["workout_id"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_template",
+            "description": """Updates an existing workout template's exercises. Use this to modify the exercises in a reusable template.
+
+IMPORTANT: This modifies the template itself, which affects ALL future workouts using this template. 
+Only use this when the user explicitly wants to change the template, not just a single scheduled workout.
+
+For changing just one scheduled workout's exercises, use update_planned_workout with a new exercises array instead.""",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "template_id": {
+                        "type": "string",
+                        "description": "ID of the template to update"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "New template name (optional)"
+                    },
+                    "notes": {
+                        "type": "string",
+                        "description": "New template notes (optional)"
+                    },
+                    "exercises": {
+                        "type": "array",
+                        "description": "New exercises array - REPLACES all existing exercises",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "exercise_id": {
+                                    "type": "string",
+                                    "description": "ID of the exercise (from get_exercises)"
+                                },
+                                "sets": {
+                                    "type": "integer",
+                                    "description": "Number of sets (default: 3)"
+                                },
+                                "reps": {
+                                    "type": "integer",
+                                    "description": "Target reps per set (default: 10)"
+                                },
+                                "weight": {
+                                    "type": "number",
+                                    "description": "Target weight in kg (optional)"
+                                },
+                                "notes": {
+                                    "type": "string",
+                                    "description": "Notes for this exercise (optional)"
+                                }
+                            },
+                            "required": ["exercise_id"]
+                        }
+                    }
+                },
+                "required": ["template_id"]
             }
         }
     }
