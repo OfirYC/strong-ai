@@ -464,6 +464,7 @@ async def start_workout(
     workout = WorkoutSession(
         user_id=user_id,
         template_id=workout_data.template_id,
+        planned_workout_id=workout_data.planned_workout_id,
         name=name,
         notes=notes,
         exercises=exercises
@@ -471,6 +472,14 @@ async def start_workout(
     
     result = await db.workouts.insert_one(workout.dict(by_alias=True, exclude={"id"}))
     workout.id = str(result.inserted_id)
+    
+    # If this workout is linked to a planned workout, update its status
+    if workout_data.planned_workout_id:
+        if ObjectId.is_valid(workout_data.planned_workout_id):
+            await db.planned_workouts.update_one(
+                {"_id": ObjectId(workout_data.planned_workout_id), "user_id": user_id},
+                {"$set": {"status": "in_progress", "workout_session_id": str(result.inserted_id)}}
+            )
     
     return workout
 
