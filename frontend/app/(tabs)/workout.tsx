@@ -182,7 +182,7 @@ export default function WorkoutScreen() {
   const handleStartPlannedWorkout = async (plannedWorkout: EnrichedPlannedWorkout) => {
     // If completed, navigate to workout detail page
     if (plannedWorkout.status === 'completed' && plannedWorkout.workout_session_id) {
-      router.push(`/workout-detail?id=${plannedWorkout.workout_session_id}`);
+      router.push(`/workout-detail?workoutId=${plannedWorkout.workout_session_id}`);
       return;
     }
 
