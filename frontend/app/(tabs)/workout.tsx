@@ -305,7 +305,9 @@ export default function WorkoutScreen() {
               >
                 <View style={styles.plannedWorkoutContent}>
                   <View style={styles.plannedWorkoutHeader}>
-                    <Text style={styles.plannedWorkoutName}>{plannedWorkout.name}</Text>
+                    <Text style={styles.plannedWorkoutName}>
+                      {plannedWorkout.actualName || plannedWorkout.name}
+                    </Text>
                     <View style={[styles.statusBadge, getStatusBadgeStyle(plannedWorkout.status)]}>
                       <Ionicons 
                         name={getStatusIcon(plannedWorkout.status) as any} 
@@ -318,10 +320,12 @@ export default function WorkoutScreen() {
                       </Text>
                     </View>
                   </View>
-                  {plannedWorkout.notes && (
-                    <Text style={styles.plannedWorkoutNotes}>{plannedWorkout.notes}</Text>
+                  {(plannedWorkout.actualNotes || plannedWorkout.notes) && (
+                    <Text style={styles.plannedWorkoutNotes}>
+                      {plannedWorkout.actualNotes || plannedWorkout.notes}
+                    </Text>
                   )}
-                  {plannedWorkout.type && (
+                  {plannedWorkout.type && !plannedWorkout.actualNotes && (
                     <Text style={styles.plannedWorkoutType}>{plannedWorkout.type}</Text>
                   )}
                 </View>
