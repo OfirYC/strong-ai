@@ -115,11 +115,11 @@ user_problem_statement: |
 backend:
   - task: "PlannedWorkout Models with Recurring Support"
     implemented: true
-    working: "NA"
+    working: true
     file: "backend/models.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
@@ -131,14 +131,32 @@ backend:
           - Added recurrence_parent_id to link expanded instances
           - Updated WorkoutSession to include planned_workout_id field
           - Updated WorkoutSessionCreate to accept planned_workout_id
+      - working: true
+        agent: "testing"
+        comment: |
+          ✅ COMPREHENSIVE TESTING COMPLETE - All PlannedWorkout models working correctly:
+          
+          MODELS VERIFIED:
+          - PlannedWorkout model with all recurring fields (is_recurring, recurrence_type, recurrence_days, recurrence_end_date)
+          - PlannedWorkoutCreate with proper validation
+          - PlannedWorkoutUpdate for status changes
+          - WorkoutSession linking via planned_workout_id
+          
+          RECURRING LOGIC TESTED:
+          - Daily recurring: Creates instance for each day in range ✅
+          - Weekly recurring: Correctly expands on specified weekdays (0=Mon, 6=Sun) ✅
+          - Monthly recurring: Creates instances on same day of each month ✅
+          - Proper date range filtering and expansion ✅
+          
+          All model structures and data types working as expected.
 
   - task: "Planned Workout API Endpoints"
     implemented: true
-    working: "NA"
+    working: true
     file: "backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
@@ -152,6 +170,37 @@ backend:
           - Added expand_recurring_workouts helper function to generate instances
           - Updated workout creation to link to planned workout and set status to "in_progress"
           - Updated workout completion to set planned workout status to "completed"
+      - working: true
+        agent: "testing"
+        comment: |
+          ✅ ALL API ENDPOINTS TESTED AND WORKING PERFECTLY:
+          
+          CRUD OPERATIONS (30/30 tests passed):
+          ✅ POST /api/planned-workouts - Creates one-time and recurring workouts
+          ✅ GET /api/planned-workouts?date=YYYY-MM-DD - Returns expanded workouts for specific date
+          ✅ GET /api/planned-workouts?start_date=X&end_date=Y - Returns expanded workouts for date range
+          ✅ GET /api/planned-workouts/{id} - Retrieves specific planned workout
+          ✅ PUT /api/planned-workouts/{id} - Updates workout name, status, etc.
+          ✅ DELETE /api/planned-workouts/{id} - Removes planned workout
+          
+          RECURRING EXPANSION VERIFIED:
+          ✅ Daily recurring: 11 instances generated for 11-day range
+          ✅ Weekly recurring: 6 instances for Mon/Wed/Fri over 2 weeks
+          ✅ Monthly recurring: 4 instances over 4-month period
+          ✅ Correct weekday calculation (0=Monday, 6=Sunday)
+          
+          WORKOUT SESSION INTEGRATION:
+          ✅ Creating workout from planned_workout_id sets status to "in_progress"
+          ✅ Completing workout sets planned workout status to "completed"
+          ✅ Status transitions: planned → in_progress → completed
+          
+          EDGE CASES HANDLED:
+          ✅ Invalid date formats properly rejected
+          ✅ Date range queries work correctly
+          ✅ Authentication required for all endpoints
+          ✅ User isolation (users only see their own workouts)
+          
+          All backend planned workout functionality is production-ready.
 
 frontend:
   - task: "Today's Workouts Section"
