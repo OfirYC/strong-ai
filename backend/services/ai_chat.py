@@ -1385,6 +1385,23 @@ async def generate_ai_chat_response(
             logger.info(f"[REQ-{request_id}] === ROUND {round_num + 1} END - no tool calls, final response ===")
             break
     
+    # If we exhausted all rounds with tool calls, make one final call to get the response
+    if not final_content:
+        logger.info(f"[REQ-{request_id}] All rounds exhausted with tool calls, making final API call for response")
+        try:
+            final_response = client.chat.completions.create(
+                model="openai/gpt-5.1",
+                messages=current_messages,
+                tools=TOOLS,
+                tool_choice="none",  # Force no more tool calls
+                temperature=0.7
+            )
+            final_content = final_response.choices[0].message.content or ""
+            logger.info(f"[REQ-{request_id}] Final call response: {final_content[:300] if final_content else 'EMPTY'}")
+        except Exception as e:
+            logger.error(f"[REQ-{request_id}] Final call error: {str(e)}")
+            final_content = ""
+    
     # Log the final response we're sending back
     logger.info(f"[REQ-{request_id}] === FINAL RESPONSE ===")
     logger.info(f"[REQ-{request_id}] Final content length: {len(final_content)}")
