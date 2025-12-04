@@ -112,27 +112,40 @@ export default function CalendarModal({ visible, onClose, onDateSelect }: Calend
   };
 
   const handleWorkoutClick = async (workout: PlannedWorkout) => {
-    // Only show details for workouts with a template
-    if (!workout.template_id) {
-      Alert.alert(
-        workout.name,
-        workout.notes || 'No additional details available',
-        [{ text: 'OK' }]
-      );
+    // If workout has a template, show routine detail modal
+    if (workout.template_id) {
+      try {
+        setLoadingTemplate(true);
+        const response = await api.get(`/templates/${workout.template_id}`);
+        setSelectedRoutine(response.data);
+        setShowRoutineModal(true);
+      } catch (error) {
+        console.error('Failed to load template:', error);
+        Alert.alert('Error', 'Failed to load workout details');
+      } finally {
+        setLoadingTemplate(false);
+      }
       return;
     }
 
-    try {
-      setLoadingTemplate(true);
-      const response = await api.get(`/templates/${workout.template_id}`);
-      setSelectedRoutine(response.data);
-      setShowRoutineModal(true);
-    } catch (error) {
-      console.error('Failed to load template:', error);
-      Alert.alert('Error', 'Failed to load workout details');
-    } finally {
-      setLoadingTemplate(false);
+    // No template - show alert with notes/type
+    const details = [];
+    if (workout.type) {
+      details.push(`Type: ${workout.type}`);
     }
+    if (workout.notes) {
+      details.push(workout.notes);
+    }
+    
+    const message = details.length > 0 
+      ? details.join('\n\n')
+      : 'No template or details available. This workout was created without exercises.';
+
+    Alert.alert(
+      workout.name,
+      message,
+      [{ text: 'OK' }]
+    );
   };
 
   const handleDatePress = (dateStr: string) => {
