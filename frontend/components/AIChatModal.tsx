@@ -68,9 +68,11 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
     setLoading(true);
 
     try {
-      // Call AI chat API
+      // Call AI chat API with extended timeout for tool calls
       const response = await api.post('/ai/chat', {
         messages: updatedMessages
+      }, {
+        timeout: 120000 // 2 minute timeout for AI requests
       });
 
       // Update with full message history including AI response
