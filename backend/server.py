@@ -14,7 +14,8 @@ from models import (
     Exercise, ExerciseCreate, ExerciseUpdate,
     WorkoutTemplate, WorkoutTemplateCreate,
     WorkoutSession, WorkoutSessionCreate, WorkoutSessionUpdate,
-    PRRecord, WorkoutSummary, WorkoutExerciseSummary
+    PRRecord, WorkoutSummary, WorkoutExerciseSummary,
+    PlannedWorkout, PlannedWorkoutCreate, PlannedWorkoutUpdate
 )
 from services.ai_profile import generate_profile_insights
 from auth import get_password_hash, verify_password, create_access_token, decode_access_token
