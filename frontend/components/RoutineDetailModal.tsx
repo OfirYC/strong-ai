@@ -20,6 +20,7 @@ interface RoutineDetailModalProps {
   routine: WorkoutTemplate | null;
   onClose: () => void;
   onStartWorkout: (routine: WorkoutTemplate) => void;
+  onSchedule?: (routine: WorkoutTemplate) => void;
   onEdit?: (routine: WorkoutTemplate) => void;
 }
 
