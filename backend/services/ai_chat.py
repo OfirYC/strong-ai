@@ -1154,99 +1154,70 @@ async def generate_ai_chat_response(
                 "content": msg.content
             })
     
-    # Call OpenAI with tools
-    response = client.chat.completions.create(
-        model="openai/gpt-5.1",
-        messages=openai_messages,
-        tools=TOOLS,
-        temperature=0.7
-    )
+    # Call OpenAI with tools - support multiple rounds of tool calls
+    max_tool_rounds = 5  # Prevent infinite loops
+    current_messages = openai_messages.copy()
     
-    assistant_message = response.choices[0].message
-    
-    # Check if tool calls were made
-    if assistant_message.tool_calls:
-        # Store tool calls for the second API call
-        tool_calls_data = []
-        
-        # Execute each tool call
-        for tool_call in assistant_message.tool_calls:
-            tool_name = tool_call.function.name
-            arguments = json.loads(tool_call.function.arguments)
-            
-            logger.info(f"[AI TOOL CALL] Tool: {tool_name}, Arguments: {arguments}")
-            
-            # Execute tool
-            tool_result = await execute_tool(tool_name, arguments, db, user_id)
-            
-            logger.info(f"[AI TOOL RESULT] {tool_name}: {tool_result[:200]}...")
-            
-            # Store for second call
-            tool_calls_data.append({
-                "id": tool_call.id,
-                "type": "function",
-                "function": {
-                    "name": tool_name,
-                    "arguments": tool_call.function.arguments
-                },
-                "result": tool_result
-            })
-        
-        # Make second call with tool results
-        # We need to include the assistant message with tool_calls and then the tool results
-        openai_messages_with_tools = [
-            {"role": "system", "content": system_prompt}
-        ]
-        
-        # Add all previous user/assistant messages
-        for msg in user_messages:
-            openai_messages_with_tools.append({
-                "role": msg.role,
-                "content": msg.content
-            })
-        
-        # Add assistant message with tool calls
-        openai_messages_with_tools.append({
-            "role": "assistant",
-            "content": assistant_message.content,
-            "tool_calls": [
-                {
-                    "id": tc["id"],
-                    "type": tc["type"],
-                    "function": tc["function"]
-                }
-                for tc in tool_calls_data
-            ]
-        })
-        
-        # Add tool results
-        for tc in tool_calls_data:
-            openai_messages_with_tools.append({
-                "role": "tool",
-                "content": tc["result"],
-                "tool_call_id": tc["id"]
-            })
-        
-        # Make final call
-        final_response = client.chat.completions.create(
+    for round_num in range(max_tool_rounds):
+        response = client.chat.completions.create(
             model="openai/gpt-5.1",
-            messages=openai_messages_with_tools,
+            messages=current_messages,
+            tools=TOOLS,
             temperature=0.7
         )
         
-        final_message = final_response.choices[0].message
+        assistant_message = response.choices[0].message
         
-        # Don't add tool messages to user_messages - they're internal to AI processing
-        # Only add the final assistant response
-        user_messages.append(ChatMessage(
-            role="assistant",
-            content=final_message.content or ""
-        ))
-    else:
-        # No tool calls, just add the response
-        user_messages.append(ChatMessage(
-            role="assistant",
-            content=assistant_message.content or ""
-        ))
+        # Check if tool calls were made
+        if assistant_message.tool_calls:
+            logger.info(f"[AI ROUND {round_num + 1}] Tool calls: {[tc.function.name for tc in assistant_message.tool_calls]}")
+            
+            # Add assistant message with tool calls to conversation
+            current_messages.append({
+                "role": "assistant",
+                "content": assistant_message.content or "",
+                "tool_calls": [
+                    {
+                        "id": tc.id,
+                        "type": "function",
+                        "function": {
+                            "name": tc.function.name,
+                            "arguments": tc.function.arguments
+                        }
+                    }
+                    for tc in assistant_message.tool_calls
+                ]
+            })
+            
+            # Execute each tool call and add results
+            for tool_call in assistant_message.tool_calls:
+                tool_name = tool_call.function.name
+                arguments = json.loads(tool_call.function.arguments)
+                
+                logger.info(f"[AI TOOL CALL] Tool: {tool_name}, Arguments: {arguments}")
+                
+                # Execute tool
+                tool_result = await execute_tool(tool_name, arguments, db, user_id)
+                
+                logger.info(f"[AI TOOL RESULT] {tool_name}: {tool_result[:200]}...")
+                
+                # Add tool result to conversation
+                current_messages.append({
+                    "role": "tool",
+                    "content": tool_result,
+                    "tool_call_id": tool_call.id
+                })
+            
+            # Continue to next round to let AI process tool results
+            continue
+        else:
+            # No more tool calls - we have our final response
+            break
+    
+    # Add final assistant response to user_messages
+    user_messages.append(ChatMessage(
+        role="assistant",
+        content=assistant_message.content or ""
+    ))
     
     return user_messages
