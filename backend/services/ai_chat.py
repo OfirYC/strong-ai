@@ -84,6 +84,43 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "create_exercise",
+            "description": "Creates a new exercise in the database. Use this when get_exercises doesn't find an exercise you need. The exercise will be available for all future workouts.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Exercise name (e.g., 'Romanian Deadlift', 'Hip Thrust')"
+                    },
+                    "exercise_kind": {
+                        "type": "string",
+                        "enum": ["Barbell", "Dumbbell", "Cable", "Machine", "Bodyweight", "Kettlebell", "Band", "Other"],
+                        "description": "Type of equipment used"
+                    },
+                    "primary_body_parts": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Primary muscles worked (e.g., ['Legs'], ['Back'], ['Chest', 'Shoulders'])"
+                    },
+                    "secondary_body_parts": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Secondary muscles worked (optional)"
+                    },
+                    "category": {
+                        "type": "string",
+                        "enum": ["Strength", "Cardio", "Mobility", "Core", "Full Body"],
+                        "description": "Exercise category"
+                    }
+                },
+                "required": ["name", "exercise_kind", "primary_body_parts", "category"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "get_workout_history",
             "description": "Retrieves recent completed workout sessions with summaries. Use this to see what workouts the user has done recently.",
             "parameters": {
