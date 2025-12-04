@@ -303,6 +303,12 @@ export default function WorkoutScreen() {
       >
         <View style={styles.header}>
           <Text style={styles.title}>Start Workout</Text>
+          <TouchableOpacity 
+            style={styles.calendarButton}
+            onPress={() => setShowCalendarModal(true)}
+          >
+            <Ionicons name="calendar-outline" size={24} color="#007AFF" />
+          </TouchableOpacity>
         </View>
 
         {/* Today's Workouts Section */}
