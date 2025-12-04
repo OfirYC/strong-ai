@@ -1189,12 +1189,12 @@ async def generate_ai_chat_response(
                             "arguments": tc.function.arguments
                         }
                     }
-                    for tc in assistant_message.tool_calls
+                    for tc in tool_calls_to_process
                 ]
             })
             
             # Execute each tool call and add results
-            for tool_call in assistant_message.tool_calls:
+            for tool_call in tool_calls_to_process:
                 tool_name = tool_call.function.name
                 arguments = json.loads(tool_call.function.arguments)
                 
