@@ -240,6 +240,7 @@ class WorkoutSession(BaseModel):
     id: Optional[str] = Field(default=None)
     user_id: str
     template_id: Optional[str] = None
+    planned_workout_id: Optional[str] = None  # Link to planned workout if started from schedule
     name: Optional[str] = None  # Workout name
     started_at: datetime = Field(default_factory=datetime.utcnow)
     ended_at: Optional[datetime] = None
