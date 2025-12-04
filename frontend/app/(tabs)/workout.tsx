@@ -299,7 +299,7 @@ export default function WorkoutScreen() {
         {todaysWorkouts.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Today's Workouts</Text>
-            {todaysWorkout.sort((a, b) => todaysWorkoutsOrder[a.status] - todaysWorkoutsOrder[b.status]).map((plannedWorkout) => (
+            {todaysWorkouts.sort((a, b) => todaysWorkoutsOrder[a.status] - todaysWorkoutsOrder[b.status]).map((plannedWorkout) => (
               <TouchableOpacity
                 key={plannedWorkout.id}
                 style={[
