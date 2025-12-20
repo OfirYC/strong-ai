@@ -112,8 +112,12 @@ export default function WorkoutDetailScreen() {
       case 'Weighted Bodyweight': return 'Weighted BW';
       case 'Assisted Bodyweight': return 'Assisted BW';
       case 'Reps Only': return 'Bodyweight';
-      case 'Cardio': return 'Cardio';
       case 'Duration': return 'Timed';
+      case 'Cardio': return 'Cardio';
+      case 'Weighted Cardio': return 'Weighted Cardio';
+      case 'Weighted Duration': return 'Weighted Timed';
+      case 'EMOM (Every Minute On The Minute)': return 'EMOM';
+      case 'ETOT (Every Thirty Seconds on Thirty Seconds)': return 'ETOT';
       default: return '';
     }
   };
