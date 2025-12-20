@@ -11,8 +11,12 @@ export const EXERCISE_KINDS = [
   'Weighted Bodyweight',
   'Assisted Bodyweight',
   'Reps Only',
-  'Cardio',
   'Duration',
+  'Cardio',
+  'Weighted Cardio',
+  'Weighted Duration',
+  'EMOM (Every Minute On The Minute)',
+  'ETOT (Every Thirty Seconds on Thirty Seconds)',
 ] as const;
 
 export type ExerciseKind = typeof EXERCISE_KINDS[number];
@@ -62,10 +66,17 @@ export function getExerciseFields(kind: ExerciseKind): string[] {
       return ['weight', 'reps'];
     case 'Reps Only':
       return ['reps'];
-    case 'Cardio':
-      return ['distance', 'duration'];
     case 'Duration':
       return ['duration'];
+    case 'Cardio':
+      return ['duration', 'distance'];
+    case 'Weighted Cardio':
+      return ['duration', 'distance', 'weight'];
+    case 'Weighted Duration':
+      return ['duration', 'weight'];
+    case 'EMOM (Every Minute On The Minute)':
+    case 'ETOT (Every Thirty Seconds on Thirty Seconds)':
+      return ['reps', 'weight', 'duration'];
     default:
       return ['weight', 'reps'];
   }
@@ -73,12 +84,22 @@ export function getExerciseFields(kind: ExerciseKind): string[] {
 
 // Helper to check if exercise is duration-based
 export function isDurationBased(kind: ExerciseKind): boolean {
-  return kind === 'Cardio' || kind === 'Duration';
+  return ['Duration', 'Cardio', 'Weighted Cardio', 'Weighted Duration', 'EMOM (Every Minute On The Minute)', 'ETOT (Every Thirty Seconds on Thirty Seconds)'].includes(kind);
 }
 
 // Helper to check if exercise uses weight
 export function usesWeight(kind: ExerciseKind): boolean {
-  return ['Barbell', 'Dumbbell', 'Machine/Other', 'Weighted Bodyweight', 'Assisted Bodyweight'].includes(kind);
+  return ['Barbell', 'Dumbbell', 'Machine/Other', 'Weighted Bodyweight', 'Assisted Bodyweight', 'Weighted Cardio', 'Weighted Duration', 'EMOM (Every Minute On The Minute)', 'ETOT (Every Thirty Seconds on Thirty Seconds)'].includes(kind);
+}
+
+// Helper to check if exercise uses distance
+export function usesDistance(kind: ExerciseKind): boolean {
+  return ['Cardio', 'Weighted Cardio'].includes(kind);
+}
+
+// Helper to check if exercise uses reps
+export function usesReps(kind: ExerciseKind): boolean {
+  return ['Barbell', 'Dumbbell', 'Machine/Other', 'Weighted Bodyweight', 'Assisted Bodyweight', 'Reps Only', 'EMOM (Every Minute On The Minute)', 'ETOT (Every Thirty Seconds on Thirty Seconds)'].includes(kind);
 }
 
 export interface WorkoutExercise {
