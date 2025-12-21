@@ -1,13 +1,15 @@
 """AI-powered profile insights generation using OpenAI via OpenRouter"""
 import json
 import os
+from pathlib import Path
 from typing import Optional
 from dotenv import load_dotenv
 from openai import OpenAI
 from models import UserProfile, ProfileInsights, TrainingPhase
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from backend/.env
+ROOT_DIR = Path(__file__).parent.parent
+load_dotenv(ROOT_DIR / '.env')
 
 # OpenRouter configuration from environment
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
