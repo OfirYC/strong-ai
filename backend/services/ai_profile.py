@@ -1,13 +1,20 @@
 """AI-powered profile insights generation using OpenAI via OpenRouter"""
 import json
+import os
 from typing import Optional
+from dotenv import load_dotenv
 from openai import OpenAI
 from models import UserProfile, ProfileInsights, TrainingPhase
 
+# Load environment variables
+load_dotenv()
 
-# OpenRouter configuration
-OPENROUTER_API_KEY = "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"
-OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+# OpenRouter configuration from environment
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+
+if not OPENROUTER_API_KEY:
+    raise ValueError("OPENROUTER_API_KEY environment variable is required")
 
 # Initialize OpenAI client with OpenRouter
 client = OpenAI(
