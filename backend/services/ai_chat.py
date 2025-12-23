@@ -793,8 +793,11 @@ async def execute_tool(tool_name: str, arguments: Dict[str, Any], db, user_id: s
                         "name": t.get("name"),
                         "notes": t.get("notes"),
                         "exercise_count": len(t.get("exercises", [])),
+                        "exercise_ids": [e.get("exercise_id") for e in t.get("exercises", []) if e.get("exercise_id")],
                     }
                 )
+                # Print the full result object nicely and readability on the console
+                logger.info(f"[TemplateResultWExerciseIDs] Template result: {result}")
             return json.dumps(result)
 
         if tool_name == "template__create":
@@ -861,8 +864,7 @@ async def execute_tool(tool_name: str, arguments: Dict[str, Any], db, user_id: s
             for pw in planned_workouts:
                 pw["id"] = str(pw["_id"])
 
-            expanded = expand_recurring_workouts(planned_workouts, start_date, end_date)
-            enriched = await enrich_planned_workouts_with_sessions(expanded, user_id)
+            enriched = await enrich_planned_workouts_with_sessions(planned_workouts, user_id)
 
             schedule = []
             for pw in enriched:
@@ -1326,9 +1328,25 @@ exercise_kind must be one of:
 Per-kind rules (source of truth = EXERCISE_KIND_RULES):
 {kind_rules}
 
+Exercise Naming / scope rules:
+- When creating new exercises, always make them generic and reuseable
+- Do not include workout-specific parameters in the exercise name. The exercise name should describe only the movement and general protocol style. 
+- All specifics; reps,duration,distance,pace,rest intervals,progression schemes,targets, must live in an individual workout/template.
+- Treat the exercises as the pattern, not the personalized prescription. The perscription is always encoded in the set fields and notes, not the exercise’s name
+
 When creating templates/scheduled workouts:
 - Only send fields allowed for that exercise_kind.
 - If you send incompatible fields, backend will coerce based on exercise_kind, but you should still try to be correct.
+
+**Workout/Template Naming Rules**
+
+- All name fields (for both templates, scheduled workouts etc) must be generic and protocol-only
+
+- names describe only the **movement pattern or style**,  Do **NOT** include:
+    - Day or Time
+    - Perscription Details: sets, reps, total reps, duration, distance, pace, weight, etc
+
+- All perscription must live only in exercise fields/notes field
 
 TONE:
 - Direct, concise, actionable
@@ -1531,12 +1549,12 @@ async def generate_ai_chat_response(user_id: str, messages: List[ChatMessage], d
 
                 try:
                     tool_result = await execute_tool(tool_name, arguments, db, user_id)
-                    logger.info(f"[REQ-{request_id}] TOOL RESULT ({tool_name}): {tool_result[:300]}...")
+                    logger.info(f"[REQ-{request_id}] TOOL RESULT ({tool_name}): {tool_result[:1000]}...")
                 except Exception as e:
                     logger.error(f"[REQ-{request_id}] TOOL EXECUTION ERROR: {tool_name} - {str(e)}")
                     tool_result = json.dumps({"error": str(e)})
 
-                logger.info(f"[AI TOOL RESULT] {tool_name}: {tool_result[:200]}...")
+                logger.info(f"[AI TOOL RESULT] {tool_name}: {tool_result[:1000]}...")
 
                 # Tool result message for OpenAI
                 current_messages.append({"role": "tool", "content": tool_result, "tool_call_id": tool_call.id})

@@ -42,11 +42,11 @@ EXERCISE_KIND_RULES = {
     },
     "EMOM (Every Minute On The Minute)": {
         "fields": ["reps", "weight", "duration"],
-        "description": "Use reps + weight (kg) + duration (seconds)"
+        "description": "Use reps (total reps to complete, not per minute) + weight (kg) + duration (seconds)"
     },
     "ETOT (Every Thirty Seconds on Thirty Seconds)": {
         "fields": ["reps", "weight", "duration"],
-        "description": "Use reps + weight (kg) + duration (seconds)"
+        "description": "Use reps (total reps to complete, not per 30s) + weight (kg) + duration (seconds)"
     },
 
 }
