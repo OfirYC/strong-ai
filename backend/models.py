@@ -195,8 +195,8 @@ class WorkoutTemplate(BaseModel):
 
 # Workout Session Models
 class WorkoutSetItem(BaseModel):
-    # Common fields
-    is_warmup: bool = False
+    # Set type: normal, warmup, cooldown, or failure
+    set_type: Literal["normal", "warmup", "cooldown", "failure"] = "normal"
     completed_at: Optional[datetime] = None
     completed: Optional[bool] = False
     
