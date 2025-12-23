@@ -208,7 +208,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
     const detail = exerciseDetails[exercise.exercise_id];
     const fields = getExerciseFields(detail?.exercise_kind || 'Barbell');
     
-    const newSet: WorkoutSet = { is_warmup: false };
+    const newSet: WorkoutSet = { set_type: 'normal' };
     if (fields.includes('weight')) newSet.weight = 0;
     if (fields.includes('reps')) newSet.reps = 0;
     if (fields.includes('distance')) newSet.distance = 0;
