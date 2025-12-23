@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,18 +6,20 @@ import {
   TextInput,
   TouchableOpacity,
   ViewStyle,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DecimalInput from './DecimalInput';
 import DurationInput from './DurationInput';
-import { getExerciseFields, ExerciseKind } from '../types';
+import { getExerciseFields, ExerciseKind, SetType, SET_TYPES, SET_TYPE_CONFIG } from '../types';
 
 export interface SetData {
   weight?: number;
   reps?: number;
   duration?: number;
   distance?: number;
-  is_warmup?: boolean;
+  set_type?: SetType;
   completed?: boolean;
 }
 
@@ -42,65 +44,153 @@ export default function SetRowInput({
   showCompleteButton = false,
   containerStyle,
 }: SetRowInputProps) {
+  const [showSetTypeDropdown, setShowSetTypeDropdown] = useState(false);
   const fields = getExerciseFields(exerciseKind);
   const isCompleted = set.completed;
+  const setType = set.set_type || 'normal';
+  const typeConfig = SET_TYPE_CONFIG[setType];
+
+  const renderSetNumber = () => {
+    if (setType === 'normal') {
+      return (
+        <TouchableOpacity 
+          style={styles.setNumberContainer}
+          onPress={() => setShowSetTypeDropdown(true)}
+        >
+          <Text style={[styles.setNumber, isCompleted && styles.setNumberCompleted]}>
+            {setIndex + 1}
+          </Text>
+        </TouchableOpacity>
+      );
+    }
+
+    return (
+      <TouchableOpacity 
+        style={[
+          styles.setTypeIndicator,
+          { backgroundColor: typeConfig.bgColor }
+        ]}
+        onPress={() => setShowSetTypeDropdown(true)}
+      >
+        <Text style={[styles.setTypeInitial, { color: typeConfig.color }]}>
+          {typeConfig.initial}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
 
   return (
-    <View style={[
-      styles.setRow, 
-      isCompleted && styles.setRowCompleted,
-      containerStyle
-    ]}>
-      <Text style={[styles.setNumber, isCompleted && styles.setNumberCompleted]}>
-        {setIndex + 1}
-      </Text>
-      
-      {fields.includes('weight') && (
-        <DecimalInput
-          style={[styles.setInput, isCompleted && styles.setInputCompleted]}
-          value={set.weight || 0}
-          onChangeValue={(value) => onUpdateSet('weight', value)}
-          placeholder="0"
-        />
-      )}
-      
-      {fields.includes('reps') && (
-        <TextInput
-          style={[styles.setInput, isCompleted && styles.setInputCompleted]}
-          value={set.reps?.toString() || ''}
-          onChangeText={(value) => onUpdateSet('reps', parseInt(value) || 0)}
-          keyboardType="number-pad"
-          placeholder="0"
-          placeholderTextColor="#999"
-        />
-      )}
-      
-      {fields.includes('duration') && (
-        <DurationInput
-          value={set.duration || 0}
-          onChangeValue={(value) => onUpdateSet('duration', value)}
-          style={[styles.durationInput, isCompleted && styles.durationInputCompleted]}
-        />
-      )}
-      
-      {fields.includes('distance') && (
-        <DecimalInput
-          style={[styles.setInput, isCompleted && styles.setInputCompleted]}
-          value={set.distance || 0}
-          onChangeValue={(value) => onUpdateSet('distance', value)}
-          placeholder="0"
-        />
-      )}
-      
-      {showCompleteButton && (
-        <TouchableOpacity 
-          style={[styles.completeButton, isCompleted && styles.completeButtonActive]}
-          onPress={() => onUpdateSet('completed', !isCompleted)}
+    <>
+      <View style={[
+        styles.setRow, 
+        isCompleted && styles.setRowCompleted,
+        containerStyle
+      ]}>
+        {renderSetNumber()}
+        
+        {fields.includes('weight') && (
+          <DecimalInput
+            style={[styles.setInput, isCompleted && styles.setInputCompleted]}
+            value={set.weight || 0}
+            onChangeValue={(value) => onUpdateSet('weight', value)}
+            placeholder="0"
+          />
+        )}
+        
+        {fields.includes('reps') && (
+          <TextInput
+            style={[styles.setInput, isCompleted && styles.setInputCompleted]}
+            value={set.reps?.toString() || ''}
+            onChangeText={(value) => onUpdateSet('reps', parseInt(value) || 0)}
+            keyboardType="number-pad"
+            placeholder="0"
+            placeholderTextColor="#999"
+          />
+        )}
+        
+        {fields.includes('duration') && (
+          <DurationInput
+            value={set.duration || 0}
+            onChangeValue={(value) => onUpdateSet('duration', value)}
+            style={[styles.durationInput, isCompleted && styles.durationInputCompleted]}
+          />
+        )}
+        
+        {fields.includes('distance') && (
+          <DecimalInput
+            style={[styles.setInput, isCompleted && styles.setInputCompleted]}
+            value={set.distance || 0}
+            onChangeValue={(value) => onUpdateSet('distance', value)}
+            placeholder="0"
+          />
+        )}
+        
+        {showCompleteButton && (
+          <TouchableOpacity 
+            style={[styles.completeButton, isCompleted && styles.completeButtonActive]}
+            onPress={() => onUpdateSet('completed', !isCompleted)}
+          >
+            <Ionicons name="checkmark" size={18} color={isCompleted ? '#FFFFFF' : '#D1D1D6'} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Set Type Dropdown Modal */}
+      <Modal
+        visible={showSetTypeDropdown}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSetTypeDropdown(false)}
+      >
+        <Pressable 
+          style={styles.dropdownOverlay}
+          onPress={() => setShowSetTypeDropdown(false)}
         >
-          <Ionicons name="checkmark" size={18} color={isCompleted ? '#FFFFFF' : '#D1D1D6'} />
-        </TouchableOpacity>
-      )}
-    </View>
+          <View style={styles.dropdownContainer}>
+            <Text style={styles.dropdownTitle}>Set Type</Text>
+            {SET_TYPES.map((type) => {
+              const config = SET_TYPE_CONFIG[type];
+              const isSelected = type === setType;
+              
+              return (
+                <TouchableOpacity
+                  key={type}
+                  style={[
+                    styles.dropdownOption,
+                    isSelected && styles.dropdownOptionSelected
+                  ]}
+                  onPress={() => {
+                    onUpdateSet('set_type', type);
+                    setShowSetTypeDropdown(false);
+                  }}
+                >
+                  {type !== 'normal' ? (
+                    <View style={[styles.dropdownIndicator, { backgroundColor: config.bgColor }]}>
+                      <Text style={[styles.dropdownInitial, { color: config.color }]}>
+                        {config.initial}
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={styles.dropdownIndicatorNormal}>
+                      <Text style={styles.dropdownNumber}>#</Text>
+                    </View>
+                  )}
+                  <Text style={[
+                    styles.dropdownLabel,
+                    isSelected && styles.dropdownLabelSelected
+                  ]}>
+                    {config.label}
+                  </Text>
+                  {isSelected && (
+                    <Ionicons name="checkmark" size={20} color="#007AFF" />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </Pressable>
+      </Modal>
+    </>
   );
 }
 
@@ -148,8 +238,14 @@ const styles = StyleSheet.create({
   setRowCompleted: {
     opacity: 0.7,
   },
-  setNumber: {
+  setNumberContainer: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 32,
+    minHeight: 32,
+  },
+  setNumber: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1C1C1E',
@@ -157,6 +253,19 @@ const styles = StyleSheet.create({
   },
   setNumberCompleted: {
     color: '#34C759',
+  },
+  setTypeIndicator: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 32,
+    minHeight: 32,
+    maxWidth: 32,
+    borderRadius: 6,
+  },
+  setTypeInitial: {
+    fontSize: 14,
+    fontWeight: '700',
   },
   setInput: {
     flex: 1,
@@ -181,17 +290,87 @@ const styles = StyleSheet.create({
     borderColor: '#34C759',
   },
   completeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: '#F5F5F7',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F2F2F7',
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 2,
     borderColor: '#D1D1D6',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   completeButtonActive: {
     backgroundColor: '#34C759',
     borderColor: '#34C759',
+  },
+  // Dropdown styles
+  dropdownOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dropdownContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 16,
+    width: 250,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  dropdownTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1C1C1E',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  dropdownOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    marginBottom: 4,
+  },
+  dropdownOptionSelected: {
+    backgroundColor: '#F2F2F7',
+  },
+  dropdownIndicator: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  dropdownIndicatorNormal: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    backgroundColor: '#F2F2F7',
+  },
+  dropdownNumber: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#8E8E93',
+  },
+  dropdownInitial: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  dropdownLabel: {
+    flex: 1,
+    fontSize: 16,
+    color: '#1C1C1E',
+  },
+  dropdownLabelSelected: {
+    fontWeight: '600',
   },
 });
