@@ -34,7 +34,22 @@ export interface Exercise {
   image?: string;
 }
 
+// Set types for workout sets
+export const SET_TYPES = ['normal', 'warmup', 'cooldown', 'failure'] as const;
+export type SetType = typeof SET_TYPES[number];
+
+// Set type display config
+export const SET_TYPE_CONFIG: Record<SetType, { label: string; initial: string; color: string; bgColor: string }> = {
+  normal: { label: 'Normal', initial: '', color: '#000000', bgColor: 'transparent' },
+  warmup: { label: 'Warmup', initial: 'W', color: '#F59E0B', bgColor: 'rgba(245, 158, 11, 0.15)' },
+  cooldown: { label: 'Cooldown', initial: 'C', color: '#3B82F6', bgColor: 'rgba(59, 130, 246, 0.15)' },
+  failure: { label: 'Failure', initial: 'F', color: '#EF4444', bgColor: 'rgba(239, 68, 68, 0.15)' },
+};
+
 export interface WorkoutSet {
+  // Set type
+  set_type?: SetType;
+  
   // Weight + Reps (for strength exercises)
   reps?: number;
   weight?: number;
@@ -44,7 +59,6 @@ export interface WorkoutSet {
   duration?: number;  // in seconds
   calories?: number;
   
-  is_warmup?: boolean;
   completed?: boolean;
   completed_at?: string;
   
