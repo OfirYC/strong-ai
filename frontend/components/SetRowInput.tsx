@@ -8,11 +8,20 @@ import {
   ViewStyle,
   Modal,
   Pressable,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DecimalInput from './DecimalInput';
 import DurationInput from './DurationInput';
 import { getExerciseFields, ExerciseKind, SetType, SET_TYPES, SET_TYPE_CONFIG } from '../types';
+
+// Descriptions for each set type
+const SET_TYPE_DESCRIPTIONS: Record<SetType, string> = {
+  normal: 'A regular working set at your target weight and reps.',
+  warmup: 'A lighter set to prepare your muscles and joints before working sets.',
+  cooldown: 'A lighter set after your working sets to help recovery.',
+  failure: 'A set where you attempted another rep but could not complete it (reached muscle failure).',
+};
 
 export interface SetData {
   weight?: number;
