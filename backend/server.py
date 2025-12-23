@@ -579,7 +579,9 @@ async def get_workout_history(
             estimated_1rm = None
             
             for s in sets:
-                if s.get("is_warmup", False):
+                # Skip warmup and cooldown sets for PR/volume calculations
+                set_type = s.get("set_type", "normal")
+                if set_type in ["warmup", "cooldown"]:
                     continue
                     
                 weight = s.get("weight") or 0
