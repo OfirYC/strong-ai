@@ -59,7 +59,7 @@ export default function CreateRoutineScreen() {
     const newExercise: TemplateExercise = {
       exercise_id: exercise.id,
       order: selectedExercises.length,
-      sets: [{ is_warmup: false }], // Start with one empty set
+      sets: [{ set_type: 'normal' }], // Start with one empty set
     };
     setSelectedExercises([...selectedExercises, newExercise]);
     // Add to details immediately
@@ -88,7 +88,7 @@ export default function CreateRoutineScreen() {
     const newExercises = [...selectedExercises];
     newExercises[exerciseIndex] = {
       ...newExercises[exerciseIndex],
-      sets: [...newExercises[exerciseIndex].sets, { is_warmup: false }],
+      sets: [...newExercises[exerciseIndex].sets, { set_type: 'normal' }],
     };
     setSelectedExercises(newExercises);
   };
