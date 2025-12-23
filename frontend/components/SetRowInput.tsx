@@ -391,4 +391,11 @@ const styles = StyleSheet.create({
   dropdownLabelSelected: {
     fontWeight: '600',
   },
+  checkIcon: {
+    marginRight: 8,
+  },
+  infoButton: {
+    padding: 4,
+    marginLeft: 4,
+  },
 });
