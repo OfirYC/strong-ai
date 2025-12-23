@@ -191,8 +191,17 @@ export default function SetRowInput({
                     {config.label}
                   </Text>
                   {isSelected && (
-                    <Ionicons name="checkmark" size={20} color="#007AFF" />
+                    <Ionicons name="checkmark" size={20} color="#007AFF" style={styles.checkIcon} />
                   )}
+                  <TouchableOpacity
+                    style={styles.infoButton}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      Alert.alert(config.label, SET_TYPE_DESCRIPTIONS[type]);
+                    }}
+                  >
+                    <Ionicons name="help-circle-outline" size={20} color="#8E8E93" />
+                  </TouchableOpacity>
                 </TouchableOpacity>
               );
             })}
