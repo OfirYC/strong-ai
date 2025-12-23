@@ -128,7 +128,7 @@ export interface TemplateSet {
   reps?: number;
   duration?: number;
   distance?: number;
-  is_warmup?: boolean;
+  set_type?: SetType;
 }
 
 export interface TemplateExercise {
