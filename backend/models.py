@@ -157,7 +157,7 @@ class TemplateSetItem(BaseModel):
     reps: Optional[int] = None
     duration: Optional[float] = None  # in seconds (supports decimals for centiseconds)
     distance: Optional[float] = None  # in km
-    is_warmup: bool = False
+    set_type: Literal["normal", "warmup", "cooldown", "failure"] = "normal"
 
 
 class TemplateExerciseItem(BaseModel):
