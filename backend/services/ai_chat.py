@@ -585,7 +585,7 @@ async def _build_template_exercises_from_compact(
 
         sets_arr: List[Dict[str, Any]] = []
         for _ in range(num_sets):
-            sets_arr.append({"is_warmup": False, **base_fields})
+            sets_arr.append({"set_type": "normal", **base_fields})
 
         template_exercises.append(
             {
