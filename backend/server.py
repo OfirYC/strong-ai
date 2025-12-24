@@ -773,7 +773,9 @@ async def get_workout_detail(
         estimated_1rm = None
         
         for s in sets:
-            if s.get("is_warmup", False):
+            # Skip warmup and cooldown sets for stats calculation
+            set_type = s.get("set_type", "normal")
+            if set_type in ("warmup", "cooldown"):
                 continue
                 
             weight = s.get("weight") or 0
@@ -881,7 +883,9 @@ async def check_and_create_prs(user_id: str, workout_id: str):
         max_1rm = max([pr.get("estimated_1rm") or 0 for pr in existing_prs], default=0) or 0
         
         for set_idx, set_data in enumerate(exercise.get("sets", [])):
-            if set_data.get("is_warmup", False):
+            # Skip warmup and cooldown sets for PR calculation
+            set_type = set_data.get("set_type", "normal")
+            if set_type in ("warmup", "cooldown"):
                 continue
             
             weight = set_data.get("weight") or 0
