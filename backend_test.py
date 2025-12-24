@@ -93,9 +93,9 @@ def test_planned_workouts():
                     "exercise_id": "test_exercise_1",
                     "order": 0,
                     "sets": [
-                        {"weight": 60, "reps": 10, "is_warmup": False},
-                        {"weight": 70, "reps": 8, "is_warmup": False},
-                        {"weight": 80, "reps": 6, "is_warmup": False}
+                        {"weight": 60, "reps": 10, "set_type": "normal"},
+                        {"weight": 70, "reps": 8, "set_type": "normal"},
+                        {"weight": 80, "reps": 6, "set_type": "normal"}
                     ]
                 }
             ]
@@ -358,8 +358,8 @@ def test_planned_workouts():
                         "exercise_id": "test_exercise_1",
                         "order": 0,
                         "sets": [
-                            {"weight": 60, "reps": 10, "is_warmup": False, "completed": True},
-                            {"weight": 70, "reps": 8, "is_warmup": False, "completed": True}
+                            {"weight": 60, "reps": 10, "set_type": "normal", "completed": True},
+                            {"weight": 70, "reps": 8, "set_type": "normal", "completed": True}
                         ]
                     }
                 ]
