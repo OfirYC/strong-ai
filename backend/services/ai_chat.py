@@ -1456,11 +1456,11 @@ Each set in a workout has a `set_type` field with these options:
 When creating workouts/templates, you can specify sets as an array of set objects (preferred):
 ```
 "sets": [
-  {"set_type": "warmup", "reps": 10, "weight": 40},
-  {"set_type": "warmup", "reps": 8, "weight": 50},
-  {"set_type": "normal", "reps": 8, "weight": 60},
-  {"set_type": "normal", "reps": 8, "weight": 60},
-  {"set_type": "failure", "reps": 6, "weight": 65}
+  {{"set_type": "warmup", "reps": 10, "weight": 40}},
+  {{"set_type": "warmup", "reps": 8, "weight": 50}},
+  {{"set_type": "normal", "reps": 8, "weight": 60}},
+  {{"set_type": "normal", "reps": 8, "weight": 60}},
+  {{"set_type": "failure", "reps": 6, "weight": 65}}
 ]
 ```
 Or as an integer count (legacy - creates N identical normal sets):
