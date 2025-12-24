@@ -1446,6 +1446,28 @@ When creating templates/scheduled workouts:
 - Only send fields allowed for that exercise_kind.
 - If you send incompatible fields, backend will coerce based on exercise_kind, but you should still try to be correct.
 
+**SET TYPES (IMPORTANT)**
+Each set in a workout has a `set_type` field with these options:
+- "normal": Regular working set (default)
+- "warmup": Warm-up set (lighter weight, not counted for PRs/stats)
+- "cooldown": Cool-down set (not counted for PRs/stats)
+- "failure": Set taken to muscular failure
+
+When creating workouts/templates, you can specify sets as an array of set objects (preferred):
+```
+"sets": [
+  {"set_type": "warmup", "reps": 10, "weight": 40},
+  {"set_type": "warmup", "reps": 8, "weight": 50},
+  {"set_type": "normal", "reps": 8, "weight": 60},
+  {"set_type": "normal", "reps": 8, "weight": 60},
+  {"set_type": "failure", "reps": 6, "weight": 65}
+]
+```
+Or as an integer count (legacy - creates N identical normal sets):
+```
+"sets": 3, "reps": 8, "weight": 60
+```
+
 **Workout/Template Naming Rules**
 
 - All name fields (for both templates, scheduled workouts etc) must be generic and protocol-only
