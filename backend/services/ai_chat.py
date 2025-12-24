@@ -708,10 +708,6 @@ async def _build_template_exercises_from_compact(
                 "default_distance": first_set.get("distance"),
             }
         )
-                "default_duration": base_fields.get("duration"),
-                "default_distance": base_fields.get("distance"),
-            }
-        )
 
     return template_exercises
 
