@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,23 +6,53 @@ import {
   FlatList,
   TouchableOpacity,
   Alert,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useFocusEffect } from 'expo-router';
-import Button from '../../components/Button';
-import api from '../../utils/api';
-import { WorkoutTemplate } from '../../types';
-import RoutineDetailModal from '../../components/RoutineDetailModal';
-import { useWorkoutStore } from '../../store/workoutStore';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter, useFocusEffect } from "expo-router";
+import Button from "../../components/Button";
+import api from "../../utils/api";
+import { WorkoutTemplate } from "../../types";
+import RoutineDetailModal from "../../components/RoutineDetailModal";
+import { useWorkoutStore } from "../../store/workoutStore";
+import ScheduleWorkoutModal from "../../components/ScheduleWorkoutModal";
+
+interface PlannedWorkout {
+  id: string;
+  user_id: string;
+  date: string;
+  name: string;
+  template_id?: string;
+  type?: string;
+  notes?: string;
+  status: "planned" | "in_progress" | "completed" | "skipped";
+  workout_session_id?: string;
+  order: number;
+  is_recurring: boolean;
+  recurrence_type?: string;
+  recurrence_days?: number[];
+  recurrence_end_date?: string;
+  recurrence_parent_id?: string;
+}
+
+interface EnrichedPlannedWorkout extends PlannedWorkout {
+  actualName?: string;
+  actualNotes?: string;
+}
 
 export default function RoutinesScreen() {
   const router = useRouter();
   const { activeWorkout, startWorkout, endWorkout } = useWorkoutStore();
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([]);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [selectedRoutine, setSelectedRoutine] = useState<WorkoutTemplate | null>(null);
+  const [selectedRoutine, setSelectedRoutine] =
+    useState<WorkoutTemplate | null>(null);
+
   const [showRoutineModal, setShowRoutineModal] = useState(false);
+  const [todaysWorkouts, setTodaysWorkouts] = useState<
+    EnrichedPlannedWorkout[]
+  >([]);
 
   // Load templates on mount
   useEffect(() => {
@@ -39,10 +69,10 @@ export default function RoutinesScreen() {
   const loadTemplates = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/templates');
+      const response = await api.get("/templates");
       setTemplates(response.data);
     } catch (error) {
-      console.error('Failed to load templates:', error);
+      console.error("Failed to load templates:", error);
     } finally {
       setLoading(false);
     }
@@ -56,17 +86,17 @@ export default function RoutinesScreen() {
   const handleStartWorkoutFromRoutine = async (routine: WorkoutTemplate) => {
     if (activeWorkout) {
       Alert.alert(
-        'Active Workout',
-        'You already have an Active Workout. Do you want to discard it and start a new one?',
+        "Active Workout",
+        "You already have an Active Workout. Do you want to discard it and start a new one?",
         [
-          { text: 'Cancel', style: 'cancel' },
-          { 
-            text: 'Discard & Start New', 
-            style: 'destructive',
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Discard & Start New",
+            style: "destructive",
             onPress: async () => {
               endWorkout();
               await createTemplateWorkout(routine.id);
-            }
+            },
           },
         ]
       );
@@ -77,32 +107,36 @@ export default function RoutinesScreen() {
 
   const createTemplateWorkout = async (templateId: string) => {
     try {
-      const response = await api.post('/workouts', { template_id: templateId });
+      const response = await api.post("/workouts", { template_id: templateId });
       startWorkout(response.data);
       setShowRoutineModal(false);
       // Navigate to workout tab
-      router.push('/(tabs)/workout');
+      router.push("/(tabs)/workout");
     } catch (error: any) {
-      Alert.alert('Error', 'Failed to start workout');
+      Alert.alert("Error", "Failed to start workout");
     }
   };
 
   const handleDeleteTemplate = async (templateId: string, name: string) => {
-    Alert.alert('Delete Routine', `Are you sure you want to delete "${name}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await api.delete(`/templates/${templateId}`);
-            setTemplates((prev) => prev.filter((t) => t.id !== templateId));
-          } catch (error) {
-            Alert.alert('Error', 'Failed to delete routine');
-          }
+    Alert.alert(
+      "Delete Routine",
+      `Are you sure you want to delete "${name}"?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await api.delete(`/templates/${templateId}`);
+              setTemplates(prev => prev.filter(t => t.id !== templateId));
+            } catch (error) {
+              Alert.alert("Error", "Failed to delete routine");
+            }
+          },
         },
-      },
-    ]);
+      ]
+    );
   };
 
   const renderTemplate = ({ item }: { item: WorkoutTemplate }) => (
@@ -130,20 +164,58 @@ export default function RoutinesScreen() {
     </View>
   );
 
+  const loadTodaysWorkouts = async () => {
+    try {
+      const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+      const response = await api.get(`/planned-workouts?date=${today}`);
+      const plannedWorkouts: PlannedWorkout[] = response.data;
+
+      // Enrich with actual workout session data if exists
+      const enriched: EnrichedPlannedWorkout[] = await Promise.all(
+        plannedWorkouts.map(async pw => {
+          if (pw.workout_session_id) {
+            try {
+              const workoutResponse = await api.get(
+                `/workouts/${pw.workout_session_id}`
+              );
+              const workout = workoutResponse.data;
+              return {
+                ...pw,
+                actualName: workout.name,
+                actualNotes: workout.notes,
+              };
+            } catch (error) {
+              console.error(
+                `Failed to load workout session ${pw.workout_session_id}:`,
+                error
+              );
+              return pw;
+            }
+          }
+          return pw;
+        })
+      );
+
+      setTodaysWorkouts(enriched);
+    } catch (error) {
+      console.error("Failed to load today's workouts:", error);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Routines</Text>
         <Button
           title="Create Routine"
-          onPress={() => router.push('/create-routine')}
+          onPress={() => router.push("/create-routine")}
           style={styles.createButton}
         />
       </View>
 
       <FlatList
         data={templates}
-        keyExtractor={(item) => item.id}
+        keyExtractor={item => item.id}
         renderItem={renderTemplate}
         contentContainerStyle={styles.listContent}
         refreshing={loading}
@@ -163,7 +235,21 @@ export default function RoutinesScreen() {
         visible={showRoutineModal}
         routine={selectedRoutine}
         onClose={() => setShowRoutineModal(false)}
+        onSchedule={routine => {
+          setSelectedRoutine(routine);
+          setShowScheduleModal(true);
+        }}
         onStartWorkout={handleStartWorkoutFromRoutine}
+      />
+
+      <ScheduleWorkoutModal
+        visible={showScheduleModal}
+        routine={selectedRoutine}
+        onClose={() => setShowScheduleModal(false)}
+        onScheduled={() => {
+          loadTodaysWorkouts();
+          setShowScheduleModal(false);
+        }}
       />
     </SafeAreaView>
   );
@@ -172,7 +258,7 @@ export default function RoutinesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F7',
+    backgroundColor: "#F5F5F7",
   },
   header: {
     paddingHorizontal: 20,
@@ -181,8 +267,8 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 32,
-    fontWeight: 'bold',
-    color: '#1C1C1E',
+    fontWeight: "bold",
+    color: "#1C1C1E",
     marginBottom: 16,
   },
   createButton: {
@@ -193,11 +279,11 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   templateCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 12,
     padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 12,
   },
   templateInfo: {
@@ -205,36 +291,36 @@ const styles = StyleSheet.create({
   },
   templateName: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#1C1C1E',
+    fontWeight: "600",
+    color: "#1C1C1E",
     marginBottom: 4,
   },
   templateDetail: {
     fontSize: 14,
-    color: '#8E8E93',
+    color: "#8E8E93",
     marginBottom: 4,
   },
   templateNotes: {
     fontSize: 12,
-    color: '#636366',
+    color: "#636366",
     marginTop: 4,
   },
   deleteButton: {
     padding: 8,
   },
   emptyState: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: 64,
   },
   emptyText: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#8E8E93',
+    fontWeight: "600",
+    color: "#8E8E93",
     marginTop: 16,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#636366',
+    color: "#636366",
     marginTop: 8,
   },
 });

@@ -257,7 +257,6 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   setNumberContainer: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     minWidth: 32,

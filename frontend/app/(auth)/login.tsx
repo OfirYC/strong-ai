@@ -86,6 +86,7 @@ export default function LoginScreen() {
               style={styles.linkContainer}
             >
               <Text style={styles.linkText}>
+                <Text>{process.env.EXPO_PUBLIC_BACKEND_URL ?? "BACKEND URL IS UNDEFINED"}</Text>
                 Don't have an account?{' '}
                 <Text style={styles.linkTextBold}>Sign Up</Text>
               </Text>
