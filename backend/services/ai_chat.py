@@ -234,16 +234,34 @@ TOOLS: List[Dict[str, Any]] = [
                     "notes": {"type": "string", "description": "Template notes/instructions"},
                     "exercises": {
                         "type": "array",
-                        "description": "Ordered exercise list with defaults (compact form)",
+                        "description": "Ordered exercise list. Each exercise can have 'sets' as an array of set objects (preferred) or an integer count.",
                         "items": {
                             "type": "object",
                             "properties": {
                                 "exercise_id": {"type": "string"},
-                                "sets": {"type": "integer", "description": "How many sets (default depends on kind)"},
-                                "reps": {"type": "integer", "description": "Reps (if allowed by kind)"},
-                                "weight": {"type": "number", "description": "Kg (if allowed by kind)"},
-                                "duration": {"type": "number", "description": "Seconds (if allowed by kind)"},
-                                "distance": {"type": "number", "description": "Km (if allowed by kind)"},
+                                "sets": {
+                                    "oneOf": [
+                                        {
+                                            "type": "array",
+                                            "description": "Array of set objects (preferred). Each set has set_type, reps, weight, duration, distance as needed.",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "set_type": {"type": "string", "enum": ["normal", "warmup", "cooldown", "failure"], "default": "normal"},
+                                                    "reps": {"type": "integer"},
+                                                    "weight": {"type": "number"},
+                                                    "duration": {"type": "number"},
+                                                    "distance": {"type": "number"}
+                                                }
+                                            }
+                                        },
+                                        {"type": "integer", "description": "Number of sets (legacy - will create N identical sets)"}
+                                    ]
+                                },
+                                "reps": {"type": "integer", "description": "Default reps per set (used when sets is an integer)"},
+                                "weight": {"type": "number", "description": "Default weight in kg (used when sets is an integer)"},
+                                "duration": {"type": "number", "description": "Default duration in seconds (used when sets is an integer)"},
+                                "distance": {"type": "number", "description": "Default distance in km (used when sets is an integer)"},
                                 "notes": {"type": "string"},
                             },
                             "required": ["exercise_id"],
