@@ -288,12 +288,30 @@ TOOLS: List[Dict[str, Any]] = [
                     "notes": {"type": "string"},
                     "exercises": {
                         "type": "array",
-                        "description": "REPLACES the whole template exercise list (compact form)",
+                        "description": "REPLACES the whole template exercise list. Each exercise can have 'sets' as an array of set objects (preferred) or an integer count.",
                         "items": {
                             "type": "object",
                             "properties": {
                                 "exercise_id": {"type": "string"},
-                                "sets": {"type": "integer"},
+                                "sets": {
+                                    "oneOf": [
+                                        {
+                                            "type": "array",
+                                            "description": "Array of set objects (preferred)",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "set_type": {"type": "string", "enum": ["normal", "warmup", "cooldown", "failure"], "default": "normal"},
+                                                    "reps": {"type": "integer"},
+                                                    "weight": {"type": "number"},
+                                                    "duration": {"type": "number"},
+                                                    "distance": {"type": "number"}
+                                                }
+                                            }
+                                        },
+                                        {"type": "integer", "description": "Number of sets (legacy)"}
+                                    ]
+                                },
                                 "reps": {"type": "integer"},
                                 "weight": {"type": "number"},
                                 "duration": {"type": "number"},
