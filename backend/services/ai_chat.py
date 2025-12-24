@@ -616,8 +616,9 @@ async def _build_template_exercises_from_compact(
 
     Input item supports:
     - exercise_id (required)
-    - sets (optional)
-    - reps, weight, duration, distance (optional)
+    - sets: EITHER an array of set objects [{set_type, reps, weight, duration, distance}, ...] (preferred)
+            OR an integer count (legacy - will create N identical sets using default values)
+    - reps, weight, duration, distance (optional - used as defaults when sets is an integer)
     - notes (optional)
     """
     ex_ids = [e.get("exercise_id") for e in exercises if e.get("exercise_id")]
@@ -635,30 +636,65 @@ async def _build_template_exercises_from_compact(
             kind = DEFAULT_EXERCISE_KIND
 
         raw_sets = ex.get("sets")
-
-        if raw_sets is None:
-            rule_fields = set((EXERCISE_KIND_RULES.get(kind) or {}).get("fields", []) or [])
-            is_time_or_distance_only = (("duration" in rule_fields) or ("distance" in rule_fields)) and ("reps" not in rule_fields)
-            num_sets = 1 if is_time_or_distance_only else 3
-        else:
-            try:
-                num_sets = int(raw_sets)
-            except Exception:
-                num_sets = 1
-            num_sets = num_sets if num_sets > 0 else 1
-
-        reps = ex.get("reps")
-        weight = ex.get("weight")
-        duration = ex.get("duration")
-        distance = ex.get("distance")
         notes = ex.get("notes")
-
-        base_fields = _normalize_set_fields_by_kind(kind, reps, weight, duration, distance)
-
+        
         sets_arr: List[Dict[str, Any]] = []
-        for _ in range(num_sets):
-            sets_arr.append({"set_type": "normal", **base_fields})
+        
+        # Check if sets is an array of set objects (preferred format)
+        if isinstance(raw_sets, list):
+            # Sets provided as array - use them directly with normalization
+            for set_item in raw_sets:
+                if not isinstance(set_item, dict):
+                    continue
+                set_type = set_item.get("set_type", "normal")
+                if set_type not in ("normal", "warmup", "cooldown", "failure"):
+                    set_type = "normal"
+                
+                # Normalize fields based on exercise kind
+                normalized = _normalize_set_fields_by_kind(
+                    kind,
+                    set_item.get("reps"),
+                    set_item.get("weight"),
+                    set_item.get("duration"),
+                    set_item.get("distance"),
+                )
+                sets_arr.append({"set_type": set_type, **normalized})
+            
+            # If array was empty or all invalid, create default sets
+            if not sets_arr:
+                rule_fields = set((EXERCISE_KIND_RULES.get(kind) or {}).get("fields", []) or [])
+                is_time_or_distance_only = (("duration" in rule_fields) or ("distance" in rule_fields)) and ("reps" not in rule_fields)
+                num_sets = 1 if is_time_or_distance_only else 3
+                base_fields = _normalize_set_fields_by_kind(kind, ex.get("reps"), ex.get("weight"), ex.get("duration"), ex.get("distance"))
+                for _ in range(num_sets):
+                    sets_arr.append({"set_type": "normal", **base_fields})
+        else:
+            # Sets provided as integer (legacy) or not provided - create N identical sets
+            if raw_sets is None:
+                rule_fields = set((EXERCISE_KIND_RULES.get(kind) or {}).get("fields", []) or [])
+                is_time_or_distance_only = (("duration" in rule_fields) or ("distance" in rule_fields)) and ("reps" not in rule_fields)
+                num_sets = 1 if is_time_or_distance_only else 3
+            else:
+                try:
+                    num_sets = int(raw_sets)
+                except Exception:
+                    num_sets = 1
+                num_sets = num_sets if num_sets > 0 else 1
 
+            reps = ex.get("reps")
+            weight = ex.get("weight")
+            duration = ex.get("duration")
+            distance = ex.get("distance")
+
+            base_fields = _normalize_set_fields_by_kind(kind, reps, weight, duration, distance)
+
+            for _ in range(num_sets):
+                sets_arr.append({"set_type": "normal", **base_fields})
+
+        num_sets = len(sets_arr)
+        # Use first set's values for defaults (or fallback)
+        first_set = sets_arr[0] if sets_arr else {}
+        
         template_exercises.append(
             {
                 "exercise_id": ex_id,
@@ -666,8 +702,12 @@ async def _build_template_exercises_from_compact(
                 "sets": sets_arr,
                 "notes": notes,
                 "default_sets": num_sets,
-                "default_reps": base_fields.get("reps"),
-                "default_weight": base_fields.get("weight"),
+                "default_reps": first_set.get("reps"),
+                "default_weight": first_set.get("weight"),
+                "default_duration": first_set.get("duration"),
+                "default_distance": first_set.get("distance"),
+            }
+        )
                 "default_duration": base_fields.get("duration"),
                 "default_distance": base_fields.get("distance"),
             }
