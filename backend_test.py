@@ -11,7 +11,7 @@ import sys
 import os
 
 # Get backend URL from frontend .env file
-BACKEND_URL = "https://strength-coach-12.preview.emergentagent.com/api"
+BACKEND_URL = "https://fitness-planner-96.preview.emergentagent.com/api"
 
 class TestResults:
     def __init__(self):

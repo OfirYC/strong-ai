@@ -364,7 +364,7 @@ agent_communication:
         c) Tunnel URL might have changed since last session
       
       Solution for user:
-      1. Access the web preview at https://strength-coach-12.preview.emergentagent.com
+      1. Access the web preview at https://fitness-planner-96.preview.emergentagent.com
       2. Generate a new QR code from there
       3. Scan with Expo Go app (make sure to "clear" any cached projects first)
       4. Alternative: Use the web preview directly in a browser for testing
