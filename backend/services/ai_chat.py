@@ -362,12 +362,30 @@ TOOLS: List[Dict[str, Any]] = [
                     "template_id": {"type": "string", "description": "Use an existing template"},
                     "exercises": {
                         "type": "array",
-                        "description": "If provided, auto-creates a template then schedules it (compact form)",
+                        "description": "If provided, auto-creates a template then schedules it. Each exercise can have 'sets' as an array of set objects (preferred) or an integer count.",
                         "items": {
                             "type": "object",
                             "properties": {
                                 "exercise_id": {"type": "string"},
-                                "sets": {"type": "integer"},
+                                "sets": {
+                                    "oneOf": [
+                                        {
+                                            "type": "array",
+                                            "description": "Array of set objects (preferred)",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "set_type": {"type": "string", "enum": ["normal", "warmup", "cooldown", "failure"], "default": "normal"},
+                                                    "reps": {"type": "integer"},
+                                                    "weight": {"type": "number"},
+                                                    "duration": {"type": "number"},
+                                                    "distance": {"type": "number"}
+                                                }
+                                            }
+                                        },
+                                        {"type": "integer", "description": "Number of sets (legacy)"}
+                                    ]
+                                },
                                 "reps": {"type": "integer"},
                                 "weight": {"type": "number"},
                                 "duration": {"type": "number"},
