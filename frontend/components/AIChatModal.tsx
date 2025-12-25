@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import Markdown from "react-native-markdown-display";
+import Markdown, { ASTNode } from "react-native-markdown-display";
 import api from "../utils/api";
 
 interface ChatMessage {
@@ -102,15 +102,8 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
   };
 
   const renderMessage = (message: ChatMessage, index: number) => {
-    // Don't render system or tool messages (they are for the model only)
-    if (message.role === "system" || message.role === "tool") {
-      return null;
-    }
-
-    // Defensive: don't render empty/whitespace-only messages
-    if (!message.content || !message.content.trim()) {
-      return null;
-    }
+    if (message.role === "system" || message.role === "tool") return null;
+    if (!message.content || !message.content.trim()) return null;
 
     const isUser = message.role === "user";
 
@@ -127,6 +120,7 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
             <Ionicons name="fitness" size={16} color="#007AFF" />
           </View>
         )}
+
         <TouchableOpacity
           onLongPress={() => Clipboard.setString(message.content)}
           activeOpacity={1}
@@ -142,9 +136,7 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
                 {message.content}
               </Text>
             ) : (
-              <Markdown rules={{}} style={markdownStyles}>
-                {message.content}
-              </Markdown>
+              <Markdown style={markdownStyles}>{message.content}</Markdown>
             )}
           </View>
         </TouchableOpacity>
@@ -463,5 +455,3 @@ const markdownStyles = {
     marginVertical: 12,
   },
 };
-
-
