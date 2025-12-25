@@ -160,7 +160,7 @@ export default function SetRowInput({
             <Ionicons
               name="checkmark"
               size={18}
-              color={isCompleted ? "#FFFFFF" : "#D1D1D6"}
+              color={isCompleted ? "#FFFFFF" : "#000000"}
             />
           </TouchableOpacity>
         )}
@@ -366,16 +366,13 @@ const styles = StyleSheet.create({
   completeButton: {
     width: 36,
     height: 36,
-    borderRadius: 18,
+    borderRadius: 8,
     backgroundColor: "#F2F2F7",
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 2,
-    borderColor: "#D1D1D6",
   },
   completeButtonActive: {
     backgroundColor: "#34C759",
-    borderColor: "#34C759",
   },
   // Dropdown styles
   dropdownOverlay: {
