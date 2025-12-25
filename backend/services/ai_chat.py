@@ -234,37 +234,48 @@ TOOLS: List[Dict[str, Any]] = [
                     "notes": {"type": "string", "description": "Template notes/instructions"},
                     "exercises": {
                         "type": "array",
-                        "description": "Ordered exercise list. Each exercise can have 'sets' as an array of set objects (preferred) or an integer count.",
+                        "description": "Ordered exercise list. Each exercise must have 'sets' as an array of set objects",
                         "items": {
                             "type": "object",
                             "properties": {
                                 "exercise_id": {"type": "string"},
                                 "sets": {
-                                    "oneOf": [
-                                        {
-                                            "type": "array",
-                                            "description": "Array of set objects (preferred). Each set has set_type, reps, weight, duration, distance as needed.",
-                                            "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "set_type": {"type": "string", "enum": ["normal", "warmup", "cooldown", "failure"], "default": "normal"},
-                                                    "reps": {"type": "integer"},
-                                                    "weight": {"type": "number"},
-                                                    "duration": {"type": "number"},
-                                                    "distance": {"type": "number"}
-                                                }
-                                            }
+                                    "type": "array",
+                                    "description": "Array of set objects. Each set has set_type, reps, weight, duration, distance as needed.",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "set_type": {
+                                                "type": "string",
+                                                "enum": ["normal", "warmup", "cooldown", "failure"],
+                                                "default": "normal",
+                                            },
+                                            "reps": {"type": "integer"},
+                                            "weight": {"type": "number"},
+                                            "duration": {"type": "number"},
+                                            "distance": {"type": "number"},
                                         },
-                                        {"type": "integer", "description": "Number of sets (legacy - will create N identical sets)"}
-                                    ]
+                                    },
                                 },
-                                "reps": {"type": "integer", "description": "Default reps per set (used when sets is an integer)"},
-                                "weight": {"type": "number", "description": "Default weight in kg (used when sets is an integer)"},
-                                "duration": {"type": "number", "description": "Default duration in seconds (used when sets is an integer)"},
-                                "distance": {"type": "number", "description": "Default distance in km (used when sets is an integer)"},
+                                "reps": {
+                                    "type": "integer",
+                                    "description": "Optional default reps per set (used as a hint when auto-generating sets).",
+                                },
+                                "weight": {
+                                    "type": "number",
+                                    "description": "Optional default weight in kg (used as a hint when auto-generating sets).",
+                                },
+                                "duration": {
+                                    "type": "number",
+                                    "description": "Optional default duration in seconds (used as a hint when auto-generating sets).",
+                                },
+                                "distance": {
+                                    "type": "number",
+                                    "description": "Optional default distance in km (used as a hint when auto-generating sets).",
+                                },
                                 "notes": {"type": "string"},
                             },
-                            "required": ["exercise_id"],
+                            "required": ["exercise_id", "sets"],
                         },
                     },
                 },
@@ -288,37 +299,32 @@ TOOLS: List[Dict[str, Any]] = [
                     "notes": {"type": "string"},
                     "exercises": {
                         "type": "array",
-                        "description": "REPLACES the whole template exercise list. Each exercise can have 'sets' as an array of set objects (preferred) or an integer count.",
+                        "description": "REPLACES the whole template exercise list. Each exercise must provide 'sets' as an array of set objects.",
                         "items": {
                             "type": "object",
                             "properties": {
                                 "exercise_id": {"type": "string"},
                                 "sets": {
-                                    "oneOf": [
-                                        {
-                                            "type": "array",
-                                            "description": "Array of set objects (preferred)",
-                                            "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "set_type": {"type": "string", "enum": ["normal", "warmup", "cooldown", "failure"], "default": "normal"},
-                                                    "reps": {"type": "integer"},
-                                                    "weight": {"type": "number"},
-                                                    "duration": {"type": "number"},
-                                                    "distance": {"type": "number"}
-                                                }
-                                            }
+                                    "type": "array",
+                                    "description": "Array of set objects.",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "set_type": {
+                                                "type": "string",
+                                                "enum": ["normal", "warmup", "cooldown", "failure"],
+                                                "default": "normal",
+                                            },
+                                            "reps": {"type": "integer"},
+                                            "weight": {"type": "number"},
+                                            "duration": {"type": "number"},
+                                            "distance": {"type": "number"},
                                         },
-                                        {"type": "integer", "description": "Number of sets (legacy)"}
-                                    ]
+                                    },
                                 },
-                                "reps": {"type": "integer"},
-                                "weight": {"type": "number"},
-                                "duration": {"type": "number"},
-                                "distance": {"type": "number"},
                                 "notes": {"type": "string"},
                             },
-                            "required": ["exercise_id"],
+                            "required": ["exercise_id", "sets"],
                         },
                     },
                 },
@@ -346,70 +352,96 @@ TOOLS: List[Dict[str, Any]] = [
             },
         },
     },
-    {
-        "type": "function",
-        "function": {
-            "name": "schedule__add_workout",
-            "description": (
-                "Create a scheduled workout on a specific date (optionally recurring). "
-                "Provide EITHER template_id OR exercises (which will auto-create a template)."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "date": {"type": "string", "description": "YYYY-MM-DD"},
-                    "name": {"type": "string", "description": "Workout name"},
-                    "template_id": {"type": "string", "description": "Use an existing template"},
-                    "exercises": {
-                        "type": "array",
-                        "description": "If provided, auto-creates a template then schedules it. Each exercise can have 'sets' as an array of set objects (preferred) or an integer count.",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "exercise_id": {"type": "string"},
-                                "sets": {
-                                    "oneOf": [
-                                        {
-                                            "type": "array",
-                                            "description": "Array of set objects (preferred)",
-                                            "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "set_type": {"type": "string", "enum": ["normal", "warmup", "cooldown", "failure"], "default": "normal"},
-                                                    "reps": {"type": "integer"},
-                                                    "weight": {"type": "number"},
-                                                    "duration": {"type": "number"},
-                                                    "distance": {"type": "number"}
-                                                }
-                                            }
-                                        },
-                                        {"type": "integer", "description": "Number of sets (legacy)"}
-                                    ]
-                                },
-                                "reps": {"type": "integer"},
-                                "weight": {"type": "number"},
-                                "duration": {"type": "number"},
-                                "distance": {"type": "number"},
-                                "notes": {"type": "string"},
-                            },
-                            "required": ["exercise_id"],
-                        },
-                    },
-                    "type": {"type": "string", "description": "strength/run/mobility/etc"},
-                    "notes": {"type": "string"},
-                    "is_recurring": {"type": "boolean", "default": False},
-                    "recurrence_type": {"type": "string", "enum": ["daily", "weekly", "monthly"]},
-                    "recurrence_days": {
-                        "type": "array",
-                        "items": {"type": "integer"},
-                        "description": "Weekly: [0=Mon..6=Sun]",
-                    },
-                    "recurrence_end_date": {"type": "string", "description": "YYYY-MM-DD or null for indefinite"},
-                },
-                "required": ["date", "name"],
-            },
+   {
+  "type": "function",
+  "function": {
+    "name": "schedule__add_workout",
+    "description": "Create a scheduled workout on a specific date (optionally recurring). You must provide EITHER template_id OR exercises. If you provide exercises without template_id, you MUST also specify whether to create a reusable template or schedule this as a one-time inline workout.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string",
+          "description": "Workout date in YYYY-MM-DD format"
         },
-    },
+        "name": {
+          "type": "string",
+          "description": "Workout name (e.g. 'Push Day A', 'Long Run')"
+        },
+        "template_id": {
+          "type": "string",
+          "description": "Use an existing template. If provided, any 'exercises' field will be ignored."
+        },
+        "exercises": {
+          "type": "array",
+          "description": "Compact exercise definitions for this workout. If provided WITHOUT 'template_id', you MUST also set 'create_template_from_exercises' to true (to save as a reusable template) or false (to schedule as a one-time inline workout). Each exercise must provide 'sets' as an array of set objects.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "exercise_id": { "type": "string" },
+              "sets": {
+                "type": "array",
+                "description": "Array of set objects.",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "set_type": {
+                      "type": "string",
+                      "enum": ["normal", "warmup", "cooldown", "failure"],
+                      "description": "Type of set (default normal if omitted)"
+                    },
+                    "reps": { "type": "integer" },
+                    "weight": { "type": "number" },
+                    "duration": { "type": "number" },
+                    "distance": { "type": "number" }
+                  }
+                }
+              },
+              "reps": { "type": "integer" },
+              "weight": { "type": "number" },
+              "duration": { "type": "number" },
+              "distance": { "type": "number" },
+              "notes": { "type": "string" }
+            },
+            "required": ["exercise_id", "sets"]
+          }
+        },
+        "create_template_from_exercises": {
+          "type": "boolean",
+          "description": "Required if 'exercises' is provided and 'template_id' is NOT provided. If true, auto-create a reusable template from the exercises and link it to this scheduled workout. If false, schedule this workout as a one-time session with inline_exercises only (no template is created)."
+        },
+        "type": {
+          "type": "string",
+          "description": "Workout category (e.g. 'strength', 'run', 'mobility'). Optional."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional notes for the scheduled workout."
+        },
+        "is_recurring": {
+          "type": "boolean",
+          "description": "Whether this planned workout recurs.",
+          "default": False
+        },
+        "recurrence_type": {
+          "type": "string",
+          "enum": ["daily", "weekly", "monthly"],
+          "description": "Recurrence pattern if is_recurring is true."
+        },
+        "recurrence_days": {
+          "type": "array",
+          "items": { "type": "integer" },
+          "description": "For weekly recurrence only: list of weekdays [0=Mon..6=Sun]."
+        },
+        "recurrence_end_date": {
+          "type": "string",
+          "description": "End date for recurrence in YYYY-MM-DD format, or null for indefinite."
+        }
+      },
+      "required": ["date", "name"]
+    }
+  }
+},
     {
         "type": "function",
         "function": {
@@ -427,29 +459,31 @@ TOOLS: List[Dict[str, Any]] = [
                     "template_id": {"type": "string"},
                     "exercises": {
                         "type": "array",
-                        "description": "If provided, creates a new template and attaches it. Each exercise can have 'sets' as an array of set objects (preferred) or an integer count.",
+                        "description": (
+                            "If provided, creates a new template and attaches it. "
+                            "Each exercise must provide 'sets' as an array of set objects."
+                        ),
                         "items": {
                             "type": "object",
                             "properties": {
                                 "exercise_id": {"type": "string"},
                                 "sets": {
-                                    "oneOf": [
-                                        {
-                                            "type": "array",
-                                            "description": "Array of set objects (preferred)",
-                                            "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "set_type": {"type": "string", "enum": ["normal", "warmup", "cooldown", "failure"], "default": "normal"},
-                                                    "reps": {"type": "integer"},
-                                                    "weight": {"type": "number"},
-                                                    "duration": {"type": "number"},
-                                                    "distance": {"type": "number"}
-                                                }
-                                            }
+                                    "type": "array",
+                                    "description": "Array of set objects.",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "set_type": {
+                                                "type": "string",
+                                                "enum": ["normal", "warmup", "cooldown", "failure"],
+                                                "default": "normal",
+                                            },
+                                            "reps": {"type": "integer"},
+                                            "weight": {"type": "number"},
+                                            "duration": {"type": "number"},
+                                            "distance": {"type": "number"},
                                         },
-                                        {"type": "integer", "description": "Number of sets (legacy)"}
-                                    ]
+                                    },
                                 },
                                 "reps": {"type": "integer"},
                                 "weight": {"type": "number"},
@@ -457,7 +491,7 @@ TOOLS: List[Dict[str, Any]] = [
                                 "distance": {"type": "number"},
                                 "notes": {"type": "string"},
                             },
-                            "required": ["exercise_id"],
+                            "required": ["exercise_id", "sets"],
                         },
                     },
                     "type": {"type": "string"},
@@ -486,24 +520,43 @@ TOOLS: List[Dict[str, Any]] = [
     },
 
     # WORKOUT HISTORY
-    {
-        "type": "function",
-        "function": {
-            "name": "workout_history__get_all",
-            "description": (
-                "Get recent completed workouts (summaries). "
-                "Use to understand recent training load and what the user actually did."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "days_back": {"type": "integer", "default": 30},
-                    "limit": {"type": "integer", "default": 30},
+   {
+    "type": "function",
+    "function": {
+        "name": "workout_history__get_all",
+        "description": (
+            "Get recent completed workouts.\n"
+            "- By default (expanded=false) returns lightweight summaries: volume, set count, etc.\n"
+            "- If expanded=true, returns FULL workouts including exercises and sets.\n"
+            "Use expanded=true only when you specifically need per-exercise/per-set detail."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "days_back": {
+                    "type": "integer",
+                    "default": 30,
+                    "description": "How many days back to look (1–365).",
                 },
-                "required": [],
+                "limit": {
+                    "type": "integer",
+                    "default": 30,
+                    "description": "Max workouts to return (1–200).",
+                },
+                "expanded": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": (
+                        "If true, return full workout documents including exercises and sets. "
+                        "If false (default), return compact summaries only (total volume, set count, etc.)."
+                    ),
+                },
             },
+            "required": [],
         },
     },
+},
+
     {
         "type": "function",
         "function": {
@@ -616,9 +669,8 @@ async def _build_template_exercises_from_compact(
 
     Input item supports:
     - exercise_id (required)
-    - sets: EITHER an array of set objects [{set_type, reps, weight, duration, distance}, ...] (preferred)
-            OR an integer count (legacy - will create N identical sets using default values)
-    - reps, weight, duration, distance (optional - used as defaults when sets is an integer)
+    - sets: array of set objects [{set_type, reps, weight, duration, distance}, ...]
+      (if missing/invalid/empty, default sets will be auto-generated based only on exercise_kind)
     - notes (optional)
     """
     ex_ids = [e.get("exercise_id") for e in exercises if e.get("exercise_id")]
@@ -637,19 +689,20 @@ async def _build_template_exercises_from_compact(
 
         raw_sets = ex.get("sets")
         notes = ex.get("notes")
-        
+
         sets_arr: List[Dict[str, Any]] = []
-        
-        # Check if sets is an array of set objects (preferred format)
+
+        # Only accept arrays for sets. Any non-list value is treated as "no sets provided".
         if isinstance(raw_sets, list):
             # Sets provided as array - use them directly with normalization
             for set_item in raw_sets:
                 if not isinstance(set_item, dict):
                     continue
+
                 set_type = set_item.get("set_type", "normal")
                 if set_type not in ("normal", "warmup", "cooldown", "failure"):
                     set_type = "normal"
-                
+
                 # Normalize fields based on exercise kind
                 normalized = _normalize_set_fields_by_kind(
                     kind,
@@ -659,34 +712,40 @@ async def _build_template_exercises_from_compact(
                     set_item.get("distance"),
                 )
                 sets_arr.append({"set_type": set_type, **normalized})
-            
+
             # If array was empty or all invalid, create default sets
             if not sets_arr:
                 rule_fields = set((EXERCISE_KIND_RULES.get(kind) or {}).get("fields", []) or [])
-                is_time_or_distance_only = (("duration" in rule_fields) or ("distance" in rule_fields)) and ("reps" not in rule_fields)
+                is_time_or_distance_only = (
+                    ("duration" in rule_fields) or ("distance" in rule_fields)
+                ) and ("reps" not in rule_fields)
                 num_sets = 1 if is_time_or_distance_only else 3
-                base_fields = _normalize_set_fields_by_kind(kind, ex.get("reps"), ex.get("weight"), ex.get("duration"), ex.get("distance"))
+
+                base_fields = _normalize_set_fields_by_kind(
+                    kind,
+                    None,
+                    None,
+                    None,
+                    None,
+                )
                 for _ in range(num_sets):
                     sets_arr.append({"set_type": "normal", **base_fields})
         else:
-            # Sets provided as integer (legacy) or not provided - create N identical sets
-            if raw_sets is None:
-                rule_fields = set((EXERCISE_KIND_RULES.get(kind) or {}).get("fields", []) or [])
-                is_time_or_distance_only = (("duration" in rule_fields) or ("distance" in rule_fields)) and ("reps" not in rule_fields)
-                num_sets = 1 if is_time_or_distance_only else 3
-            else:
-                try:
-                    num_sets = int(raw_sets)
-                except Exception:
-                    num_sets = 1
-                num_sets = num_sets if num_sets > 0 else 1
+            # Non-array sets are ignored as invalid.
+            # Auto-generate a reasonable default prescription based only on kind.
+            rule_fields = set((EXERCISE_KIND_RULES.get(kind) or {}).get("fields", []) or [])
+            is_time_or_distance_only = (
+                ("duration" in rule_fields) or ("distance" in rule_fields)
+            ) and ("reps" not in rule_fields)
+            num_sets = 1 if is_time_or_distance_only else 3
 
-            reps = ex.get("reps")
-            weight = ex.get("weight")
-            duration = ex.get("duration")
-            distance = ex.get("distance")
-
-            base_fields = _normalize_set_fields_by_kind(kind, reps, weight, duration, distance)
+            base_fields = _normalize_set_fields_by_kind(
+                kind,
+                None,
+                None,
+                None,
+                None,
+            )
 
             for _ in range(num_sets):
                 sets_arr.append({"set_type": "normal", **base_fields})
@@ -694,7 +753,7 @@ async def _build_template_exercises_from_compact(
         num_sets = len(sets_arr)
         # Use first set's values for defaults (or fallback)
         first_set = sets_arr[0] if sets_arr else {}
-        
+
         template_exercises.append(
             {
                 "exercise_id": ex_id,
@@ -995,15 +1054,17 @@ async def execute_tool(tool_name: str, arguments: Dict[str, Any], db, user_id: s
                 )
 
             return json.dumps(schedule)
-
         if tool_name == "schedule__add_workout":
-            if "date" not in arguments or "name" not in arguments:
+            date = arguments.get("date")
+            name = (arguments.get("name") or "").strip()
+
+            if not date or not name:
                 return json.dumps({"error": "date and name are required"})
 
-            workout_date = arguments["date"]
-            workout_name = arguments["name"]
-
-            existing = await db.planned_workouts.find_one({"user_id": user_id, "date": workout_date, "name": workout_name})
+            # Check if a workout with the same date + name already exists
+            existing = await db.planned_workouts.find_one(
+                {"user_id": user_id, "date": date, "name": name}
+            )
             if existing:
                 return json.dumps(
                     {
@@ -1014,29 +1075,55 @@ async def execute_tool(tool_name: str, arguments: Dict[str, Any], db, user_id: s
                     }
                 )
 
-            template_id = arguments.get("template_id") or ""
+            template_id = arguments.get("template_id") or None
             exercises = arguments.get("exercises") or None
 
-            created_template_id = None
-            if exercises and not template_id:
-                template_exercises = await _build_template_exercises_from_compact(exercises, db, user_id)
-                template_doc = {
-                    "user_id": user_id,
-                    "name": workout_name,
-                    "notes": arguments.get("notes") or "Created by AI Coach",
-                    "exercises": template_exercises,
-                    "created_at": datetime.utcnow(),
-                    "updated_at": datetime.utcnow(),
-                }
-                template_res = await db.templates.insert_one(template_doc)
-                template_id = str(template_res.inserted_id)
-                created_template_id = template_id
+            created_template_id: Optional[str] = None
+            inline_exercises: Optional[List[Dict[str, Any]]] = None
 
-            planned_workout = {
+            # If no template_id but exercises are provided, we must know what to do with them
+            if template_id is None and exercises:
+                create_template_from_exercises = arguments.get("create_template_from_exercises")
+
+                if create_template_from_exercises is None:
+                    return json.dumps(
+                        {
+                            "error": "create_template_from_exercises is required when exercises are provided without template_id",
+                            "hint": (
+                                "Set create_template_from_exercises=true to auto-create a reusable template, "
+                                "or false to schedule this as a one-time inline workout."
+                            ),
+                        }
+                    )
+
+                # Normalize compact exercises into template-style exercises
+                template_exercises = await _build_template_exercises_from_compact(
+                    exercises, db, user_id
+                )
+
+                if create_template_from_exercises:
+                    # Create reusable template and link it
+                    template_doc = {
+                        "user_id": user_id,
+                        "name": name,
+                        "notes": arguments.get("notes") or "Created by AI Coach",
+                        "exercises": template_exercises,
+                        "created_at": datetime.utcnow(),
+                        "updated_at": datetime.utcnow(),
+                    }
+                    template_res = await db.templates.insert_one(template_doc)
+                    template_id = str(template_res.inserted_id)
+                    created_template_id = template_id
+                else:
+                    # One-time workout: store exercises inline on the planned workout
+                    inline_exercises = template_exercises
+
+            planned_workout: Dict[str, Any] = {
                 "user_id": user_id,
-                "date": workout_date,
-                "name": workout_name,
-                "template_id": template_id if template_id else None,
+                "date": date,
+                "name": name,
+                "template_id": template_id,
+                "inline_exercises": inline_exercises,
                 "type": arguments.get("type"),
                 "notes": arguments.get("notes"),
                 "status": "planned",
@@ -1052,20 +1139,24 @@ async def execute_tool(tool_name: str, arguments: Dict[str, Any], db, user_id: s
 
             insert_res = await db.planned_workouts.insert_one(planned_workout)
 
-            msg = f"Scheduled '{workout_name}' for {workout_date}"
+            msg = f"Scheduled '{name}' for {date}"
             if created_template_id:
-                msg += f" (auto-created template {created_template_id})"
+                msg += f" (created template {created_template_id})"
+            elif inline_exercises is not None:
+                msg += " (one-time inline workout; no template created)"
+            elif template_id:
+                msg += f" (using existing template {template_id})"
 
             return json.dumps(
                 {
                     "success": True,
                     "id": str(insert_res.inserted_id),
-                    "template_id": template_id if template_id else None,
+                    "template_id": template_id,
                     "created_template_id": created_template_id,
                     "message": msg,
                 }
             )
-
+        
         if tool_name == "schedule__update_workout":
             workout_id = arguments.get("workout_id")
             oid = _safe_object_id(workout_id)
@@ -1131,6 +1222,8 @@ async def execute_tool(tool_name: str, arguments: Dict[str, Any], db, user_id: s
         if tool_name == "workout_history__get_all":
             days_back = int(arguments.get("days_back", 30) or 30)
             limit = int(arguments.get("limit", 30) or 30)
+            expanded = bool(arguments.get("expanded", False))
+
             days_back = max(1, min(days_back, 365))
             limit = max(1, min(limit, 200))
 
@@ -1139,22 +1232,57 @@ async def execute_tool(tool_name: str, arguments: Dict[str, Any], db, user_id: s
 
             workouts = (
                 await db.workouts.find(
-                    {"user_id": user_id, "ended_at": {"$ne": None}, "started_at": {"$gte": start_date, "$lte": end_date}}
+                    {
+                        "user_id": user_id,
+                        "ended_at": {"$ne": None},
+                        "started_at": {"$gte": start_date, "$lte": end_date},
+                    }
                 )
                 .sort("started_at", -1)
                 .limit(limit)
                 .to_list(limit)
             )
 
+            # NEW: expanded mode – return full workouts
+            if expanded:
+                expanded_workouts = []
+
+                for w in workouts:
+                    w_copy = dict(w)
+
+                    # Normalize id
+                    if "_id" in w_copy:
+                        w_copy["id"] = str(w_copy.pop("_id"))
+
+                    # Normalize top-level datetimes
+                    for dt_key in ("started_at", "ended_at", "created_at", "updated_at"):
+                        if w_copy.get(dt_key) is not None:
+                            try:
+                                w_copy[dt_key] = w_copy[dt_key].isoformat()
+                            except Exception:
+                                # Let json.dumps(default=str) handle anything weird
+                                pass
+
+                    # Normalize nested exercise_ids if they’re ObjectIds
+                    exercises = w_copy.get("exercises") or []
+                    for ex in exercises:
+                        if isinstance(ex.get("exercise_id"), ObjectId):
+                            ex["exercise_id"] = str(ex["exercise_id"])
+
+                    expanded_workouts.append(w_copy)
+
+                return json.dumps(expanded_workouts, default=str)
+
+            # EXISTING: summary mode (unchanged)
             summaries = []
             for w in workouts:
                 total_volume = 0.0
                 ex_count = 0
                 set_count = 0
 
-                for ex in w.get("exercises", []) or []:
+                for ex in (w.get("exercises") or []):
                     ex_count += 1
-                    for set_data in ex.get("sets", []) or []:
+                    for set_data in (ex.get("sets") or []):
                         set_count += 1
                         wt = set_data.get("weight")
                         reps = set_data.get("reps")
@@ -1453,20 +1581,14 @@ Each set in a workout has a `set_type` field with these options:
 - "cooldown": Cool-down set (not counted for PRs/stats)
 - "failure": Set taken to muscular failure
 
-When creating workouts/templates, you can specify sets as an array of set objects (preferred):
-```
+When creating workouts/templates, you must specify sets as an array of set objects:
 "sets": [
-  {{"set_type": "warmup", "reps": 10, "weight": 40}},
-  {{"set_type": "warmup", "reps": 8, "weight": 50}},
-  {{"set_type": "normal", "reps": 8, "weight": 60}},
-  {{"set_type": "normal", "reps": 8, "weight": 60}},
-  {{"set_type": "failure", "reps": 6, "weight": 65}}
+{{"set_type": "warmup", "reps": 10, "weight": 40}},
+{{"set_type": "warmup", "reps": 8, "weight": 50}},
+{{"set_type": "normal", "reps": 8, "weight": 60}},
+{{"set_type": "normal", "reps": 8, "weight": 60}},
+{{"set_type": "failure", "reps": 6, "weight": 65}}
 ]
-```
-Or as an integer count (legacy - creates N identical normal sets):
-```
-"sets": 3, "reps": 8, "weight": 60
-```
 
 **Workout/Template Naming Rules**
 
@@ -1505,6 +1627,8 @@ CRITICAL RULES:
 4) History usage:
    - If user asks for personalization based on their level, call workout_history__get_by_exercise using the closest relevant exercise.
    - You can infer relatedness (e.g., pull-ups -> lat pulldown) without pre-tagging patterns.
+   - Use workout_history__get_all(expanded=true) ONLY when you need full per-set details; otherwise keep expanded=false for lighter summaries.
+
 
 DELETES:
 - To delete scheduled workouts, always call schedule__get first and use deletable_id with schedule__delete_workout.

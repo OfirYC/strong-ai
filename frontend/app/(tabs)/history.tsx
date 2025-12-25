@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,13 +6,13 @@ import {
   SectionList,
   TouchableOpacity,
   RefreshControl,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { format, parseISO, isToday, isYesterday } from 'date-fns';
-import { useRouter } from 'expo-router';
-import api from '../../utils/api';
-import { WorkoutSummary } from '../../types';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { format, parseISO, isToday, isYesterday } from "date-fns";
+import { useRouter } from "expo-router";
+import api from "../../utils/api";
+import { WorkoutSummary } from "../../types";
 
 interface GroupedWorkouts {
   title: string;
@@ -33,10 +33,10 @@ export default function HistoryScreen() {
   const loadWorkouts = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/workouts/history');
+      const response = await api.get("/workouts/history");
       setWorkouts(response.data);
     } catch (error) {
-      console.error('Failed to load workouts:', error);
+      console.error("Failed to load workouts:", error);
     } finally {
       setLoading(false);
     }
@@ -51,9 +51,9 @@ export default function HistoryScreen() {
   // Group workouts by date
   const groupedWorkouts = React.useMemo((): GroupedWorkouts[] => {
     const groups: { [key: string]: WorkoutSummary[] } = {};
-    
-    workouts.forEach((workout) => {
-      const date = format(parseISO(workout.started_at), 'yyyy-MM-dd');
+
+    workouts.forEach(workout => {
+      const date = format(parseISO(workout.started_at), "yyyy-MM-dd");
       if (!groups[date]) {
         groups[date] = [];
       }
@@ -63,34 +63,34 @@ export default function HistoryScreen() {
     return Object.entries(groups).map(([date, data]) => {
       const parsedDate = parseISO(date);
       let title: string;
-      
+
       if (isToday(parsedDate)) {
-        title = 'Today';
+        title = "Today";
       } else if (isYesterday(parsedDate)) {
-        title = 'Yesterday';
+        title = "Yesterday";
       } else {
-        title = format(parsedDate, 'EEEE, MMM d, yyyy');
+        title = format(parsedDate, "EEEE, MMM d, yyyy");
       }
-      
+
       return { title, date, data };
     });
   }, [workouts]);
 
- const formatDuration = (seconds: number): string => {
-  const totalMins = Math.round(seconds / 60);
+  const formatDuration = (seconds: number): string => {
+    const totalMins = Math.round(seconds / 60);
 
-  if (totalMins < 60) {
-    return `${totalMins}m`;
-  }
+    if (totalMins < 60) {
+      return `${totalMins}m`;
+    }
 
-  const hours = Math.floor(totalMins / 60);
-  const mins = totalMins % 60;
+    const hours = Math.floor(totalMins / 60);
+    const mins = totalMins % 60;
 
-  // pad minutes to always 2 digits (e.g., 1:05)
-  const paddedMins = mins.toString().padStart(2, "0");
+    // pad minutes to always 2 digits (e.g., 1:05)
+    const paddedMins = mins.toString().padStart(2, "0");
 
-  return `${hours}h ${paddedMins}m`;
-};
+    return `${hours}h ${paddedMins}m`;
+  };
 
   const formatVolume = (kg: number): string => {
     if (kg >= 1000) {
@@ -101,16 +101,16 @@ export default function HistoryScreen() {
 
   const handleWorkoutPress = (workout: WorkoutSummary) => {
     router.push({
-      pathname: '/workout-detail',
-      params: { workoutId: workout.id }
+      pathname: "/workout-detail",
+      params: { workoutId: workout.id },
     });
   };
 
   const renderWorkoutCard = ({ item }: { item: WorkoutSummary }) => {
-    const startTime = format(parseISO(item.started_at), 'h:mm a');
-    
+    const startTime = format(parseISO(item.started_at), "h:mm a");
+
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.workoutCard}
         onPress={() => handleWorkoutPress(item)}
         activeOpacity={0.7}
@@ -118,7 +118,7 @@ export default function HistoryScreen() {
         <View style={styles.cardHeader}>
           <View style={styles.cardTitleContainer}>
             <Text style={styles.workoutName} numberOfLines={1}>
-              {item.name || 'Workout'}
+              {item.name || "Workout"}
             </Text>
           </View>
           <Text style={styles.workoutTime}>{startTime}</Text>
@@ -137,12 +137,16 @@ export default function HistoryScreen() {
 
           <View style={styles.statItem}>
             <Ionicons name="fitness-outline" size={16} color="#007AFF" />
-            <Text style={styles.statText}>{formatVolume(item.total_volume_kg)} vol</Text>
+            <Text style={styles.statText}>
+              {formatVolume(item.total_volume_kg)} vol
+            </Text>
           </View>
 
           <View style={styles.statItem}>
             <Ionicons name="time-outline" size={16} color="#007AFF" />
-            <Text style={styles.statText}>{formatDuration(item.duration_seconds)}</Text>
+            <Text style={styles.statText}>
+              {formatDuration(item.duration_seconds)}
+            </Text>
           </View>
         </View>
       </TouchableOpacity>
@@ -156,14 +160,14 @@ export default function HistoryScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.header}>
         <Text style={styles.title}>History</Text>
       </View>
 
       <SectionList
         sections={groupedWorkouts}
-        keyExtractor={(item) => item.id}
+        keyExtractor={item => item.id}
         renderItem={renderWorkoutCard}
         renderSectionHeader={renderSectionHeader}
         contentContainerStyle={styles.listContent}
@@ -188,7 +192,7 @@ export default function HistoryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F7',
+    backgroundColor: "#F5F5F7",
   },
   header: {
     paddingHorizontal: 20,
@@ -197,8 +201,8 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 32,
-    fontWeight: 'bold',
-    color: '#1C1C1E',
+    fontWeight: "bold",
+    color: "#1C1C1E",
   },
   listContent: {
     paddingHorizontal: 20,
@@ -210,23 +214,23 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 15,
-    fontWeight: '600',
-    color: '#6E6E73',
-    textTransform: 'uppercase',
+    fontWeight: "600",
+    color: "#6E6E73",
+    textTransform: "uppercase",
     letterSpacing: 0.5,
   },
   workoutCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 12,
     padding: 16,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#E5E5EA',
+    borderColor: "#E5E5EA",
   },
   cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 12,
   },
   cardTitleContainer: {
@@ -235,40 +239,40 @@ const styles = StyleSheet.create({
   },
   workoutName: {
     fontSize: 17,
-    fontWeight: '600',
-    color: '#1C1C1E',
+    fontWeight: "600",
+    color: "#1C1C1E",
   },
   workoutTime: {
     fontSize: 15,
-    color: '#8E8E93',
+    color: "#8E8E93",
   },
   statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
   },
   statText: {
     fontSize: 13,
-    color: '#6E6E73',
+    color: "#6E6E73",
   },
   emptyState: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: 64,
   },
   emptyText: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#8E8E93',
+    fontWeight: "600",
+    color: "#8E8E93",
     marginTop: 16,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#AEAEB2',
+    color: "#AEAEB2",
     marginTop: 8,
-    textAlign: 'center',
+    textAlign: "center",
   },
 });
