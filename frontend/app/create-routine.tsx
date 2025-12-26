@@ -1,15 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   Alert,
+  GestureResponderEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import * as Haptics from 'expo-haptics';
+import DraggableFlatList, {
+  RenderItemParams,
+} from 'react-native-draggable-flatlist';
+
 import Input from '../components/Input';
 import SetRowInput, { SetHeader } from '../components/SetRowInput';
 import SwipeToDeleteRow from '../components/SwipeToDeleteRow';
@@ -28,6 +33,12 @@ export default function CreateRoutineScreen() {
   const [exerciseDetails, setExerciseDetails] = useState<{ [key: string]: Exercise }>({});
   const [saving, setSaving] = useState(false);
 
+  // Drag / collapse logic copied from ActiveWorkoutSheet
+  const [isDraggingList, setIsDraggingList] = useState(false);
+  const [extraTopPadding, setExtraTopPadding] = useState(0);
+  const listRef = useRef<typeof DraggableFlatList<TemplateExercise> | null>(null);
+  const itemRefs = useRef<Record<string, View | null>>({});
+
   useEffect(() => {
     loadExerciseDetails();
   }, [selectedExercises]);
@@ -35,19 +46,19 @@ export default function CreateRoutineScreen() {
   const loadExerciseDetails = async () => {
     const exerciseIds = selectedExercises.map(e => e.exercise_id);
     const missingIds = exerciseIds.filter(id => !exerciseDetails[id]);
-    
+
     if (missingIds.length > 0) {
       try {
         const response = await api.get('/exercises');
         const allExercises: Exercise[] = response.data;
         const detailsMap: { [key: string]: Exercise } = { ...exerciseDetails };
-        
+
         allExercises.forEach(ex => {
           if (missingIds.includes(ex.id)) {
             detailsMap[ex.id] = ex;
           }
         });
-        
+
         setExerciseDetails(detailsMap);
       } catch (error) {
         console.error('Failed to load exercise details:', error);
@@ -61,7 +72,7 @@ export default function CreateRoutineScreen() {
       order: selectedExercises.length,
       sets: [{ set_type: 'normal' }], // Start with one empty set
     };
-    setSelectedExercises([...selectedExercises, newExercise]);
+    setSelectedExercises(prev => [...prev, newExercise]);
     // Add to details immediately
     setExerciseDetails(prev => ({ ...prev, [exercise.id]: exercise }));
   };
@@ -102,7 +113,12 @@ export default function CreateRoutineScreen() {
     setSelectedExercises(newExercises);
   };
 
-  const updateSet = (exerciseIndex: number, setIndex: number, field: string, value: any) => {
+  const updateSet = (
+    exerciseIndex: number,
+    setIndex: number,
+    field: string,
+    value: any
+  ) => {
     const newExercises = [...selectedExercises];
     newExercises[exerciseIndex] = {
       ...newExercises[exerciseIndex],
@@ -111,6 +127,15 @@ export default function CreateRoutineScreen() {
       ),
     };
     setSelectedExercises(newExercises);
+  };
+
+  const handleReorderExercises = (data: TemplateExercise[]) => {
+    // 1:1 with ActiveWorkoutSheet: update order to match new index
+    const reordered = data.map((ex, index) => ({
+      ...ex,
+      order: index,
+    }));
+    setSelectedExercises(reordered);
   };
 
   const handleSave = async () => {
@@ -149,106 +174,229 @@ export default function CreateRoutineScreen() {
     return exerciseDetails[exerciseId]?.name || 'Loading...';
   };
 
+  const renderExerciseItem = ({
+    item,
+    drag,
+    getIndex,
+    isActive,
+  }: RenderItemParams<TemplateExercise>) => {
+    const index = getIndex?.();
+    if (index == null) return null;
+
+    const detail = exerciseDetails[item.exercise_id];
+    const exerciseKind = detail?.exercise_kind || 'Barbell';
+    const itemKey = `${item.exercise_id}-${item.order}`;
+    const isCompact = isDraggingList; // collapse sets while dragging, same as ActiveWorkoutSheet
+
+    const handleLongPress = (e: GestureResponderEvent) => {
+      if (selectedExercises.length <= 1) return;
+
+      // Enter compact mode + haptic
+      setIsDraggingList(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+
+      // Wait one frame so compact layout takes effect, then measure + scroll
+      requestAnimationFrame(() => {
+        const ref = itemRefs.current[itemKey];
+        if (!ref) {
+          drag();
+          return;
+        }
+
+        ref.measure((x, y, width, height, pageX, pageY) => {
+          const desiredY = e.nativeEvent.locationY;
+          const cumulativeHeightsOfOtherItems = index * height;
+          const baseAbsoluteLocation = pageY;
+          const diff = baseAbsoluteLocation - desiredY; // kept for 1:1 logic, even if not used
+
+          setExtraTopPadding(cumulativeHeightsOfOtherItems);
+          setTimeout(() => {
+            // @ts-ignore
+            listRef.current?.scrollToOffset({
+              offset: cumulativeHeightsOfOtherItems,
+              animated: false,
+            });
+            drag();
+          }, 0);
+        });
+      });
+    };
+
+    return (
+      <View
+        ref={el => {
+          itemRefs.current[itemKey] = el;
+        }}
+        style={[
+          styles.exerciseCard,
+          isActive && {
+            opacity: 0.95,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.15,
+            shadowRadius: 8,
+          },
+        ]}
+      >
+        <View style={styles.exerciseHeader}>
+          <TouchableOpacity
+            style={styles.exerciseNameTouch}
+            onLongPress={handleLongPress}
+            delayLongPress={150}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.exerciseName}>
+              {getExerciseName(item.exercise_id)}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => removeExercise(index)}
+            disabled={isDraggingList}
+          >
+            <Ionicons name="trash-outline" size={22} color="#FF3B30" />
+          </TouchableOpacity>
+        </View>
+
+        {/* BODY – only rendered in full mode */}
+        {!isCompact && (
+          <>
+            {item.sets.length > 0 && (
+              <View style={styles.setsContainer}>
+                <SetHeader exerciseKind={exerciseKind} />
+
+                {item.sets.map((set, setIndex) => (
+                  <SwipeToDeleteRow
+                    key={setIndex}
+                    onDelete={() => removeSet(index, setIndex)}
+                  >
+                    <SetRowInput
+                      set={set}
+                      setIndex={setIndex}
+                      exerciseKind={exerciseKind}
+                      onUpdateSet={(field, value) =>
+                        updateSet(index, setIndex, field, value)
+                      }
+                      showCompleteButton={false}
+                    />
+                  </SwipeToDeleteRow>
+                ))}
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={styles.addSetButton}
+              onPress={() => addSet(index)}
+              disabled={isDraggingList}
+            >
+              <Ionicons name="add" size={20} color="#007AFF" />
+              <Text style={styles.addSetText}>Add Set</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header (unchanged) */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="close" size={28} color="#1C1C1E" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Create Routine</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={handleSave}
           disabled={saving || !name.trim() || selectedExercises.length === 0}
           style={[
             styles.saveButton,
-            (saving || !name.trim() || selectedExercises.length === 0) && styles.saveButtonDisabled
+            (saving || !name.trim() || selectedExercises.length === 0) &&
+              styles.saveButtonDisabled,
           ]}
         >
-          <Text style={[
-            styles.saveButtonText,
-            (saving || !name.trim() || selectedExercises.length === 0) && styles.saveButtonTextDisabled
-          ]}>
+          <Text
+            style={[
+              styles.saveButtonText,
+              (saving || !name.trim() || selectedExercises.length === 0) &&
+                styles.saveButtonTextDisabled,
+            ]}
+          >
             {saving ? 'Saving...' : 'Save'}
           </Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Input
-          label="Routine Name"
-          value={name}
-          onChangeText={setName}
-          placeholder="e.g., Push Day"
-        />
+      {/* DraggableFlatList replaces ScrollView for exercises section,
+          but uses same paddings / styles so visuals stay the same */}
+      <DraggableFlatList
+        ref={listRef as any}
+        data={selectedExercises}
+        keyExtractor={item => `${item.exercise_id}-${item.order}`}
+        contentContainerStyle={{
+          ...styles.scrollContent,
+          paddingBottom: isDraggingList ? extraTopPadding : styles.scrollContent.paddingBottom,
+        }}
+        ListHeaderComponent={
+          <>
+            <Input
+              label="Routine Name"
+              value={name}
+              onChangeText={setName}
+              placeholder="e.g., Push Day"
+            />
 
-        <Input
-          label="Notes (Optional)"
-          value={notes}
-          onChangeText={setNotes}
-          placeholder="Add any notes about this routine"
-          multiline
-          numberOfLines={3}
-          style={styles.notesInput}
-        />
+            <Input
+              label="Notes (Optional)"
+              value={notes}
+              onChangeText={setNotes}
+              placeholder="Add any notes about this routine"
+              multiline
+              numberOfLines={3}
+              style={styles.notesInput}
+            />
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Exercises</Text>
-
-          {selectedExercises.map((exercise, exerciseIndex) => {
-            const detail = exerciseDetails[exercise.exercise_id];
-            const exerciseKind = detail?.exercise_kind || 'Barbell';
-
-            return (
-              <View key={exerciseIndex} style={styles.exerciseCard}>
-                <View style={styles.exerciseHeader}>
-                  <Text style={styles.exerciseName}>
-                    {getExerciseName(exercise.exercise_id)}
-                  </Text>
-                  <TouchableOpacity onPress={() => removeExercise(exerciseIndex)}>
-                    <Ionicons name="trash-outline" size={22} color="#FF3B30" />
-                  </TouchableOpacity>
-                </View>
-
-                {/* Sets */}
-                {exercise.sets.length > 0 && (
-                  <View style={styles.setsContainer}>
-                    <SetHeader exerciseKind={exerciseKind} />
-
-                    {exercise.sets.map((set, setIndex) => (
-                      <SwipeToDeleteRow
-                        key={setIndex}
-                        onDelete={() => removeSet(exerciseIndex, setIndex)}
-                      >
-                        <SetRowInput
-                          set={set}
-                          setIndex={setIndex}
-                          exerciseKind={exerciseKind}
-                          onUpdateSet={(field, value) => updateSet(exerciseIndex, setIndex, field, value)}
-                          showCompleteButton={false}
-                        />
-                      </SwipeToDeleteRow>
-                    ))}
-                  </View>
-                )}
-
-                <TouchableOpacity style={styles.addSetButton} onPress={() => addSet(exerciseIndex)}>
-                  <Ionicons name="add" size={20} color="#007AFF" />
-                  <Text style={styles.addSetText}>Add Set</Text>
-                </TouchableOpacity>
-              </View>
-            );
-          })}
-
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Exercises</Text>
+            </View>
+          </>
+        }
+        ListFooterComponent={
           <TouchableOpacity
             style={styles.addExerciseButton}
             onPress={() => setShowExercisePicker(true)}
+            disabled={isDraggingList}
           >
             <Ionicons name="add" size={24} color="#007AFF" />
             <Text style={styles.addExerciseText}>Add Exercise</Text>
           </TouchableOpacity>
-        </View>
-      </ScrollView>
+        }
+        renderItem={renderExerciseItem}
+        onDragBegin={() => {
+          if (selectedExercises.length <= 1) return;
+          setIsDraggingList(true);
+        }}
+        onDragEnd={({ data }) => {
+          setIsDraggingList(false);
+          setExtraTopPadding(0);
+          handleReorderExercises(data);
+          Haptics.selectionAsync(); // confirmation tap, same as ActiveWorkoutSheet
+        }}
+        onPlaceholderIndexChange={() => {
+          Haptics.selectionAsync().catch(() => {});
+        }}
+        animationConfig={{
+          stiffness: 400,
+          damping: 50,
+          mass: 0.2,
+          overshootClamping: true,
+          // @ts-ignore
+          restSpeedThreshold: 0.05,
+          restDisplacementThreshold: 0.05,
+        }}
+      />
 
+      {/* Modals (unchanged) */}
       <ExercisePickerModal
         visible={showExercisePicker}
         onClose={() => setShowExercisePicker(false)}
@@ -330,6 +478,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+  },
+  exerciseNameTouch: {
+    flex: 1,
   },
   exerciseName: {
     fontSize: 17,

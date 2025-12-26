@@ -800,13 +800,6 @@ export default function ActiveWorkoutSheet({
                           paddingHorizontal:
                             styles.exercisesList.paddingHorizontal,
                         },
-                        isActive && {
-                          opacity: 0.95,
-                          shadowColor: "#000",
-                          shadowOffset: { width: 0, height: 4 },
-                          shadowOpacity: 0.15,
-                          shadowRadius: 8,
-                        },
                       ]}
                     >
                       {/* HEADER – always visible */}
@@ -822,7 +815,18 @@ export default function ActiveWorkoutSheet({
                           onLongPress={handleLongPress}
                           delayLongPress={150}
                         >
-                          <Text style={[styles.exerciseNameClickable]}>
+                          <Text
+                            style={[
+                              styles.exerciseNameClickable,
+                              isActive && {
+                                opacity: 0.95,
+                                shadowColor: "#000",
+                                shadowOffset: { width: 0, height: 4 },
+                                shadowOpacity: 0.15,
+                                shadowRadius: 8,
+                              },
+                            ]}
+                          >
                             {detail?.name ?? "Loading..."}
                           </Text>
                         </TouchableOpacity>
