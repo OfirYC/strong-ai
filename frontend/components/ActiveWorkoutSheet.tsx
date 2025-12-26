@@ -90,7 +90,7 @@ export default function ActiveWorkoutSheet({
   const [showWorkoutComplete, setShowWorkoutComplete] = useState(false);
   const [workoutSummary, setWorkoutSummary] =
     useState<WorkoutSummaryData | null>(null);
-  const [isDraggingList, setIsDraggingList] = useState(true);
+  const [isDraggingList, setIsDraggingList] = useState(false);
   const [extraTopPadding, setExtraTopPadding] = useState(0);
 
   // Calculate the maximum height for expanded state
