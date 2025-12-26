@@ -1,33 +1,36 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
+
+import React, { useEffect, useRef, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
   Alert,
-  Modal,
-  FlatList,
-  Image,
   Animated,
   Dimensions,
+  GestureResponderEvent,
   PanResponder,
-} from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { useWorkoutStore } from '../store/workoutStore';
-import Button from './Button';
-import DurationInput from './DurationInput';
-import DecimalInput from './DecimalInput';
-import SetRowInput, { SetHeader } from './SetRowInput';
-import SwipeToDeleteRow from './SwipeToDeleteRow';
-import CreateExerciseModal from './CreateExerciseModal';
-import ExerciseDetailModal from './ExerciseDetailModal';
-import ExercisePickerModal from './ExercisePickerModal';
-import WorkoutCompleteModal from './WorkoutCompleteModal';
-import api from '../utils/api';
-import { Exercise, WorkoutExercise, WorkoutSet, getExerciseFields } from '../types';
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import DraggableFlatList from "react-native-draggable-flatlist";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useWorkoutStore } from "../store/workoutStore";
+import {
+  Exercise,
+  WorkoutExercise,
+  WorkoutSet,
+  getExerciseFields,
+} from "../types";
+import api from "../utils/api";
+import Button from "./Button";
+import CreateExerciseModal from "./CreateExerciseModal";
+import ExerciseDetailModal from "./ExerciseDetailModal";
+import ExercisePickerModal from "./ExercisePickerModal";
+import SetRowInput, { SetHeader } from "./SetRowInput";
+import SwipeToDeleteRow from "./SwipeToDeleteRow";
+import WorkoutCompleteModal from "./WorkoutCompleteModal";
 
 interface WorkoutSummaryData {
   name: string;
@@ -44,7 +47,7 @@ interface WorkoutSummaryData {
   workoutNumber: number;
 }
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const COLLAPSED_HEIGHT = 80;
 
 interface ActiveWorkoutSheetProps {
@@ -52,31 +55,52 @@ interface ActiveWorkoutSheetProps {
   initialExpanded?: boolean;
 }
 
-export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = true }: ActiveWorkoutSheetProps) {
+export default function ActiveWorkoutSheet({
+  onFinishWorkout,
+  initialExpanded = true,
+}: ActiveWorkoutSheetProps) {
   const insets = useSafeAreaInsets();
-  
-  const { activeWorkout, updateWorkout, updateWorkoutName, updateWorkoutNotes, endWorkout, workoutStartTime } = useWorkoutStore();
+
+  const {
+    activeWorkout,
+    updateWorkout,
+    updateWorkoutName,
+    updateWorkoutNotes,
+    endWorkout,
+    workoutStartTime,
+  } = useWorkoutStore();
   const [isExpanded, setIsExpanded] = useState(initialExpanded);
   const isExpandedRef = useRef(initialExpanded); // Ref to track current expanded state
   const [showMenu, setShowMenu] = useState(false);
-  const [showDescription, setShowDescription] = useState(!!activeWorkout?.notes);
-  const [exerciseDetails, setExerciseDetails] = useState<{ [key: string]: Exercise }>({});
+  const [showDescription, setShowDescription] = useState(
+    !!activeWorkout?.notes
+  );
+  const [exerciseDetails, setExerciseDetails] = useState<{
+    [key: string]: Exercise;
+  }>({});
   const [timer, setTimer] = useState(0);
   const [saving, setSaving] = useState(false);
   const [showExercisePicker, setShowExercisePicker] = useState(false);
   const [showCreateExercise, setShowCreateExercise] = useState(false);
   const [showExerciseDetail, setShowExerciseDetail] = useState(false);
-  const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
+  const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(
+    null
+  );
   const [availableExercises, setAvailableExercises] = useState<Exercise[]>([]);
   const [showWorkoutComplete, setShowWorkoutComplete] = useState(false);
-  const [workoutSummary, setWorkoutSummary] = useState<WorkoutSummaryData | null>(null);
-  
+  const [workoutSummary, setWorkoutSummary] =
+    useState<WorkoutSummaryData | null>(null);
+  const [isDraggingList, setIsDraggingList] = useState(true);
+  const [extraTopPadding, setExtraTopPadding] = useState(0);
+
   // Calculate the maximum height for expanded state
   // Screen height minus top safe area minus tab bar (60px) minus bottom safe area
   // Extra 40px at top to avoid system gesture conflicts
   const maxExpandedHeight = SCREEN_HEIGHT - insets.top - 100 - insets.bottom;
-  
-  const animatedHeight = useRef(new Animated.Value(initialExpanded ? maxExpandedHeight : COLLAPSED_HEIGHT)).current;
+
+  const animatedHeight = useRef(
+    new Animated.Value(initialExpanded ? maxExpandedHeight : COLLAPSED_HEIGHT)
+  ).current;
 
   const exercises = activeWorkout?.exercises || [];
 
@@ -97,6 +121,11 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
       onPanResponderRelease: () => {},
     })
   ).current;
+
+  const listRef = useRef<typeof DraggableFlatList<WorkoutExercise> | null>(
+    null
+  );
+  const itemRefs = useRef<Record<string, View | null>>({});
 
   const expand = () => {
     Animated.spring(animatedHeight, {
@@ -160,7 +189,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
           const response = await api.get(`/exercises/${exercise.exercise_id}`);
           details[exercise.exercise_id] = response.data;
         } catch (error) {
-          console.error('Failed to load exercise details:', error);
+          console.error("Failed to load exercise details:", error);
         }
       } else {
         details[exercise.exercise_id] = exerciseDetails[exercise.exercise_id];
@@ -171,10 +200,10 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
 
   const loadAvailableExercises = async () => {
     try {
-      const response = await api.get('/exercises');
+      const response = await api.get("/exercises");
       setAvailableExercises(response.data);
     } catch (error) {
-      console.error('Failed to load exercises:', error);
+      console.error("Failed to load exercises:", error);
     }
   };
 
@@ -183,8 +212,8 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
   };
 
   const handleAddExerciseToWorkout = async (exercise: Exercise) => {
-    console.log('Adding exercise:', exercise.id, exercise.name);
-    
+    console.log("Adding exercise:", exercise.id, exercise.name);
+
     const newExercise: WorkoutExercise = {
       exercise_id: exercise.id,
       order: exercises.length,
@@ -193,27 +222,27 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
 
     const newExercises = [...exercises, newExercise];
     updateWorkout(newExercises);
-    
+
     // Add to local exercise details
     setExerciseDetails(prev => ({
       ...prev,
-      [exercise.id]: exercise
+      [exercise.id]: exercise,
     }));
-    
+
     setShowExercisePicker(false);
   };
 
   const addSet = (exerciseIndex: number) => {
     const exercise = exercises[exerciseIndex];
     const detail = exerciseDetails[exercise.exercise_id];
-    const fields = getExerciseFields(detail?.exercise_kind || 'Barbell');
-    
-    const newSet: WorkoutSet = { set_type: 'normal' };
-    if (fields.includes('weight')) newSet.weight = 0;
-    if (fields.includes('reps')) newSet.reps = 0;
-    if (fields.includes('distance')) newSet.distance = 0;
-    if (fields.includes('duration')) newSet.duration = 0;
-    if (fields.includes('calories')) newSet.calories = 0;
+    const fields = getExerciseFields(detail?.exercise_kind || "Barbell");
+
+    const newSet: WorkoutSet = { set_type: "normal" };
+    if (fields.includes("weight")) newSet.weight = 0;
+    if (fields.includes("reps")) newSet.reps = 0;
+    if (fields.includes("distance")) newSet.distance = 0;
+    if (fields.includes("duration")) newSet.duration = 0;
+    if (fields.includes("calories")) newSet.calories = 0;
 
     const newExercises = [...exercises];
     newExercises[exerciseIndex] = {
@@ -223,7 +252,12 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
     updateWorkout(newExercises);
   };
 
-  const updateSet = (exerciseIndex: number, setIndex: number, field: string, value: any) => {
+  const updateSet = (
+    exerciseIndex: number,
+    setIndex: number,
+    field: string,
+    value: any
+  ) => {
     const newExercises = [...exercises];
     newExercises[exerciseIndex] = {
       ...newExercises[exerciseIndex],
@@ -244,19 +278,23 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
   };
 
   const removeExercise = (exerciseIndex: number) => {
-    const exerciseName = exerciseDetails[exercises[exerciseIndex]?.exercise_id]?.name || 'this exercise';
+    const exerciseName =
+      exerciseDetails[exercises[exerciseIndex]?.exercise_id]?.name ||
+      "this exercise";
     Alert.alert(
-      'Delete Exercise',
+      "Delete Exercise",
       `Are you sure you want to remove ${exerciseName} from this workout?`,
       [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive',
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
           onPress: () => {
-            const newExercises = exercises.filter((_, i) => i !== exerciseIndex);
+            const newExercises = exercises.filter(
+              (_, i) => i !== exerciseIndex
+            );
             updateWorkout(newExercises);
-          }
+          },
         },
       ]
     );
@@ -277,14 +315,16 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
 
     if (uncompletedSetCount > 0) {
       Alert.alert(
-        'Uncompleted Sets',
-        `You have ${uncompletedSetCount} uncompleted set${uncompletedSetCount > 1 ? 's' : ''}. These will be removed. Are you sure you want to finish?`,
+        "Uncompleted Sets",
+        `You have ${uncompletedSetCount} uncompleted set${
+          uncompletedSetCount > 1 ? "s" : ""
+        }. These will be removed. Are you sure you want to finish?`,
         [
-          { text: 'No', style: 'cancel' },
-          { 
-            text: 'Yes, Finish', 
-            style: 'destructive',
-            onPress: () => saveWorkout(true)
+          { text: "No", style: "cancel" },
+          {
+            text: "Yes, Finish",
+            style: "destructive",
+            onPress: () => saveWorkout(true),
           },
         ]
       );
@@ -299,10 +339,12 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
     // Filter out uncompleted sets if requested
     let exercisesToSave = exercises;
     if (removeUncompleted) {
-      exercisesToSave = exercises.map(ex => ({
-        ...ex,
-        sets: ex.sets.filter(set => set.completed)
-      })).filter(ex => ex.sets.length > 0); // Remove exercises with no completed sets
+      exercisesToSave = exercises
+        .map(ex => ({
+          ...ex,
+          sets: ex.sets.filter(set => set.completed),
+        }))
+        .filter(ex => ex.sets.length > 0); // Remove exercises with no completed sets
     }
 
     try {
@@ -312,41 +354,50 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
         exercises: exercisesToSave,
         name: activeWorkout.name,
         notes: activeWorkout.notes,
-        status: 'completed',
+        status: "completed",
         ended_at: new Date().toISOString(),
         duration: timer,
       });
-      
+
       // Get workout count for summary
       let workoutNumber = 1;
       try {
-        const countRes = await api.get('/workouts/count');
+        const countRes = await api.get("/workouts/count");
         workoutNumber = countRes.data.count;
       } catch (e) {
-        console.log('Could not fetch workout count');
+        console.log("Could not fetch workout count");
       }
-      
+
       // Build exercise summaries (use saved exercises, not original)
       const exerciseSummaries = exercisesToSave.map(ex => {
         const detail = exerciseDetails[ex.exercise_id];
         const sets = ex.sets;
-        let bestSet = '';
-        
+        let bestSet = "";
+
         // Determine best set based on exercise type
-        if (detail?.exercise_kind === 'Cardio') {
+        if (detail?.exercise_kind === "Cardio") {
           // For cardio, show best distance or longest time
-          const bestDistanceSet = sets.reduce((best, set) => 
-            (set.distance || 0) > (best.distance || 0) ? set : best, sets[0] || {});
+          const bestDistanceSet = sets.reduce(
+            (best, set) =>
+              (set.distance || 0) > (best.distance || 0) ? set : best,
+            sets[0] || {}
+          );
           if (bestDistanceSet?.distance) {
             bestSet = `${bestDistanceSet.distance} km`;
           } else if (bestDistanceSet?.duration) {
             const mins = Math.floor((bestDistanceSet.duration || 0) / 60);
             bestSet = `${mins}m`;
           }
-        } else if (detail?.exercise_kind && ['Plank', 'Static Hold'].includes(detail.exercise_kind)) {
+        } else if (
+          detail?.exercise_kind &&
+          ["Plank", "Static Hold"].includes(detail.exercise_kind)
+        ) {
           // Duration-based
-          const bestDurationSet = sets.reduce((best, set) => 
-            (set.duration || 0) > (best.duration || 0) ? set : best, sets[0] || {});
+          const bestDurationSet = sets.reduce(
+            (best, set) =>
+              (set.duration || 0) > (best.duration || 0) ? set : best,
+            sets[0] || {}
+          );
           const mins = Math.floor((bestDurationSet?.duration || 0) / 60);
           const secs = (bestDurationSet?.duration || 0) % 60;
           bestSet = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
@@ -363,14 +414,14 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
             bestSet = `${bestWeightSet.reps} reps`;
           }
         }
-        
+
         return {
-          name: detail?.name || 'Unknown Exercise',
+          name: detail?.name || "Unknown Exercise",
           sets: sets.length,
-          bestSet: bestSet || '-',
+          bestSet: bestSet || "-",
         };
       });
-      
+
       // Calculate total volume (only for weight exercises, use saved exercises)
       let totalVolume = 0;
       exercisesToSave.forEach(ex => {
@@ -380,10 +431,10 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
           }
         });
       });
-      
+
       // Build summary data
       const summary: WorkoutSummaryData = {
-        name: activeWorkout.name || 'Workout',
+        name: activeWorkout.name || "Workout",
         date: new Date(),
         duration: timer,
         totalVolume: totalVolume,
@@ -392,19 +443,21 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
         exercises: exerciseSummaries,
         workoutNumber: workoutNumber,
       };
-      
+
       setWorkoutSummary(summary);
       collapse();
       setShowWorkoutComplete(true);
-      
     } catch (error: any) {
-      console.error('Save error:', error.response?.data || error);
-      Alert.alert('Error', error.response?.data?.detail || 'Failed to save workout');
+      console.error("Save error:", error.response?.data || error);
+      Alert.alert(
+        "Error",
+        error.response?.data?.detail || "Failed to save workout"
+      );
     } finally {
       setSaving(false);
     }
   };
-  
+
   const handleCloseWorkoutComplete = () => {
     setShowWorkoutComplete(false);
     setWorkoutSummary(null);
@@ -428,55 +481,61 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
     // Check if this is a scheduled workout
     if (activeWorkout?.planned_workout_id) {
       Alert.alert(
-        'Cancel Scheduled Workout',
-        'This is a scheduled workout. What would you like to do?',
+        "Cancel Scheduled Workout",
+        "This is a scheduled workout. What would you like to do?",
         [
-          { text: 'Keep Training', style: 'cancel' },
-          { 
-            text: 'Continue Later Today', 
+          { text: "Keep Training", style: "cancel" },
+          {
+            text: "Continue Later Today",
             onPress: () => {
               endWorkout();
               collapse();
-            }
+            },
           },
-          { 
-            text: 'Cancel for Today', 
-            style: 'destructive',
+          {
+            text: "Cancel for Today",
+            style: "destructive",
             onPress: async () => {
               // Mark the planned workout as skipped
               try {
-                await api.put(`/planned-workouts/${activeWorkout.planned_workout_id}`, {
-                  status: 'skipped'
-                });
+                await api.put(
+                  `/planned-workouts/${activeWorkout.planned_workout_id}`,
+                  {
+                    status: "skipped",
+                  }
+                );
               } catch (error) {
-                console.error('Failed to update planned workout status:', error);
+                console.error(
+                  "Failed to update planned workout status:",
+                  error
+                );
               }
               endWorkout();
               collapse();
-            }
+            },
           },
         ]
       );
     } else {
       // Unscheduled workout (quick start or template without scheduling) - delete it entirely
       Alert.alert(
-        'Cancel Workout',
-        'Are you sure you want to cancel this workout? All progress will be lost.',
+        "Cancel Workout",
+        "Are you sure you want to cancel this workout? All progress will be lost.",
         [
-          { text: 'Keep Workout', style: 'cancel' },
-          { 
-            text: 'Cancel Workout', 
-            style: 'destructive',
+          { text: "Keep Workout", style: "cancel" },
+          {
+            text: "Cancel Workout",
+            style: "destructive",
             onPress: async () => {
               // Delete the workout session from database
               try {
                 await api.delete(`/workouts/${activeWorkout?.id}`);
               } catch (error) {
-                console.error('Failed to delete workout:', error);
+                console.error("Failed to delete workout:", error);
               }
               endWorkout();
               collapse();
-            }
+            },
           },
         ]
       );
@@ -488,21 +547,30 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
     const mins = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
     if (hrs > 0) {
-      return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+      return `${hrs}:${mins.toString().padStart(2, "0")}:${secs
+        .toString()
+        .padStart(2, "0")}`;
     }
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
   if (!activeWorkout) return null;
+  const handleReorderExercises = (data: WorkoutExercise[]) => {
+    const reordered = data.map((ex, index) => ({
+      ...ex,
+      order: index, // keep consistent with backend ordering
+    }));
+    updateWorkout(reordered);
+  };
 
   return (
     <>
       <Animated.View style={[styles.container, { height: animatedHeight }]}>
         {/* Top Header with drag handle - different content for collapsed vs expanded */}
         <View {...panResponder.panHandlers}>
-          <TouchableOpacity 
-            style={styles.collapsedHeader} 
-            onPress={toggleExpand} 
+          <TouchableOpacity
+            style={styles.collapsedHeader}
+            onPress={toggleExpand}
             activeOpacity={0.9}
             disabled={isExpanded}
           >
@@ -513,7 +581,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
                 <View style={styles.collapsedLeft}>
                   <Ionicons name="barbell" size={24} color="#007AFF" />
                   <Text style={styles.collapsedTitle} numberOfLines={1}>
-                    {activeWorkout?.name || 'Workout'}
+                    {activeWorkout?.name || "Workout"}
                   </Text>
                 </View>
                 <View style={styles.collapsedRight}>
@@ -526,17 +594,20 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
             ) : (
               // Expanded: just show Finish button
               <View style={styles.expandedTopBar}>
-                <View style={{flex: 1}} />
-                <TouchableOpacity 
+                <View style={{ flex: 1 }} />
+                <TouchableOpacity
                   style={styles.finishButton}
                   onPress={handleSaveAndFinish}
                   disabled={saving || exercises.length === 0}
                 >
-                  <Text style={[
-                    styles.finishButtonText,
-                    (saving || exercises.length === 0) && styles.finishButtonTextDisabled
-                  ]}>
-                    {saving ? 'Saving...' : 'Finish'}
+                  <Text
+                    style={[
+                      styles.finishButtonText,
+                      (saving || exercises.length === 0) &&
+                        styles.finishButtonTextDisabled,
+                    ]}
+                  >
+                    {saving ? "Saving..." : "Finish"}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -549,19 +620,28 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
           <View style={styles.expandedContent}>
             {/* Row 1: Workout Name + Menu */}
             <View style={styles.nameRow}>
-              <Ionicons name="barbell" size={24} color="#007AFF" style={styles.nameBarbell} />
+              <Ionicons
+                name="barbell"
+                size={24}
+                color="#007AFF"
+                style={styles.nameBarbell}
+              />
               <TextInput
                 style={styles.workoutNameInput}
-                value={activeWorkout?.name || ''}
+                value={activeWorkout?.name || ""}
                 onChangeText={updateWorkoutName}
                 placeholder="Workout Name"
                 placeholderTextColor="#8E8E93"
               />
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.menuButton}
                 onPress={() => setShowMenu(!showMenu)}
               >
-                <Ionicons name="ellipsis-horizontal" size={24} color="#1C1C1E" />
+                <Ionicons
+                  name="ellipsis-horizontal"
+                  size={24}
+                  color="#1C1C1E"
+                />
               </TouchableOpacity>
             </View>
 
@@ -569,11 +649,14 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
             <View style={styles.dateRow}>
               <Ionicons name="calendar-outline" size={18} color="#8E8E93" />
               <Text style={styles.dateText}>
-                {new Date(workoutStartTime || Date.now()).toLocaleDateString('en-US', {
-                  day: 'numeric',
-                  month: 'long',
-                  year: 'numeric'
-                })}
+                {new Date(workoutStartTime || Date.now()).toLocaleDateString(
+                  "en-US",
+                  {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  }
+                )}
               </Text>
             </View>
 
@@ -586,14 +669,21 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
             {/* Dropdown Menu */}
             {showMenu && (
               <View style={styles.menuDropdown}>
-                <TouchableOpacity style={styles.menuItem} onPress={handleToggleDescription}>
-                  <Ionicons 
-                    name={showDescription ? "remove-circle-outline" : "add-circle-outline"} 
-                    size={20} 
-                    color="#1C1C1E" 
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={handleToggleDescription}
+                >
+                  <Ionicons
+                    name={
+                      showDescription
+                        ? "remove-circle-outline"
+                        : "add-circle-outline"
+                    }
+                    size={20}
+                    color="#1C1C1E"
                   />
                   <Text style={styles.menuItemText}>
-                    {showDescription ? 'Remove Description' : 'Add Description'}
+                    {showDescription ? "Remove Description" : "Add Description"}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -604,7 +694,7 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
               <View style={styles.descriptionContainer}>
                 <TextInput
                   style={styles.descriptionInput}
-                  value={activeWorkout?.notes || ''}
+                  value={activeWorkout?.notes || ""}
                   onChangeText={updateWorkoutNotes}
                   placeholder="Add workout description..."
                   placeholderTextColor="#8E8E93"
@@ -614,84 +704,202 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
               </View>
             )}
 
-            <ScrollView style={styles.exercisesList} showsVerticalScrollIndicator={false}>
-              {exercises.length === 0 ? (
-                <View style={styles.emptyState}>
-                  <Text style={styles.emptyText}>No exercises added yet</Text>
-                </View>
-              ) : (
-                exercises.map((exercise, exerciseIndex) => {
-                  const detail = exerciseDetails[exercise.exercise_id];
-                  
+            <View
+              style={{
+                ...styles.exercisesList,
+                flex: 1, // THIS is what fixes overflow + footer
+                overflow: "hidden",
+                paddingHorizontal: isDraggingList
+                  ? 0
+                  : styles.exercisesList.paddingHorizontal,
+              }}
+            >
+              <DraggableFlatList
+                ref={listRef as any}
+                data={exercises || []}
+                contentContainerStyle={{
+                  // paddingBottom: 120, // leaves room for footer
+                  paddingTop: 4,
+                  paddingBottom: isDraggingList ? extraTopPadding : 0,
+                }}
+                keyExtractor={item => `${item.exercise_id}-${item.order}`}
+                onDragBegin={() => {
+                  // we actually trigger drag manually from onLongPress, so this is just a safety
+                  setIsDraggingList(true);
+                }}
+                onDragEnd={({ data }) => {
+                  setIsDraggingList(false);
+                  setExtraTopPadding(0);
+                  handleReorderExercises(data);
+                  Haptics.selectionAsync(); // <<< added (confirmation tap)
+                }}
+                onPlaceholderIndexChange={i => Haptics.selectionAsync()}
+                animationConfig={{
+                  stiffness: 400,
+                  damping: 50,
+                  mass: 0.2,
+                  overshootClamping: true,
+                  // @ts-ignore
+                  restSpeedThreshold: 0.05,
+                  restDisplacementThreshold: 0.05,
+                }}
+                renderItem={({ item, drag, getIndex, isActive }) => {
+                  const index = getIndex?.();
+                  if (index == null) return null;
+                  const detail = exerciseDetails[item.exercise_id];
+
+                  const itemKey = `${item.exercise_id}-${item.order}`;
+
+                  const handleLongPress = (e: GestureResponderEvent) => {
+                    // Enter compact mode + haptic
+                    setIsDraggingList(true);
+                    Haptics.impactAsync(
+                      Haptics.ImpactFeedbackStyle.Light
+                    ).catch(() => {});
+
+                    // Wait one frame so collapsed layout takes effect, then measure + scroll
+                    requestAnimationFrame(() => {
+                      const ref = itemRefs.current[itemKey];
+                      if (!ref) {
+                        drag();
+                        return;
+                      }
+
+                      ref.measure((x, y, width, height, pageX, pageY) => {
+                        const desiredY = e.nativeEvent.locationY; // finger position on screen
+                        // All heights are same when collapsed
+                        const cumlativeHeightsOfOtherItems = index * height;
+
+                        const baseAbsoluteLocation = pageY;
+
+                        const diff = baseAbsoluteLocation - desiredY;
+
+                        setExtraTopPadding(cumlativeHeightsOfOtherItems); // clamp so we don't get negative padding
+                        setTimeout(() => {
+                          // @ts-ignore
+                          listRef.current?.scrollToOffset({
+                            offset: cumlativeHeightsOfOtherItems,
+                            animated: false,
+                          });
+                          // Finally, start the drag
+                          drag();
+                        }, 0);
+                      });
+                    });
+                  };
+                  const isCompact = isDraggingList; // all items compact while dragging
+
                   return (
-                    <View key={`${exercise.exercise_id}-${exerciseIndex}`} style={styles.exerciseCard}>
+                    <View
+                      ref={el => {
+                        itemRefs.current[itemKey] = el;
+                      }}
+                      style={[
+                        styles.exerciseCard,
+                        isDraggingList && {
+                          paddingHorizontal:
+                            styles.exercisesList.paddingHorizontal,
+                        },
+                        isActive && {
+                          opacity: 0.95,
+                          shadowColor: "#000",
+                          shadowOffset: { width: 0, height: 4 },
+                          shadowOpacity: 0.15,
+                          shadowRadius: 8,
+                        },
+                      ]}
+                    >
+                      {/* HEADER – always visible */}
                       <View style={styles.exerciseHeader}>
                         <TouchableOpacity
                           style={styles.exerciseNameContainer}
                           onPress={() => {
-                            if (detail) {
+                            if (!isDraggingList && detail) {
                               setSelectedExercise(detail);
                               setShowExerciseDetail(true);
                             }
                           }}
+                          onLongPress={handleLongPress}
+                          delayLongPress={150}
                         >
-                          <Text style={styles.exerciseNameClickable}>
-                            {detail?.name || 'Loading...'}
+                          <Text style={[styles.exerciseNameClickable]}>
+                            {detail?.name ?? "Loading..."}
                           </Text>
                         </TouchableOpacity>
+
                         <TouchableOpacity
                           style={styles.exerciseMenuButton}
+                          disabled={isDraggingList}
                           onPress={() => {
                             Alert.alert(
-                              detail?.name || 'Exercise',
-                              'What would you like to do?',
+                              detail?.name || "Exercise",
+                              "What would you like to do?",
                               [
-                                { text: 'Cancel', style: 'cancel' },
-                                { 
-                                  text: 'Delete Exercise', 
-                                  style: 'destructive',
-                                  onPress: () => removeExercise(exerciseIndex)
+                                { text: "Cancel", style: "cancel" },
+                                {
+                                  text: "Delete Exercise",
+                                  style: "destructive",
+                                  onPress: () => removeExercise(index),
                                 },
                               ]
                             );
                           }}
                         >
-                          <Ionicons name="ellipsis-horizontal" size={20} color="#8E8E93" />
+                          <Ionicons
+                            name="ellipsis-horizontal"
+                            size={20}
+                            color="#8E8E93"
+                          />
                         </TouchableOpacity>
                       </View>
 
-                      {/* Sets */}
-                      {exercise.sets.length > 0 && (
-                        <View style={styles.setsContainer}>
-                          <SetHeader exerciseKind={detail?.exercise_kind || 'Barbell'} showCompleteColumn />
-                          
-                          {exercise.sets.map((set, setIndex) => (
-                            <SwipeToDeleteRow
-                              key={setIndex}
-                              onDelete={() => removeSet(exerciseIndex, setIndex)}
-                            >
-                              <SetRowInput
-                                set={set}
-                                setIndex={setIndex}
-                                exerciseKind={detail?.exercise_kind || 'Barbell'}
-                                onUpdateSet={(field, value) => updateSet(exerciseIndex, setIndex, field, value)}
-                                showCompleteButton
+                      {/* BODY – only rendered in full mode */}
+                      {!isCompact && (
+                        <>
+                          {item.sets.length > 0 && (
+                            <View style={styles.setsContainer}>
+                              <SetHeader
+                                exerciseKind={
+                                  detail?.exercise_kind || "Barbell"
+                                }
+                                showCompleteColumn
                               />
-                            </SwipeToDeleteRow>
-                          ))}
-                        </View>
-                      )}
 
-                      <TouchableOpacity style={styles.addSetButton} onPress={() => addSet(exerciseIndex)}>
-                        <Ionicons name="add" size={20} color="#007AFF" />
-                        <Text style={styles.addSetText}>Add Set</Text>
-                      </TouchableOpacity>
+                              {item.sets.map((set, setIndex) => (
+                                <SwipeToDeleteRow
+                                  key={setIndex}
+                                  onDelete={() => removeSet(index, setIndex)}
+                                >
+                                  <SetRowInput
+                                    set={set}
+                                    setIndex={setIndex}
+                                    exerciseKind={
+                                      detail?.exercise_kind || "Barbell"
+                                    }
+                                    onUpdateSet={(field, value) =>
+                                      updateSet(index, setIndex, field, value)
+                                    }
+                                    showCompleteButton
+                                  />
+                                </SwipeToDeleteRow>
+                              ))}
+                            </View>
+                          )}
+
+                          <TouchableOpacity
+                            style={styles.addSetButton}
+                            onPress={() => addSet(index)}
+                          >
+                            <Ionicons name="add" size={20} color="#007AFF" />
+                            <Text style={styles.addSetText}>Add Set</Text>
+                          </TouchableOpacity>
+                        </>
+                      )}
                     </View>
                   );
-                })
-              )}
-              <View style={styles.bottomSpacer} />
-            </ScrollView>
+                }}
+              />
+            </View>
 
             <View style={styles.footer}>
               <Button
@@ -700,7 +908,10 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
                 variant="outline"
                 style={styles.addExerciseButton}
               />
-              <TouchableOpacity style={styles.cancelButton} onPress={handleCancelWorkout}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={handleCancelWorkout}
+              >
                 <Text style={styles.cancelButtonText}>Cancel Workout</Text>
               </TouchableOpacity>
             </View>
@@ -749,14 +960,14 @@ export default function ActiveWorkoutSheet({ onFinishWorkout, initialExpanded = 
 
 const styles = StyleSheet.create({
   container: {
-    position: 'absolute',
+    position: "absolute",
     left: 0,
     right: 0,
     bottom: 60, // Position above the tab bar (60px tab bar height)
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
@@ -770,35 +981,35 @@ const styles = StyleSheet.create({
   dragHandle: {
     width: 40,
     height: 4,
-    backgroundColor: '#D1D1D6',
+    backgroundColor: "#D1D1D6",
     borderRadius: 2,
-    alignSelf: 'center',
+    alignSelf: "center",
     marginBottom: 12,
   },
   collapsedContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   collapsedLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
   collapsedTitle: {
     fontSize: 17,
-    fontWeight: '600',
-    color: '#1C1C1E',
+    fontWeight: "600",
+    color: "#1C1C1E",
   },
   collapsedRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
   timerBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F7',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F5F5F7",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
@@ -806,19 +1017,19 @@ const styles = StyleSheet.create({
   },
   timerText: {
     fontSize: 15,
-    fontWeight: '600',
-    color: '#007AFF',
+    fontWeight: "600",
+    color: "#007AFF",
   },
   expandedTopBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   expandedContent: {
     flex: 1,
   },
   nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 20,
     paddingTop: 8,
   },
@@ -828,24 +1039,24 @@ const styles = StyleSheet.create({
   workoutNameInput: {
     flex: 1,
     fontSize: 28,
-    fontWeight: '700',
-    color: '#1C1C1E',
+    fontWeight: "700",
+    color: "#1C1C1E",
     padding: 0,
   },
   dateRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 20,
     paddingTop: 6,
     gap: 8,
   },
   dateText: {
     fontSize: 15,
-    color: '#8E8E93',
+    color: "#8E8E93",
   },
   timerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 20,
     paddingTop: 6,
     paddingBottom: 12,
@@ -853,20 +1064,20 @@ const styles = StyleSheet.create({
   },
   timerTextLarge: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#007AFF',
+    fontWeight: "600",
+    color: "#007AFF",
   },
   menuButton: {
     padding: 4,
   },
   menuDropdown: {
-    position: 'absolute',
+    position: "absolute",
     top: 60,
     right: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 12,
     paddingVertical: 8,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
@@ -874,15 +1085,15 @@ const styles = StyleSheet.create({
     zIndex: 100,
   },
   menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 12,
     gap: 12,
   },
   menuItemText: {
     fontSize: 16,
-    color: '#1C1C1E',
+    color: "#1C1C1E",
   },
   descriptionContainer: {
     paddingHorizontal: 20,
@@ -890,47 +1101,47 @@ const styles = StyleSheet.create({
   },
   descriptionInput: {
     fontSize: 15,
-    color: '#3A3A3C',
+    color: "#3A3A3C",
     padding: 0,
     minHeight: 40,
   },
   finishButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: "#007AFF",
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,
   },
   finishButtonText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontWeight: "600",
+    color: "#FFFFFF",
   },
   finishButtonTextDisabled: {
     opacity: 0.5,
   },
   exercisesList: {
-    flex: 1,
+    flex: 0,
     paddingHorizontal: 20,
     paddingTop: 16,
   },
   emptyState: {
-    alignItems: 'center',
+    alignItems: "center",
     padding: 32,
   },
   emptyText: {
     fontSize: 16,
-    color: '#8E8E93',
+    color: "#8E8E93",
   },
   exerciseCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 12,
     padding: 0,
     marginBottom: 16,
   },
   exerciseHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 12,
   },
   exerciseNameContainer: {
@@ -938,8 +1149,8 @@ const styles = StyleSheet.create({
   },
   exerciseNameClickable: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#007AFF',
+    fontWeight: "600",
+    color: "#007AFF",
   },
   exerciseMenuButton: {
     padding: 8,
@@ -948,15 +1159,15 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   addSetButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 10,
   },
   addSetText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#007AFF',
+    fontWeight: "600",
+    color: "#007AFF",
     marginLeft: 6,
   },
   bottomSpacer: {
@@ -966,19 +1177,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderTopWidth: 1,
-    borderTopColor: '#E5E5EA',
-    backgroundColor: '#FFFFFF',
+    borderTopColor: "#E5E5EA",
+    backgroundColor: "#FFFFFF",
   },
   addExerciseButton: {
     marginBottom: 12,
   },
   cancelButton: {
     paddingVertical: 12,
-    alignItems: 'center',
+    alignItems: "center",
   },
   cancelButtonText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#FF3B30',
+    fontWeight: "600",
+    color: "#FF3B30",
   },
 });
