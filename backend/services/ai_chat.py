@@ -341,6 +341,7 @@ TOOLS: List[Dict[str, Any]] = [
             "description": (
                 "Fetch planned/scheduled workouts for a date range (including recurring expansion). "
                 "Use this to see what is on the user's calendar."
+                "it includes either a template id or inline_exercises for one-time workouts."
             ),
             "parameters": {
                 "type": "object",
@@ -442,31 +443,56 @@ TOOLS: List[Dict[str, Any]] = [
     }
   }
 },
+
     {
         "type": "function",
         "function": {
             "name": "schedule__update_workout",
             "description": (
-                "Update a scheduled workout entry (date/name/type/notes/status/template). "
-                "If exercises provided, creates a NEW template and links it."
+                "Update a scheduled workout entry (date/name/type/notes/status/template).\n"
+                "You can either:\n"
+                "  - Link it to an existing template via template_id, OR\n"
+                "  - Override it with inline exercises (one-time prescription).\n\n"
+                "LOGIC (MIRRORS schedule__add_workout):\n"
+                "- If template_id is provided, any 'exercises' field will be ignored and the workout will use that template.\n"
+                "- If exercises are provided WITHOUT template_id, you MUST also set 'create_template_from_exercises':\n"
+                "    * true  => create a NEW reusable template from these exercises and attach it to this scheduled workout.\n"
+                "    * false => store these exercises as inline_exercises ONLY for this workout (no template is created/used).\n"
+                "- If neither template_id nor exercises are provided, the existing template/inline_exercises are left unchanged."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "workout_id": {"type": "string"},
-                    "date": {"type": "string"},
-                    "name": {"type": "string"},
-                    "template_id": {"type": "string"},
+                    "workout_id": {
+                        "type": "string",
+                        "description": "The id of the planned workout to update (from schedule__get)."
+                    },
+                    "date": {
+                        "type": "string",
+                        "description": "New date in YYYY-MM-DD format (optional)."
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "New workout name (optional)."
+                    },
+                    "template_id": {
+                        "type": "string",
+                        "description": (
+                            "If provided, the scheduled workout will use this template. "
+                            "Any 'exercises' field in the same call will be ignored."
+                        )
+                    },
                     "exercises": {
                         "type": "array",
                         "description": (
-                            "If provided, creates a new template and attaches it. "
+                            "Compact exercise definitions to override this scheduled workout. "
+                            "If provided WITHOUT 'template_id', you MUST also set 'create_template_from_exercises' to true or false. "
                             "Each exercise must provide 'sets' as an array of set objects."
                         ),
                         "items": {
                             "type": "object",
                             "properties": {
-                                "exercise_id": {"type": "string"},
+                                "exercise_id": { "type": "string" },
                                 "sets": {
                                     "type": "array",
                                     "description": "Array of set objects.",
@@ -476,33 +502,73 @@ TOOLS: List[Dict[str, Any]] = [
                                             "set_type": {
                                                 "type": "string",
                                                 "enum": ["normal", "warmup", "cooldown", "failure"],
-                                                "default": "normal",
+                                                "description": "Type of set (default normal if omitted)"
                                             },
-                                            "reps": {"type": "integer"},
-                                            "weight": {"type": "number"},
-                                            "duration": {"type": "number"},
-                                            "distance": {"type": "number"},
-                                        },
-                                    },
+                                            "reps": { "type": "integer" },
+                                            "weight": { "type": "number" },
+                                            "duration": { "type": "number" },
+                                            "distance": { "type": "number" }
+                                        }
+                                    }
                                 },
-                                "reps": {"type": "integer"},
-                                "weight": {"type": "number"},
-                                "duration": {"type": "number"},
-                                "distance": {"type": "number"},
-                                "notes": {"type": "string"},
+                                "reps": { "type": "integer" },
+                                "weight": { "type": "number" },
+                                "duration": { "type": "number" },
+                                "distance": { "type": "number" },
+                                "notes": { "type": "string" }
                             },
-                            "required": ["exercise_id", "sets"],
-                        },
+                            "required": ["exercise_id", "sets"]
+                        }
                     },
-                    "type": {"type": "string"},
-                    "notes": {"type": "string"},
-                    "status": {"type": "string", "enum": ["planned", "in_progress", "completed", "skipped"]},
-                    "order": {"type": "integer"},
+                    "create_template_from_exercises": {
+                        "type": "boolean",
+                        "description": (
+                            "Required if 'exercises' is provided and 'template_id' is NOT provided. "
+                            "If true, auto-create a reusable template from the exercises and link it to this scheduled workout. "
+                            "If false, overwrite this workout with inline_exercises only (no template is created or linked)."
+                        )
+                    },
+                    "type": {
+                        "type": "string",
+                        "description": "Workout category (e.g. 'strength', 'run', 'mobility'). Optional."
+                    },
+                    "notes": {
+                        "type": "string",
+                        "description": "Optional notes for the scheduled workout."
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": ["planned", "in_progress", "completed", "skipped"],
+                        "description": "Optional status update for the scheduled workout."
+                    },
+                    "order": {
+                        "type": "integer",
+                        "description": "Optional ordering index for the workout in the day."
+                    },
+                    "is_recurring": {
+                        "type": "boolean",
+                        "description": "Optional: update whether this workout is recurring."
+                    },
+                    "recurrence_type": {
+                        "type": "string",
+                        "enum": ["daily", "weekly", "monthly"],
+                        "description": "Optional: recurrence pattern if is_recurring is true."
+                    },
+                    "recurrence_days": {
+                        "type": "array",
+                        "items": { "type": "integer" },
+                        "description": "Optional: for weekly recurrence only, weekdays [0=Mon..6=Sun]."
+                    },
+                    "recurrence_end_date": {
+                        "type": "string",
+                        "description": "Optional: end date for recurrence in YYYY-MM-DD format, or null for indefinite."
+                    }
                 },
                 "required": ["workout_id"],
             },
         },
     },
+
     {
         "type": "function",
         "function": {
@@ -1048,6 +1114,7 @@ async def execute_tool(tool_name: str, arguments: Dict[str, Any], db, user_id: s
                         "type": pw.get("type"),
                         "notes": pw.get("notes"),
                         "template_id": pw.get("template_id"),
+                        "inline_exercises": pw.get("inline_exercises", []),
                         "is_recurring": is_recurring,
                         "is_recurring_instance": is_recurring,
                     }
@@ -1156,50 +1223,110 @@ async def execute_tool(tool_name: str, arguments: Dict[str, Any], db, user_id: s
                     "message": msg,
                 }
             )
-        
         if tool_name == "schedule__update_workout":
             workout_id = arguments.get("workout_id")
             oid = _safe_object_id(workout_id)
             if not oid:
                 return json.dumps({"error": "Valid workout_id is required"})
 
+            # Fetch existing planned workout so we can preserve fields when not overridden
+            existing_workout = await db.planned_workouts.find_one({"_id": oid, "user_id": user_id})
+            if not existing_workout:
+                return json.dumps({"error": "Scheduled workout not found"})
+
             update_fields: Dict[str, Any] = {}
+
+            # Basic scalar fields
             for field in ["date", "name", "type", "notes", "status", "order"]:
                 if field in arguments:
                     update_fields[field] = arguments[field]
 
-            if "template_id" in arguments and arguments["template_id"] is not None:
-                update_fields["template_id"] = arguments["template_id"]
+            # Recurrence fields (optional)
+            if "is_recurring" in arguments:
+                update_fields["is_recurring"] = bool(arguments["is_recurring"])
+            if "recurrence_type" in arguments:
+                update_fields["recurrence_type"] = arguments["recurrence_type"]
+            if "recurrence_days" in arguments:
+                update_fields["recurrence_days"] = arguments["recurrence_days"]
+            if "recurrence_end_date" in arguments:
+                update_fields["recurrence_end_date"] = arguments["recurrence_end_date"]
 
+            template_id_arg = arguments.get("template_id")
             exercises = arguments.get("exercises") or None
-            if exercises:
-                existing_workout = await db.planned_workouts.find_one({"_id": oid, "user_id": user_id})
-                if not existing_workout:
-                    return json.dumps({"error": "Scheduled workout not found"})
 
+            created_template_id: Optional[str] = None
+
+            # Case 1: Explicit template_id provided -> use that and ignore 'exercises'
+            if template_id_arg:
+                update_fields["template_id"] = template_id_arg
+                # When switching to a template explicitly, inline_exercises should not be the source of truth anymore.
+                # We clear them to avoid ambiguity.
+                update_fields["inline_exercises"] = None
+
+            # Case 2: No template_id, but exercises provided -> mirror schedule__add_workout logic
+            elif exercises:
+                create_template_from_exercises = arguments.get("create_template_from_exercises")
+
+                if create_template_from_exercises is None:
+                    return json.dumps(
+                        {
+                            "error": "create_template_from_exercises is required when exercises are provided without template_id",
+                            "hint": (
+                                "Set create_template_from_exercises=true to auto-create a reusable template, "
+                                "or false to store these exercises as inline_exercises only for this workout."
+                            ),
+                        }
+                    )
+
+                # Normalize compact exercises into template-style exercises
+                template_exercises = await _build_template_exercises_from_compact(
+                    exercises, db, user_id
+                )
+
+                # Figure out final name for new template if needed
                 workout_name = (arguments.get("name") or existing_workout.get("name") or "Workout").strip()
-                template_exercises = await _build_template_exercises_from_compact(exercises, db, user_id)
 
-                template_doc = {
-                    "user_id": user_id,
-                    "name": f"{workout_name} (Modified)",
-                    "notes": "Created from scheduled workout modification",
-                    "exercises": template_exercises,
-                    "created_at": datetime.utcnow(),
-                    "updated_at": datetime.utcnow(),
-                }
-                template_res = await db.templates.insert_one(template_doc)
-                update_fields["template_id"] = str(template_res.inserted_id)
+                if create_template_from_exercises:
+                    # Create NEW reusable template and link it
+                    template_doc = {
+                        "user_id": user_id,
+                        "name": f"{workout_name} (Modified)",
+                        "notes": "Created from scheduled workout modification",
+                        "exercises": template_exercises,
+                        "created_at": datetime.utcnow(),
+                        "updated_at": datetime.utcnow(),
+                    }
+                    template_res = await db.templates.insert_one(template_doc)
+                    new_template_id = str(template_res.inserted_id)
+
+                    update_fields["template_id"] = new_template_id
+                    update_fields["inline_exercises"] = None
+                    created_template_id = new_template_id
+                else:
+                    # One-time override: store as inline_exercises, no template
+                    update_fields["template_id"] = None
+                    update_fields["inline_exercises"] = template_exercises
+
+            # Case 3: Neither template_id nor exercises provided -> keep existing linkage as-is
+            # (do not touch template_id or inline_exercises)
 
             if not update_fields:
                 return json.dumps({"error": "No fields to update"})
+
+            update_fields["updated_at"] = datetime.utcnow()
 
             res = await db.planned_workouts.update_one({"_id": oid, "user_id": user_id}, {"$set": update_fields})
             if res.matched_count == 0:
                 return json.dumps({"error": "Scheduled workout not found"})
 
             return json.dumps(
-                {"success": True, "message": "Schedule updated", "template_id": update_fields.get("template_id")}
+                {
+                    "success": True,
+                    "message": "Schedule updated",
+                    "template_id": update_fields.get("template_id", existing_workout.get("template_id")),
+                    "created_template_id": created_template_id,
+                },
+                default=str,
             )
 
         if tool_name == "schedule__delete_workout":
