@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,35 +7,39 @@ import {
   TouchableOpacity,
   TextInput,
   Image,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import api from '../../utils/api';
-import { Exercise } from '../../types';
-import CreateExerciseModal from '../../components/CreateExerciseModal';
-import ExerciseDetailModal from '../../components/ExerciseDetailModal';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import api from "../../utils/api";
+import { Exercise } from "../../types";
+import CreateExerciseModal from "../../components/CreateExerciseModal";
+import ExerciseDetailModal from "../../components/ExerciseDetailModal";
+import { LoadingData } from "../../components/LoadingData";
 
-const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=100&h=100&fit=crop';
+const PLACEHOLDER_IMAGE =
+  "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=100&h=100&fit=crop";
 
 const MUSCLE_GROUPS = [
-  'All',
-  'Chest',
-  'Back',
-  'Shoulders',
-  'Arms',
-  'Legs',
-  'Abs',
-  'Full Body',
+  "All",
+  "Chest",
+  "Back",
+  "Shoulders",
+  "Arms",
+  "Legs",
+  "Abs",
+  "Full Body",
 ];
 
 export default function ExercisesScreen() {
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [filteredExercises, setFilteredExercises] = useState<Exercise[]>([]);
-  const [selectedMuscleGroup, setSelectedMuscleGroup] = useState('All');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedMuscleGroup, setSelectedMuscleGroup] = useState("All");
+  const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
+  const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(
+    null
+  );
   const [showDetailModal, setShowDetailModal] = useState(false);
 
   useEffect(() => {
@@ -49,10 +53,10 @@ export default function ExercisesScreen() {
   const loadExercises = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/exercises');
+      const response = await api.get("/exercises");
       setExercises(response.data);
     } catch (error) {
-      console.error('Failed to load exercises:', error);
+      console.error("Failed to load exercises:", error);
     } finally {
       setLoading(false);
     }
@@ -61,14 +65,14 @@ export default function ExercisesScreen() {
   const filterExercises = () => {
     let filtered = exercises;
 
-    if (selectedMuscleGroup !== 'All') {
+    if (selectedMuscleGroup !== "All") {
       filtered = filtered.filter(
-        (ex) => ex.muscle_group === selectedMuscleGroup
+        ex => ex.primary_body_parts.some((p) => p == selectedMuscleGroup) 
       );
     }
 
     if (searchQuery) {
-      filtered = filtered.filter((ex) =>
+      filtered = filtered.filter(ex =>
         ex.name.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
@@ -86,14 +90,14 @@ export default function ExercisesScreen() {
   };
 
   const renderExercise = ({ item }: { item: Exercise }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={styles.exerciseCard}
       onPress={() => handleExercisePress(item)}
     >
       <View style={styles.exerciseImageContainer}>
         {item.image ? (
-          <Image 
-            source={{ uri: item.image }} 
+          <Image
+            source={{ uri: item.image }}
             style={styles.exerciseImage}
             resizeMode="cover"
           />
@@ -106,7 +110,7 @@ export default function ExercisesScreen() {
       <View style={styles.exerciseInfo}>
         <Text style={styles.exerciseName}>{item.name}</Text>
         <Text style={styles.exerciseDetail}>
-          {item.exercise_kind} • {item.primary_body_parts.join(', ')}
+          {item.exercise_kind} • {item.primary_body_parts.join(", ")}
         </Text>
       </View>
       <Ionicons name="chevron-forward" size={24} color="#8E8E93" />
@@ -118,7 +122,7 @@ export default function ExercisesScreen() {
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <Text style={styles.title}>Exercises</Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.newButton}
             onPress={() => setShowCreateModal(true)}
           >
@@ -142,7 +146,7 @@ export default function ExercisesScreen() {
           horizontal
           showsHorizontalScrollIndicator={false}
           data={MUSCLE_GROUPS}
-          keyExtractor={(item) => item}
+          keyExtractor={item => item}
           renderItem={({ item }) => (
             <TouchableOpacity
               style={[
@@ -166,16 +170,20 @@ export default function ExercisesScreen() {
 
       <FlatList
         data={filteredExercises}
-        keyExtractor={(item) => item.id}
+        keyExtractor={item => item.id}
         renderItem={renderExercise}
         contentContainerStyle={styles.listContent}
         refreshing={loading}
         onRefresh={loadExercises}
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons name="fitness-outline" size={64} color="#3A3A3C" />
-            <Text style={styles.emptyText}>No exercises found</Text>
-          </View>
+          loading ? (
+            <LoadingData loadingTitle="Loading Exercises..." />
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons name="fitness-outline" size={64} color="#3A3A3C" />
+              <Text style={styles.emptyText}>No exercises found</Text>
+            </View>
+          )
         }
       />
 
@@ -201,7 +209,7 @@ export default function ExercisesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F7',
+    backgroundColor: "#F5F5F7",
   },
   header: {
     paddingHorizontal: 20,
@@ -209,120 +217,120 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 16,
   },
   title: {
     fontSize: 32,
-    fontWeight: 'bold',
-    color: '#1C1C1E',
+    fontWeight: "bold",
+    color: "#1C1C1E",
   },
   newButton: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: '#007AFF',
+    backgroundColor: "#007AFF",
     borderRadius: 8,
   },
   newButtonText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontWeight: "600",
+    color: "#FFFFFF",
   },
   searchContainer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 12,
     paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     borderWidth: 1,
-    borderColor: '#D1D1D6',
+    borderColor: "#D1D1D6",
   },
   searchInput: {
     flex: 1,
     paddingVertical: 12,
     paddingLeft: 12,
     fontSize: 16,
-    color: '#1C1C1E',
+    color: "#1C1C1E",
   },
   filterContainer: {
     paddingLeft: 20,
     marginBottom: 16,
   },
   filterChip: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
     marginRight: 8,
     borderWidth: 1,
-    borderColor: '#D1D1D6',
+    borderColor: "#D1D1D6",
   },
   filterChipActive: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+    backgroundColor: "#007AFF",
+    borderColor: "#007AFF",
   },
   filterChipText: {
-    color: '#1C1C1E',
+    color: "#1C1C1E",
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   filterChipTextActive: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
   },
   listContent: {
     paddingHorizontal: 20,
     paddingBottom: 24,
   },
   exerciseCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 12,
     padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#E5E5EA',
+    borderColor: "#E5E5EA",
   },
   exerciseImageContainer: {
     width: 56,
     height: 56,
     borderRadius: 12,
-    overflow: 'hidden',
+    overflow: "hidden",
     marginRight: 12,
   },
   exerciseImage: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   exercisePlaceholder: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#F5F5F7',
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#F5F5F7",
+    alignItems: "center",
+    justifyContent: "center",
   },
   exerciseInfo: {
     flex: 1,
   },
   exerciseName: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1C1C1E',
+    fontWeight: "600",
+    color: "#1C1C1E",
     marginBottom: 4,
   },
   exerciseDetail: {
     fontSize: 14,
-    color: '#6E6E73',
+    color: "#6E6E73",
   },
   emptyState: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: 64,
   },
   emptyText: {
     fontSize: 16,
-    color: '#8E8E93',
+    color: "#8E8E93",
     marginTop: 16,
   },
 });

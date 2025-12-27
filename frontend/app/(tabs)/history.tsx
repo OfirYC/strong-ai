@@ -13,6 +13,7 @@ import { format, parseISO, isToday, isYesterday } from "date-fns";
 import { useRouter } from "expo-router";
 import api from "../../utils/api";
 import { WorkoutSummary } from "../../types";
+import { LoadingData } from "../../components/LoadingData";
 
 interface GroupedWorkouts {
   title: string;
@@ -175,13 +176,17 @@ export default function HistoryScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons name="time-outline" size={64} color="#C7C7CC" />
-            <Text style={styles.emptyText}>No workouts yet</Text>
-            <Text style={styles.emptySubtext}>
-              Complete your first workout to see it here
-            </Text>
-          </View>
+          loading ? (
+            <LoadingData loadingTitle="Loading Workouts..." />
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons name="time-outline" size={64} color="#C7C7CC" />
+              <Text style={styles.emptyText}>No workouts yet</Text>
+              <Text style={styles.emptySubtext}>
+                Complete your first workout to see it here
+              </Text>
+            </View>
+          )
         }
         stickySectionHeadersEnabled={false}
       />

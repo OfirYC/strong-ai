@@ -17,6 +17,7 @@ import { WorkoutTemplate } from "../../types";
 import RoutineDetailModal from "../../components/RoutineDetailModal";
 import ScheduleWorkoutModal from "../../components/ScheduleWorkoutModal";
 import CalendarModal from "../../components/CalendarModal";
+import { LoadingData } from "../../components/LoadingData";
 
 interface PlannedWorkout {
   id: string;
@@ -49,6 +50,7 @@ export default function WorkoutScreen() {
     EnrichedPlannedWorkout[]
   >([]);
   const [loading, setLoading] = useState(false);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [selectedRoutine, setSelectedRoutine] =
     useState<WorkoutTemplate | null>(null);
   const [showRoutineModal, setShowRoutineModal] = useState(false);
@@ -88,11 +90,14 @@ export default function WorkoutScreen() {
   }, [activeWorkout?.id]);
 
   const loadTemplates = async () => {
+    setLoadingTemplates(true);
     try {
       const response = await api.get("/templates");
       setTemplates(response.data);
     } catch (error) {
       console.error("Failed to load templates:", error);
+    } finally {
+      setLoadingTemplates(false);
     }
   };
 
@@ -509,13 +514,17 @@ export default function WorkoutScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Recent Routines</Text>
           {templates.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="list-outline" size={64} color="#3A3A3C" />
-              <Text style={styles.emptyText}>No routines yet</Text>
-              <Text style={styles.emptySubtext}>
-                Create a routine in the Routines tab
-              </Text>
-            </View>
+            loadingTemplates ? (
+              <LoadingData loadingTitle="Loading Routines..." />
+            ) : (
+              <View style={styles.emptyState}>
+                <Ionicons name="list-outline" size={64} color="#3A3A3C" />
+                <Text style={styles.emptyText}>No routines yet</Text>
+                <Text style={styles.emptySubtext}>
+                  Create a routine in the Routines tab
+                </Text>
+              </View>
+            )
           ) : (
             templates.map(template => (
               <TouchableOpacity

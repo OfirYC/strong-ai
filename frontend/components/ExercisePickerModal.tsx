@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,13 +8,23 @@ import {
   TextInput,
   FlatList,
   Image,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import api from '../utils/api';
-import { Exercise } from '../types';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import api from "../utils/api";
+import { Exercise } from "../types";
+import { LoadingData } from "./LoadingData";
 
-const MUSCLE_GROUPS = ['All', 'Chest', 'Back', 'Shoulders', 'Arms', 'Legs', 'Abs', 'Full Body'];
+const MUSCLE_GROUPS = [
+  "All",
+  "Chest",
+  "Back",
+  "Shoulders",
+  "Arms",
+  "Legs",
+  "Abs",
+  "Full Body",
+];
 
 interface ExercisePickerModalProps {
   visible: boolean;
@@ -30,31 +40,37 @@ export default function ExercisePickerModal({
   onCreateNew,
 }: ExercisePickerModalProps) {
   const [exercises, setExercises] = useState<Exercise[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedMuscleGroup, setSelectedMuscleGroup] = useState('All');
+  const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedMuscleGroup, setSelectedMuscleGroup] = useState("All");
 
   useEffect(() => {
     if (visible) {
       loadExercises();
-      setSearchQuery('');
-      setSelectedMuscleGroup('All');
+      setSearchQuery("");
+      setSelectedMuscleGroup("All");
     }
   }, [visible]);
 
   const loadExercises = async () => {
+    setLoading(true);
     try {
-      const response = await api.get('/exercises');
+      const response = await api.get("/exercises");
       setExercises(response.data);
     } catch (error) {
-      console.error('Failed to load exercises:', error);
+      console.error("Failed to load exercises:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
   const filteredExercises = exercises.filter(exercise => {
-    const matchesSearch = !searchQuery || 
+    const matchesSearch =
+      !searchQuery ||
       exercise.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesMuscleGroup = selectedMuscleGroup === 'All' || 
-      exercise.muscle_group === selectedMuscleGroup;
+    const matchesMuscleGroup =
+      selectedMuscleGroup === "All" ||
+      exercise.primary_body_parts.some(p => p == selectedMuscleGroup);
     return matchesSearch && matchesMuscleGroup;
   });
 
@@ -95,7 +111,7 @@ export default function ExercisePickerModal({
             onChangeText={setSearchQuery}
           />
           {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <TouchableOpacity onPress={() => setSearchQuery("")}>
               <Ionicons name="close-circle" size={20} color="#8E8E93" />
             </TouchableOpacity>
           )}
@@ -107,7 +123,7 @@ export default function ExercisePickerModal({
             horizontal
             showsHorizontalScrollIndicator={false}
             data={MUSCLE_GROUPS}
-            keyExtractor={(item) => item}
+            keyExtractor={item => item}
             renderItem={({ item }) => (
               <TouchableOpacity
                 style={[
@@ -131,7 +147,7 @@ export default function ExercisePickerModal({
 
         <FlatList
           data={filteredExercises}
-          keyExtractor={(item) => item.id}
+          keyExtractor={item => item.id}
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.exerciseOption}
@@ -139,7 +155,10 @@ export default function ExercisePickerModal({
             >
               <View style={styles.exerciseImageContainer}>
                 {item.image ? (
-                  <Image source={{ uri: item.image }} style={styles.exerciseImage} />
+                  <Image
+                    source={{ uri: item.image }}
+                    style={styles.exerciseImage}
+                  />
                 ) : (
                   <View style={styles.exercisePlaceholder}>
                     <Ionicons name="barbell" size={20} color="#8E8E93" />
@@ -149,17 +168,21 @@ export default function ExercisePickerModal({
               <View style={styles.exerciseInfo}>
                 <Text style={styles.exerciseName}>{item.name}</Text>
                 <Text style={styles.exerciseDetail}>
-                  {item.exercise_kind} • {item.primary_body_parts?.join(', ')}
+                  {item.exercise_kind} • {item.primary_body_parts?.join(", ")}
                 </Text>
               </View>
             </TouchableOpacity>
           )}
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Ionicons name="fitness-outline" size={48} color="#8E8E93" />
-              <Text style={styles.emptyText}>No exercises found</Text>
-            </View>
+            loading ? (
+              <LoadingData loadingTitle="Loading Exercises..." />
+            ) : (
+              <View style={styles.emptyState}>
+                <Ionicons name="fitness-outline" size={48} color="#8E8E93" />
+                <Text style={styles.emptyText}>No exercises found</Text>
+              </View>
+            )
           }
         />
       </SafeAreaView>
@@ -170,71 +193,71 @@ export default function ExercisePickerModal({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F7',
+    backgroundColor: "#F5F5F7",
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#D1D1D6',
-    backgroundColor: '#FFFFFF',
+    borderBottomColor: "#D1D1D6",
+    backgroundColor: "#FFFFFF",
   },
   title: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#1C1C1E',
+    fontWeight: "600",
+    color: "#1C1C1E",
   },
   newText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#007AFF',
+    fontWeight: "600",
+    color: "#007AFF",
   },
   searchContainer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 12,
     paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginHorizontal: 20,
     marginTop: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#D1D1D6',
+    borderColor: "#D1D1D6",
   },
   searchInput: {
     flex: 1,
     paddingVertical: 12,
     paddingHorizontal: 12,
     fontSize: 16,
-    color: '#1C1C1E',
+    color: "#1C1C1E",
   },
   filterContainer: {
     paddingLeft: 20,
     marginBottom: 12,
   },
   filterChip: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
     marginRight: 8,
     borderWidth: 1,
-    borderColor: '#D1D1D6',
+    borderColor: "#D1D1D6",
   },
   filterChipActive: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+    backgroundColor: "#007AFF",
+    borderColor: "#007AFF",
   },
   filterChipText: {
-    color: '#1C1C1E',
+    color: "#1C1C1E",
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   filterChipTextActive: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
   },
   listContent: {
     paddingHorizontal: 20,
@@ -242,51 +265,51 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   exerciseOption: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 12,
     padding: 12,
     marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   exerciseImageContainer: {
     width: 48,
     height: 48,
     borderRadius: 10,
-    overflow: 'hidden',
+    overflow: "hidden",
     marginRight: 12,
   },
   exerciseImage: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   exercisePlaceholder: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#F5F5F7',
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#F5F5F7",
+    alignItems: "center",
+    justifyContent: "center",
   },
   exerciseInfo: {
     flex: 1,
   },
   exerciseName: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1C1C1E',
+    fontWeight: "600",
+    color: "#1C1C1E",
     marginBottom: 4,
   },
   exerciseDetail: {
     fontSize: 14,
-    color: '#6E6E73',
+    color: "#6E6E73",
   },
   emptyState: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: 48,
   },
   emptyText: {
     fontSize: 16,
-    color: '#8E8E93',
+    color: "#8E8E93",
     marginTop: 12,
   },
 });

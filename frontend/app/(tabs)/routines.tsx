@@ -6,6 +6,7 @@ import {
   FlatList,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -16,6 +17,7 @@ import { WorkoutTemplate } from "../../types";
 import RoutineDetailModal from "../../components/RoutineDetailModal";
 import { useWorkoutStore } from "../../store/workoutStore";
 import ScheduleWorkoutModal from "../../components/ScheduleWorkoutModal";
+import { LoadingData } from "../../components/LoadingData";
 
 interface PlannedWorkout {
   id: string;
@@ -212,7 +214,6 @@ export default function RoutinesScreen() {
           style={styles.createButton}
         />
       </View>
-
       <FlatList
         data={templates}
         keyExtractor={item => item.id}
@@ -221,13 +222,19 @@ export default function RoutinesScreen() {
         refreshing={loading}
         onRefresh={loadTemplates}
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons name="list-outline" size={64} color="#3A3A3C" />
-            <Text style={styles.emptyText}>No routines yet</Text>
-            <Text style={styles.emptySubtext}>
-              Create your first routine to get started
-            </Text>
-          </View>
+          loading ? (
+            // Initial (or refresh) load with no data yet
+            <LoadingData loadingTitle="Loading Routines..." />
+          ) : (
+            // Loaded and actually empty
+            <View style={styles.emptyState}>
+              <Ionicons name="list-outline" size={64} color="#3A3A3C" />
+              <Text style={styles.emptyText}>No routines yet</Text>
+              <Text style={styles.emptySubtext}>
+                Create your first routine to get started
+              </Text>
+            </View>
+          )
         }
       />
 
