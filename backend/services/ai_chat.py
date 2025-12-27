@@ -1236,11 +1236,17 @@ async def execute_tool(tool_name: str, arguments: Dict[str, Any], db, user_id: s
 
             update_fields: Dict[str, Any] = {}
 
-            # Basic scalar fields
-            for field in ["date", "name", "type", "notes", "status", "order"]:
-                if field in arguments:
-                    update_fields[field] = arguments[field]
+            # Basic scalar fields (ignore empty strings for optional fields)
+            optional_scalar_fields = ["date", "name", "type", "notes", "status", "order"]
 
+            for field in optional_scalar_fields:
+                if field in arguments:
+                    val = arguments[field]
+                    # Ignore empty string or whitespace-only
+                    if isinstance(val, str) and not val.strip():
+                        continue
+                    update_fields[field] = val
+                    
             # Recurrence fields (optional)
             if "is_recurring" in arguments:
                 update_fields["is_recurring"] = bool(arguments["is_recurring"])
