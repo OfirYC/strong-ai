@@ -295,7 +295,6 @@ class PRRecord(BaseModel):
         populate_by_name = True
         json_encoders = {ObjectId: str}
 
-
 # Planned Workout Models
 class PlannedWorkoutCreate(BaseModel):
     """Create a planned workout"""
@@ -305,13 +304,16 @@ class PlannedWorkoutCreate(BaseModel):
     type: Optional[str] = None  # e.g. "strength", "run", "mobility"
     notes: Optional[str] = None
     order: int = 0
-    
+
+    # one-off inline prescription (same structure as template.exercises)
+    # When set, this planned workout stores exercises directly instead of (or in addition to) template_id.
+    inline_exercises: Optional[List[TemplateExerciseItem]] = None
+
     # Recurring schedule fields
     is_recurring: bool = False
     recurrence_type: Optional[str] = None  # "daily", "weekly", "monthly"
     recurrence_days: Optional[List[int]] = None  # For weekly: [0=Monday, 1=Tuesday, ..., 6=Sunday]
-    recurrence_end_date: Optional[str] = None  # YYYY-MM-DD format or None for indefinite
-
+    recurrence_end_date: Optional[str] = None  # YYYY-MM-DD format or None for indefiniteite
 
 class PlannedWorkoutUpdate(BaseModel):
     """Update a planned workout"""
@@ -323,7 +325,15 @@ class PlannedWorkoutUpdate(BaseModel):
     order: Optional[int] = None
     status: Optional[str] = None  # "planned", "in_progress", "completed", "skipped"
 
+    # NEW: allow updating inline_exercises directly (for admin / REST usage)
+    inline_exercises: Optional[List[TemplateExerciseItem]] = None
 
+    # Recurring fields (optional updates)
+    is_recurring: Optional[bool] = None
+    recurrence_type: Optional[str] = None
+    recurrence_days: Optional[List[int]] = None
+    recurrence_end_date: Optional[str] = None
+    
 class PlannedWorkout(BaseModel):
     """Planned workout for a specific date"""
     id: Optional[str] = Field(default=None)
@@ -331,20 +341,21 @@ class PlannedWorkout(BaseModel):
     date: str  # YYYY-MM-DD format
     name: str
     template_id: Optional[str] = None
+
+    # NEW: one-time embedded exercise prescription (what ai_chat.py writes as 'inline_exercises')
+    # Shape matches TemplateExerciseItem as produced by _build_template_exercises_from_compact.
+    inline_exercises: Optional[List[TemplateExerciseItem]] = None
+
     type: Optional[str] = None
     notes: Optional[str] = None
     status: str = "planned"  # "planned", "in_progress", "completed", "skipped"
     workout_session_id: Optional[str] = None
     order: int = 0
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    
+
     # Recurring schedule fields
     is_recurring: bool = False
     recurrence_type: Optional[str] = None  # "daily", "weekly", "monthly"
     recurrence_days: Optional[List[int]] = None  # For weekly: [0=Monday, 1=Tuesday, ..., 6=Sunday]
     recurrence_end_date: Optional[str] = None  # YYYY-MM-DD format
     recurrence_parent_id: Optional[str] = None  # Links instance to parent recurring workout
-
-    class Config:
-        populate_by_name = True
-        json_encoders = {ObjectId: str}
