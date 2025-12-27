@@ -498,12 +498,10 @@ export default function ActiveWorkoutSheet({
             onPress: async () => {
               // Mark the planned workout as skipped
               try {
-                await api.put(
-                  `/planned-workouts/${activeWorkout.planned_workout_id}`,
-                  {
-                    status: "skipped",
-                  }
-                );
+                await api.put(`/workouts/${activeWorkout.id}`, {
+                  skipped: true,
+                  exercises: [],
+                });
               } catch (error) {
                 console.error(
                   "Failed to update planned workout status:",

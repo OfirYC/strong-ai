@@ -138,9 +138,29 @@ export default function WorkoutScreen() {
       console.error("Failed to load today's workouts:", error);
     }
   };
+  const getActiveWorkout = () => useWorkoutStore.getState().activeWorkout;
+
+  const discardCurrentAndRun = async (next: () => Promise<void>) => {
+    const current = getActiveWorkout();
+    if (current) {
+      // keep your current behavior about scheduled vs unscheduled
+      if (!current.planned_workout_id) {
+        try {
+          await api.delete(`/workouts/${current.id}`);
+        } catch (error) {
+          console.error("Failed to delete workout:", error);
+        }
+      }
+      endWorkout();
+    }
+
+    await next();
+  };
 
   const handleStartEmptyWorkout = async () => {
-    if (activeWorkout) {
+    const current = getActiveWorkout();
+
+    if (current) {
       Alert.alert(
         "Active Workout",
         "You already have an Active Workout. Do you want to discard it and start a new one?",
@@ -150,16 +170,17 @@ export default function WorkoutScreen() {
             text: "Discard & Start New",
             style: "destructive",
             onPress: async () => {
-              // Delete the old workout if it's unscheduled
-              if (!activeWorkout.planned_workout_id) {
-                try {
-                  await api.delete(`/workouts/${activeWorkout.id}`);
-                } catch (error) {
-                  console.error("Failed to delete workout:", error);
-                }
+              try {
+                setLoading(true);
+                await discardCurrentAndRun(async () => {
+                  const response = await api.post("/workouts", { notes: "" });
+                  startWorkout(response.data);
+                });
+              } catch (error) {
+                Alert.alert("Error", "Failed to start workout");
+              } finally {
+                setLoading(false);
               }
-              endWorkout();
-              await createNewWorkout();
             },
           },
         ]
@@ -185,9 +206,10 @@ export default function WorkoutScreen() {
     setSelectedRoutine(template);
     setShowRoutineModal(true);
   };
-
   const handleStartWorkoutFromRoutine = async (routine: WorkoutTemplate) => {
-    if (activeWorkout) {
+    const current = getActiveWorkout();
+
+    if (current) {
       Alert.alert(
         "Active Workout",
         "You already have an Active Workout. Do you want to discard it and start a new one?",
@@ -197,16 +219,14 @@ export default function WorkoutScreen() {
             text: "Discard & Start New",
             style: "destructive",
             onPress: async () => {
-              // Delete the old workout if it's unscheduled
-              if (!activeWorkout.planned_workout_id) {
-                try {
-                  await api.delete(`/workouts/${activeWorkout.id}`);
-                } catch (error) {
-                  console.error("Failed to delete workout:", error);
-                }
+              try {
+                setLoading(true);
+                await discardCurrentAndRun(async () => {
+                  await createTemplateWorkout(routine.id);
+                });
+              } finally {
+                setLoading(false);
               }
-              endWorkout();
-              await createTemplateWorkout(routine.id);
             },
           },
         ]
@@ -277,22 +297,18 @@ export default function WorkoutScreen() {
               style: "destructive",
               onPress: async () => {
                 try {
-                  // Delete the old workout if it's unscheduled
-                  if (!activeWorkout.planned_workout_id) {
-                    try {
-                      await api.delete(`/workouts/${activeWorkout.id}`);
-                    } catch (error) {
-                      console.error("Failed to delete workout:", error);
-                    }
-                  }
-                  endWorkout();
-                  const response = await api.get(
-                    `/workouts/${plannedWorkout.workout_session_id}`
-                  );
-                  startWorkout(response.data);
+                  setLoading(true);
+                  await discardCurrentAndRun(async () => {
+                    const response = await api.get(
+                      `/workouts/${plannedWorkout.workout_session_id}`
+                    );
+                    startWorkout(response.data);
+                  });
                 } catch (error) {
                   console.error("Failed to resume workout:", error);
                   Alert.alert("Error", "Failed to resume workout");
+                } finally {
+                  setLoading(false);
                 }
               },
             },
@@ -323,20 +339,19 @@ export default function WorkoutScreen() {
         "You already have an Active Workout. Do you want to discard it and start a new one?",
         [
           { text: "Cancel", style: "cancel" },
+          // Inside the "status is 'planned' and activeWorkout exists" block
           {
             text: "Discard & Start New",
             style: "destructive",
             onPress: async () => {
-              // Delete the old workout if it's unscheduled
-              if (!activeWorkout.planned_workout_id) {
-                try {
-                  await api.delete(`/workouts/${activeWorkout.id}`);
-                } catch (error) {
-                  console.error("Failed to delete workout:", error);
-                }
+              try {
+                setLoading(true);
+                await discardCurrentAndRun(async () => {
+                  await createPlannedWorkoutSession(plannedWorkout);
+                });
+              } finally {
+                setLoading(false);
               }
-              endWorkout();
-              await createPlannedWorkoutSession(plannedWorkout);
             },
           },
         ]
@@ -724,3 +739,29 @@ const styles = StyleSheet.create({
     textTransform: "capitalize",
   },
 });
+
+[
+  {
+    actualName: "Pull-Up and Chin-Up ETOT",
+    actualNotes:
+      "Weekly ETOT pull-up and chin-up session. Maintain crisp technique and avoid going to failure early. Stop sets if reps degrade or elbow/shoulder starts to complain.",
+    created_at: "2025-12-21T20:15:52.086000",
+    date: "2025-12-27",
+    id: "69485578afba3337720f026e",
+    inline_exercises: null,
+    is_recurring: true,
+    name: "Pull-Up and Chin-Up ETOT",
+    notes:
+      "Weekly ETOT pull-up and chin-up session. Maintain crisp technique and avoid going to failure early. Stop sets if reps degrade or elbow/shoulder starts to complain.",
+    order: 0,
+    recurrence_days: [5],
+    recurrence_end_date: "",
+    recurrence_parent_id: "69485578afba3337720f026e",
+    recurrence_type: "weekly",
+    status: "in_progress",
+    template_id: "69485575afba3337720f026d",
+    type: "strength",
+    user_id: "692f3b3c82e3e5fe865428ac",
+    workout_session_id: "694ff0540af55e331931e875",
+  },
+];

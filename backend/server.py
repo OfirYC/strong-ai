@@ -1106,79 +1106,89 @@ def expand_recurring_workouts(planned_workouts: List[dict], start_date: str, end
     expanded.sort(key=lambda x: (x["date"], x.get("order", 0)))
     return expanded
 
-
 async def enrich_planned_workouts_with_sessions(planned_workouts: List[dict], user_id: str) -> List[dict]:
-    """
-    Enrich planned workouts with actual workout session data.
-    Updates status, name, and notes from the actual workout session.
-    """
-    enriched = []
-    
-    for pw in planned_workouts:
-        workout_session = None
-        
-        # Check if this planned workout has a linked session already
-        if pw.get("workout_session_id"):
-            workout_session = await db.workouts.find_one({
-                "_id": ObjectId(pw["workout_session_id"]),
-                "user_id": user_id
-            })
-        
-        # If it's a recurring workout instance (has recurrence_parent_id)
-        # Check if there's an actual workout session for this specific date
-        elif pw.get("recurrence_parent_id"):
-            pw_date = pw["date"]
-            
-            # Find workout sessions for this date that might be linked to this recurring workout
-            # Check both by planned_workout_id matching the parent ID and by date matching
-            workout_session = await db.workouts.find_one({
-                "user_id": user_id,
-                "$or": [
-                    {"planned_workout_id": pw.get("recurrence_parent_id")},
-                    {"planned_workout_id": str(pw.get("_id"))} if pw.get("_id") else {}
-                ]
-            })
-            
-            # More specific: find workout sessions that started on this specific date
-            if not workout_session:
-                from datetime import datetime
-                start_of_day = datetime.fromisoformat(pw_date + "T00:00:00")
-                end_of_day = datetime.fromisoformat(pw_date + "T23:59:59")
-                
-                # Look for workouts with matching name and date
-                workout_session = await db.workouts.find_one({
-                    "user_id": user_id,
-                    "name": pw.get("name"),
-                    "started_at": {"$gte": start_of_day, "$lte": end_of_day}
-                })
-        
-        # Check for non-recurring scheduled workouts
-        elif pw.get("_id"):
-            workout_session = await db.workouts.find_one({
-                "user_id": user_id,
-                "planned_workout_id": str(pw["_id"])
-            })
-        
-        # Update with actual session data if found
-        if workout_session:
-            # Update status
-            if workout_session.get("ended_at"):
-                pw["status"] = "completed"
-            else:
-                pw["status"] = "in_progress"
-            
-            # Update name and notes from actual session (for real-time changes)
-            if workout_session.get("name"):
-                pw["name"] = workout_session["name"]
-            if workout_session.get("notes"):
-                pw["notes"] = workout_session["notes"]
-            
-            pw["workout_session_id"] = str(workout_session["_id"])
-        
-        enriched.append(pw)
-    
-    return enriched
+    from datetime import datetime as dt
 
+    if not planned_workouts:
+        return planned_workouts
+
+    # 1) Collect all candidate IDs + build per-date windows
+    date_windows = {}
+    id_candidates = set()
+
+    for pw in planned_workouts:
+        date_str = pw.get("date")
+        if date_str:
+            start = dt.fromisoformat(date_str + "T00:00:00")
+            end = dt.fromisoformat(date_str + "T23:59:59")
+            date_windows[pw.get("id") or pw.get("_id")] = (start, end)
+
+        # collect possible planned_workout_id references
+        if pw.get("id"): id_candidates.add(str(pw["id"]))
+        if pw.get("_id") and isinstance(pw["_id"], ObjectId): id_candidates.add(str(pw["_id"]))
+        if pw.get("recurrence_parent_id"): id_candidates.add(str(pw["recurrence_parent_id"]))
+
+    id_candidates = list(id_candidates)
+    if not id_candidates:
+        return planned_workouts
+
+    # 2) Single DB fetch: all sessions tied to these IDs
+    sessions_cursor = db.workouts.find({
+        "user_id": user_id,
+        "planned_workout_id": {"$in": id_candidates}
+    })
+    sessions = await sessions_cursor.to_list(200)
+
+    # 3) Index sessions by planned_workout_id
+    sessions_by_planned: dict[str, list] = {}
+    for s in sessions:
+        pid = str(s.get("planned_workout_id"))
+        sessions_by_planned.setdefault(pid, []).append(s)
+
+    enriched = []
+
+    # 4) Resolve status per item from memory, no more DB hits
+    for pw in planned_workouts:
+        pw = dict(pw)
+        if pw.get("status") == "skipped":
+            enriched.append(pw)
+            continue
+
+        # determine which ID to inspect
+        candidates = []
+        if pw.get("id"): candidates.append(str(pw["id"]))
+        if pw.get("_id"): candidates.append(str(pw["_id"]))
+        if pw.get("recurrence_parent_id"): candidates.append(str(pw["recurrence_parent_id"]))
+
+        matching = []
+        for cid in candidates:
+            matching.extend(sessions_by_planned.get(cid, []))
+
+        # date window filter
+        date_str = pw.get("date")
+        if matching and date_str:
+            start, end = dt.fromisoformat(date_str + "T00:00:00"), dt.fromisoformat(date_str + "T23:59:59")
+            matching = [s for s in matching if s.get("started_at") and start <= s["started_at"] <= end]
+
+        # choose the latest
+        if matching:
+            session = max(matching, key=lambda s: s.get("created_at", s.get("started_at")))
+            started, ended, skipped = session.get("started_at"), session.get("ended_at"), session.get("skipped")
+
+            if ended: pw["status"] = "completed"
+            elif skipped: pw['status'] = 'skipped'
+            elif started: pw["status"] = "in_progress"
+            else: pw["status"] = "planned"
+
+            pw["workout_session_id"] = str(session["_id"])
+            if session.get("name"): pw["name"] = session["name"]
+            if session.get("notes"): pw["notes"] = session["notes"]
+        else:
+            pw.setdefault("status", "planned")
+
+        enriched.append(pw)
+
+    return enriched
 
 async def get_unscheduled_workouts_for_date(user_id: str, date_str: str) -> List[dict]:
     """
