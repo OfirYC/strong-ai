@@ -5,21 +5,21 @@ export interface User {
 }
 
 export const EXERCISE_KINDS = [
-  'Barbell',
-  'Dumbbell',
-  'Machine/Other',
-  'Weighted Bodyweight',
-  'Assisted Bodyweight',
-  'Reps Only',
-  'Duration',
-  'Cardio',
-  'Weighted Cardio',
-  'Weighted Duration',
-  'EMOM (Every Minute On The Minute)',
-  'ETOT (Every Thirty Seconds on Thirty Seconds)',
+  "Barbell",
+  "Dumbbell",
+  "Machine/Other",
+  "Weighted Bodyweight",
+  "Assisted Bodyweight",
+  "Reps Only",
+  "Duration",
+  "Cardio",
+  "Weighted Cardio",
+  "Weighted Duration",
+  "EMOM (Every Minute On The Minute)",
+  "ETOT (Every Thirty Seconds on Thirty Seconds)",
 ] as const;
 
-export type ExerciseKind = typeof EXERCISE_KINDS[number];
+export type ExerciseKind = (typeof EXERCISE_KINDS)[number];
 
 export interface Exercise {
   id: string;
@@ -35,33 +35,56 @@ export interface Exercise {
 }
 
 // Set types for workout sets
-export const SET_TYPES = ['normal', 'warmup', 'cooldown', 'failure'] as const;
-export type SetType = typeof SET_TYPES[number];
+export const SET_TYPES = ["normal", "warmup", "cooldown", "failure"] as const;
+export type SetType = (typeof SET_TYPES)[number];
 
 // Set type display config
-export const SET_TYPE_CONFIG: Record<SetType, { label: string; initial: string; color: string; bgColor: string }> = {
-  normal: { label: 'Normal', initial: '', color: '#000000', bgColor: 'transparent' },
-  warmup: { label: 'Warmup', initial: 'W', color: '#F59E0B', bgColor: 'rgba(245, 158, 11, 0.15)' },
-  cooldown: { label: 'Cooldown', initial: 'C', color: '#3B82F6', bgColor: 'rgba(59, 130, 246, 0.15)' },
-  failure: { label: 'Failure', initial: 'F', color: '#EF4444', bgColor: 'rgba(239, 68, 68, 0.15)' },
+export const SET_TYPE_CONFIG: Record<
+  SetType,
+  { label: string; initial: string; color: string; bgColor: string }
+> = {
+  normal: {
+    label: "Normal",
+    initial: "",
+    color: "#000000",
+    bgColor: "transparent",
+  },
+  warmup: {
+    label: "Warmup",
+    initial: "W",
+    color: "#F59E0B",
+    bgColor: "rgba(245, 158, 11, 0.15)",
+  },
+  cooldown: {
+    label: "Cooldown",
+    initial: "C",
+    color: "#3B82F6",
+    bgColor: "rgba(59, 130, 246, 0.15)",
+  },
+  failure: {
+    label: "Failure",
+    initial: "F",
+    color: "#EF4444",
+    bgColor: "rgba(239, 68, 68, 0.15)",
+  },
 };
 
 export interface WorkoutSet {
   // Set type
   set_type?: SetType;
-  
+
   // Weight + Reps (for strength exercises)
   reps?: number;
   weight?: number;
-  
+
   // Cardio fields
-  distance?: number;  // in km
-  duration?: number;  // in seconds
+  distance?: number; // in km
+  duration?: number; // in seconds
   calories?: number;
-  
+
   completed?: boolean;
   completed_at?: string;
-  
+
   // PR flags
   is_volume_pr?: boolean;
   is_weight_pr?: boolean;
@@ -72,48 +95,74 @@ export interface WorkoutSet {
 // Helper function to determine what fields an exercise needs
 export function getExerciseFields(kind: ExerciseKind): string[] {
   switch (kind) {
-    case 'Barbell':
-    case 'Dumbbell':
-    case 'Machine/Other':
-    case 'Weighted Bodyweight':
-    case 'Assisted Bodyweight':
-      return ['weight', 'reps'];
-    case 'Reps Only':
-      return ['reps'];
-    case 'Duration':
-      return ['duration'];
-    case 'Cardio':
-      return ['duration', 'distance'];
-    case 'Weighted Cardio':
-      return ['duration', 'distance', 'weight'];
-    case 'Weighted Duration':
-      return ['duration', 'weight'];
-    case 'EMOM (Every Minute On The Minute)':
-    case 'ETOT (Every Thirty Seconds on Thirty Seconds)':
-      return ['reps', 'weight', 'duration'];
+    case "Barbell":
+    case "Dumbbell":
+    case "Machine/Other":
+    case "Weighted Bodyweight":
+    case "Assisted Bodyweight":
+      return ["weight", "reps"];
+    case "Reps Only":
+      return ["reps"];
+    case "Duration":
+      return ["duration"];
+    case "Cardio":
+      return ["duration", "distance"];
+    case "Weighted Cardio":
+      return ["duration", "distance", "weight"];
+    case "Weighted Duration":
+      return ["duration", "weight"];
+    case "EMOM (Every Minute On The Minute)":
+    case "ETOT (Every Thirty Seconds on Thirty Seconds)":
+      return ["reps", "weight", "duration"];
     default:
-      return ['weight', 'reps'];
+      return ["weight", "reps"];
   }
 }
 
 // Helper to check if exercise is duration-based
 export function isDurationBased(kind: ExerciseKind): boolean {
-  return ['Duration', 'Cardio', 'Weighted Cardio', 'Weighted Duration', 'EMOM (Every Minute On The Minute)', 'ETOT (Every Thirty Seconds on Thirty Seconds)'].includes(kind);
+  return [
+    "Duration",
+    "Cardio",
+    "Weighted Cardio",
+    "Weighted Duration",
+    "EMOM (Every Minute On The Minute)",
+    "ETOT (Every Thirty Seconds on Thirty Seconds)",
+  ].includes(kind);
 }
 
 // Helper to check if exercise uses weight
 export function usesWeight(kind: ExerciseKind): boolean {
-  return ['Barbell', 'Dumbbell', 'Machine/Other', 'Weighted Bodyweight', 'Assisted Bodyweight', 'Weighted Cardio', 'Weighted Duration', 'EMOM (Every Minute On The Minute)', 'ETOT (Every Thirty Seconds on Thirty Seconds)'].includes(kind);
+  return [
+    "Barbell",
+    "Dumbbell",
+    "Machine/Other",
+    "Weighted Bodyweight",
+    "Assisted Bodyweight",
+    "Weighted Cardio",
+    "Weighted Duration",
+    "EMOM (Every Minute On The Minute)",
+    "ETOT (Every Thirty Seconds on Thirty Seconds)",
+  ].includes(kind);
 }
 
 // Helper to check if exercise uses distance
 export function usesDistance(kind: ExerciseKind): boolean {
-  return ['Cardio', 'Weighted Cardio'].includes(kind);
+  return ["Cardio", "Weighted Cardio"].includes(kind);
 }
 
 // Helper to check if exercise uses reps
 export function usesReps(kind: ExerciseKind): boolean {
-  return ['Barbell', 'Dumbbell', 'Machine/Other', 'Weighted Bodyweight', 'Assisted Bodyweight', 'Reps Only', 'EMOM (Every Minute On The Minute)', 'ETOT (Every Thirty Seconds on Thirty Seconds)'].includes(kind);
+  return [
+    "Barbell",
+    "Dumbbell",
+    "Machine/Other",
+    "Weighted Bodyweight",
+    "Assisted Bodyweight",
+    "Reps Only",
+    "EMOM (Every Minute On The Minute)",
+    "ETOT (Every Thirty Seconds on Thirty Seconds)",
+  ].includes(kind);
 }
 
 export interface WorkoutExercise {
@@ -161,6 +210,7 @@ export interface WorkoutSession {
   ended_at?: string;
   notes?: string;
   exercises: WorkoutExercise[];
+  planned_workout_id?: string;
 }
 
 // Workout Summary types for history view
@@ -206,12 +256,14 @@ export function formatDuration(seconds: number): string {
   const mins = Math.floor(totalCentiseconds / 6000);
   const secs = Math.floor((totalCentiseconds % 6000) / 100);
   const centis = totalCentiseconds % 100;
-  
+
   // Only show centiseconds if they exist
   if (centis > 0) {
-    return `${mins}:${secs.toString().padStart(2, '0')}.${centis.toString().padStart(2, '0')}`;
+    return `${mins}:${secs.toString().padStart(2, "0")}.${centis
+      .toString()
+      .padStart(2, "0")}`;
   }
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
 // Helper to format duration in minutes (e.g., "12m")
@@ -220,7 +272,7 @@ export function formatDurationMinutes(seconds: number): string {
   return `${mins}m`;
 }
 
-export function formatWorkoutDuration(seconds: number): string  {
+export function formatWorkoutDuration(seconds: number): string {
   const totalMins = Math.round(seconds / 60);
 
   if (totalMins < 60) {
