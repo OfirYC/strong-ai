@@ -314,9 +314,7 @@ export default function CalendarModal({
                 {workout.status.replace("_", " ")}
               </Text>
             </View>
-            {workout.template_id && (
-              <Ionicons name="chevron-forward" size={20} color="#8E8E93" />
-            )}
+            {<Ionicons name="chevron-forward" size={20} color="#8E8E93" />}
           </TouchableOpacity>
         ))}
       </View>
