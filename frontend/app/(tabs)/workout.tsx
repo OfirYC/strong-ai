@@ -539,6 +539,7 @@ export default function WorkoutScreen() {
       <RoutineDetailModal
         visible={showRoutineModal}
         routine={selectedRoutine}
+        onRoutineEdited={setSelectedRoutine}
         onClose={() => setShowRoutineModal(false)}
         onStartWorkout={handleStartWorkoutFromRoutine}
         onSchedule={routine => {

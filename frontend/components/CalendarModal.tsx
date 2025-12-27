@@ -436,6 +436,7 @@ export default function CalendarModal({
       <RoutineDetailModal
         visible={showRoutineModal}
         routine={selectedRoutine}
+        onRoutineEdited={setSelectedRoutine}
         onClose={() => setShowRoutineModal(false)}
         onStartWorkout={() => {
           setShowRoutineModal(false);

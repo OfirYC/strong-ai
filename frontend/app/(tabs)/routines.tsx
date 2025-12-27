@@ -234,6 +234,7 @@ export default function RoutinesScreen() {
       <RoutineDetailModal
         visible={showRoutineModal}
         routine={selectedRoutine}
+        onRoutineEdited={setSelectedRoutine}
         onClose={() => setShowRoutineModal(false)}
         onSchedule={routine => {
           setSelectedRoutine(routine);
