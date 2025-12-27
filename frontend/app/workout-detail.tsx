@@ -448,7 +448,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#E5E5EA",
-    backgroundColor: "#FFFFFF",
+    // backgroundColor: "#FFFFFF",
   },
   headerBackButton: {
     padding: 4,
@@ -465,7 +465,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   summarySection: {
-    backgroundColor: "#FFFFFF",
+    // backgroundColor: "#FFFFFF",
     padding: 20,
     marginBottom: 8,
   },
@@ -510,7 +510,7 @@ const styles = StyleSheet.create({
     color: "#007AFF",
   },
   exercisesSummarySection: {
-    backgroundColor: "#FFFFFF",
+    // backgroundColor: "#FFFFFF",
     padding: 20,
     marginBottom: 8,
   },
@@ -560,7 +560,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
+    // backgroundColor: "#FFFFFF",
     paddingVertical: 16,
     marginBottom: 8,
     gap: 8,
@@ -571,7 +571,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   fullDetailSection: {
-    backgroundColor: "#FFFFFF",
+    // backgroundColor: "#FFFFFF",
     padding: 16,
   },
   exerciseCard: {
