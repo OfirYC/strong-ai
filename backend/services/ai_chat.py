@@ -101,28 +101,37 @@ TOOLS: List[Dict[str, Any]] = [
             "parameters": {"type": "object", "properties": {}, "required": []},
         },
     },
-    {
-        "type": "function",
-        "function": {
-            "name": "profile__update_insights",
-            "description": (
-                "Update specific fields in the user's profile insights (injuries, strengths, weaknesses, etc.). "
-                "Use when user shares new lasting info."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "injury_tags": {"type": "array", "items": {"type": "string"}},
-                    "current_issues": {"type": "array", "items": {"type": "string"}},
-                    "strength_tags": {"type": "array", "items": {"type": "string"}},
-                    "weak_point_tags": {"type": "array", "items": {"type": "string"}},
-                    "psych_profile": {"type": "string"},
+   {
+    "type": "function",
+    "function": {
+        "name": "profile__update_insights",
+        "description": (
+            "Update specific fields in the user's profile insights (injuries, strengths, weaknesses, etc.) "
+            "and high-level profile fields like goals and background story. "
+            "Use when user shares new lasting info."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "injury_tags": {"type": "array", "items": {"type": "string"}},
+                "current_issues": {"type": "array", "items": {"type": "string"}},
+                "strength_tags": {"type": "array", "items": {"type": "string"}},
+                "weak_point_tags": {"type": "array", "items": {"type": "string"}},
+                "psych_profile": {"type": "string"},
+                # NEW: allow AI to also update top-level profile fields
+                "goals": {
+                    "type": "string",
+                    "description": "High-level training goals summary text.",
                 },
-                "required": [],
+                "background_story": {
+                    "type": "string",
+                    "description": "Freeform background story the user shared.",
+                },
             },
+            "required": [],
         },
     },
-
+},
     # EXERCISES
     {
         "type": "function",
@@ -879,13 +888,13 @@ async def execute_tool(tool_name: str, arguments: Dict[str, Any], db, user_id: s
             insights_doc = await db.profile_insights.find_one({"user_id": user_id})
             if not insights_doc:
                 insights_doc = {
-                    "user_id": user_id,
-                    "injury_tags": [],
-                    "current_issues": [],
-                    "strength_tags": [],
-                    "weak_point_tags": [],
-                    "training_phases": [],
-                    "psych_profile": "",
+                 "user_id": user_id,
+                 "injury_tags": [],
+                 "current_issues": [],
+                 "strength_tags": [],
+                 "weak_point_tags": [],
+                 "training_phases": [],
+                 "psych_profile": "",
                 }
 
             update_fields: Dict[str, Any] = {}
@@ -899,10 +908,9 @@ async def execute_tool(tool_name: str, arguments: Dict[str, Any], db, user_id: s
             updated = await db.profile_insights.find_one({"user_id": user_id})
             if updated and "_id" in updated:
                 updated["id"] = str(updated["_id"])
-                del updated["_id"]
+            del updated["_id"]
 
             return json.dumps(updated or {}, default=str)
-
         # ---------------------------
         # EXERCISES
         # ---------------------------
