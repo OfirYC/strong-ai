@@ -255,16 +255,20 @@ export default function ActiveWorkoutSheet({
   const updateSet = (
     exerciseIndex: number,
     setIndex: number,
-    field: string,
-    value: any
+    fields: Partial<WorkoutSet> // <---- TYPE!
   ) => {
     const newExercises = [...exercises];
+
+    const oldExercise = newExercises[exerciseIndex];
+    const oldSets = oldExercise.sets;
+
     newExercises[exerciseIndex] = {
-      ...newExercises[exerciseIndex],
-      sets: newExercises[exerciseIndex].sets.map((set, i) =>
-        i === setIndex ? { ...set, [field]: value } : set
+      ...oldExercise,
+      sets: oldSets.map((set, i) =>
+        i === setIndex ? { ...set, ...fields } : set
       ),
     };
+
     updateWorkout(newExercises);
   };
 
@@ -878,8 +882,8 @@ export default function ActiveWorkoutSheet({
                                     exerciseKind={
                                       detail?.exercise_kind || "Barbell"
                                     }
-                                    onUpdateSet={(field, value) =>
-                                      updateSet(index, setIndex, field, value)
+                                    onUpdateSet={fields =>
+                                      updateSet(index, setIndex, fields)
                                     }
                                     showCompleteButton
                                   />
