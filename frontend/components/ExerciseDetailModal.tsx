@@ -785,11 +785,6 @@ export default function ExerciseDetailModal({
               </Text>
             </View>
           </View>
-
-          <TouchableOpacity style={styles.viewHistoryButton}>
-            <Text style={styles.viewHistoryText}>View Records History</Text>
-            <Ionicons name="chevron-forward" size={20} color="#007AFF" />
-          </TouchableOpacity>
         </>
       )}
     </ScrollView>
