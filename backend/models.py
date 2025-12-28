@@ -228,7 +228,7 @@ class WorkoutSessionCreate(BaseModel):
     planned_workout_id: Optional[str] = None  # Link to planned workout if starting from schedule
     notes: Optional[str] = None
     name: Optional[str] = None  # Allow custom workout name
-    exercises: Optional[List[WorkoutExerciseItem]] # custom exercises if no template
+    exercises: Optional[List[WorkoutExerciseItem]] = [] # custom exercises if no template
 
 
 class WorkoutSessionUpdate(BaseModel):

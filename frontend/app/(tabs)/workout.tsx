@@ -183,6 +183,7 @@ export default function WorkoutScreen() {
                   startWorkout(response.data);
                 });
               } catch (error) {
+                console.error(error);
                 Alert.alert("Error", "Failed to start workout");
               } finally {
                 setLoading(false);
@@ -202,6 +203,8 @@ export default function WorkoutScreen() {
       const response = await api.post("/workouts", { notes: "" });
       startWorkout(response.data);
     } catch (error: any) {
+      console.error(error);
+
       Alert.alert("Error", "Failed to start workout");
     } finally {
       setLoading(false);
