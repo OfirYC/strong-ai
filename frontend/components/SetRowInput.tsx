@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   Alert,
   Animated,
@@ -45,11 +45,13 @@ export interface SetData {
 
 interface SetRowInputProps {
   set: SetData;
+  exerciseId: string;
   setIndex: number;
   exerciseKind: ExerciseKind;
   onUpdateSet: (fields: Partial<SetData>) => void; // <-- NEW
   showCompleteButton?: boolean;
   containerStyle?: ViewStyle;
+  previousSetData: PreviousSetData | null;
 }
 
 interface PreviousSetData {
@@ -58,84 +60,6 @@ interface PreviousSetData {
   duration?: number; // seconds
   distance?: number; // km
   set_type?: SetType;
-}
-
-/**
- * Dummy async helper – in the real app you'll replace this with an API call
- * that fetches the *actual* previous set data for this exercise + set index.
- */
-async function getExercisePreviousData(
-  exerciseKind: ExerciseKind,
-  setIndex: number,
-  setType: SetType
-): Promise<PreviousSetData | null> {
-  await new Promise(resolve => setTimeout(resolve, 40));
-
-  const setNumber = setIndex + 1;
-  const baseWeight = 30 + setNumber * 2;
-  const baseReps = 6 + setNumber;
-  const baseDuration = 60 * (3 + setIndex); // seconds
-  const baseDistance = 1 + setIndex * 0.5; // km
-  if (setNumber > 6) {
-    return null;
-  }
-  switch (exerciseKind) {
-    case "Barbell":
-    case "Dumbbell":
-    case "Machine/Other":
-    case "Weighted Bodyweight":
-      return {
-        weight: baseWeight,
-        reps: baseReps,
-        set_type: setType,
-      };
-
-    case "Assisted Bodyweight":
-      return {
-        weight: -(20 + setNumber * 5),
-        reps: 8,
-        set_type: setType,
-      };
-
-    case "Reps Only":
-    case "EMOM (Every Minute On The Minute)":
-    case "ETOT (Every Thirty Seconds on Thirty Seconds)":
-      return {
-        reps: 8 + setNumber,
-        set_type: setType,
-      };
-
-    case "Duration":
-      return {
-        duration: 40 + setNumber * 10,
-        set_type: setType,
-      };
-
-    case "Cardio":
-      return {
-        distance: baseDistance,
-        duration: baseDuration,
-        set_type: setType,
-      };
-
-    case "Weighted Cardio":
-      return {
-        weight: baseWeight,
-        distance: baseDistance,
-        duration: baseDuration,
-        set_type: setType,
-      };
-
-    case "Weighted Duration":
-      return {
-        weight: baseWeight,
-        duration: baseDuration,
-        set_type: setType,
-      };
-
-    default:
-      return null;
-  }
 }
 
 /**
@@ -198,11 +122,10 @@ export default function SetRowInput({
   onUpdateSet,
   showCompleteButton = false,
   containerStyle,
+  previousSetData: previousData,
 }: SetRowInputProps) {
   const [showSetTypeDropdown, setShowSetTypeDropdown] = useState(false);
-  const [previousData, setPreviousData] = useState<PreviousSetData | null>(
-    null
-  );
+
   const rowAnim = useState(new Animated.Value(1))[0];
   const rowShake = useState(new Animated.Value(0))[0];
   const isSameAsPrevious = (): boolean => {
@@ -254,23 +177,6 @@ export default function SetRowInput({
   const isCompleted = set.completed;
   const setType: SetType = set.set_type || "normal";
   const typeConfig = SET_TYPE_CONFIG[setType];
-
-  // Load dummy "previous" value when row mounts / changes
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      const value = await getExercisePreviousData(
-        exerciseKind,
-        setIndex,
-        setType
-      );
-      if (!cancelled) setPreviousData(value);
-    };
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [exerciseKind, setIndex, setType]);
 
   const previousText = formatPreviousToText(previousData, exerciseKind);
 

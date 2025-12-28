@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import DraggableFlatList from "react-native-draggable-flatlist";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useMultipleExercisesPreviousSets } from "../hooks/usePreviousSetValues";
 import { useWorkoutStore } from "../store/workoutStore";
 import {
   Exercise,
@@ -178,6 +179,13 @@ export default function ActiveWorkoutSheet({
   useEffect(() => {
     loadExerciseDetails();
   }, [activeWorkout?.exercises]);
+
+  const { previousMap } = useMultipleExercisesPreviousSets(
+    activeWorkout?.exercises?.map(e => ({
+      id: e.exercise_id,
+      sets: e.sets,
+    })) || []
+  );
 
   const loadExerciseDetails = async () => {
     if (!activeWorkout) return;
@@ -877,6 +885,10 @@ export default function ActiveWorkoutSheet({
                                   onDelete={() => removeSet(index, setIndex)}
                                 >
                                   <SetRowInput
+                                    previousSetData={
+                                      previousMap[detail?.id]?.[setIndex]
+                                    }
+                                    exerciseId={detail?.id}
                                     set={set}
                                     setIndex={setIndex}
                                     exerciseKind={

@@ -287,3 +287,28 @@ export function formatWorkoutDuration(seconds: number): string {
 
   return `${hours}h ${paddedMins}m`;
 }
+
+export interface ExerciseHistory {
+  workout_id: string;
+  workout_name: string;
+  date: string;
+  sets: {
+    reps?: number;
+    weight?: number;
+    duration?: number;
+    distance?: number;
+    set_type: SetType;
+  }[];
+}
+
+
+export interface ExerciseHistoryResponse {
+  exercise_id: string;
+  exercise_kind: ExerciseKind;
+  window_days: number;
+  workouts_scanned: number;
+  history: ExerciseHistory[];
+  max_weight: number | undefined | null;
+  max_reps: number | undefined | null;
+  best_e1rm: number | undefined | null;
+}

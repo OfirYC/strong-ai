@@ -1,6 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import { BarChart, LineChart } from "react-native-gifted-charts";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -17,8 +16,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { BarChart, LineChart } from "react-native-gifted-charts";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Exercise, ExerciseKind, SetType } from "../types";
+import { Exercise, ExerciseHistory, ExerciseHistoryResponse } from "../types";
 import api from "../utils/api";
 import { SetNumber } from "./SetNumber";
 
@@ -33,29 +33,6 @@ interface ExerciseDetailModalProps {
   exercise: Exercise | null;
   onClose: () => void;
   onExerciseUpdated: () => void;
-}
-
-interface ExerciseHistory {
-  workout_id: string;
-  workout_name: string;
-  date: string;
-  sets: {
-    reps?: number;
-    weight?: number;
-    duration?: number;
-    distance?: number;
-    set_type: SetType;
-  }[];
-}
-interface ExerciseHistoryResponse {
-  exercise_id: string;
-  exercise_kind: ExerciseKind;
-  window_days: number;
-  workouts_scanned: number;
-  history: Exercise[];
-  max_weight: number | undefined | null;
-  max_reps: number | undefined | null;
-  best_e1rm: number | undefined | null;
 }
 
 interface PersonalRecords {
@@ -127,7 +104,7 @@ export default function ExerciseDetailModal({
 
       // 1) Map raw history
       const mappedHistory: ExerciseHistory[] = (data.history || []).map(
-        (h: any) =>
+        (h: ExerciseHistory) =>
           ({
             workout_id: h.workout_id,
             workout_name: h.workout_name,

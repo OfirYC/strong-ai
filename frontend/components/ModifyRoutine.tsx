@@ -22,8 +22,14 @@ import ExercisePickerModal from "./ExercisePickerModal";
 import Input from "./Input";
 import SetRowInput, { SetHeader } from "./SetRowInput";
 import SwipeToDeleteRow from "./SwipeToDeleteRow";
-import { Exercise, TemplateExercise, WorkoutTemplate } from "../types";
+import {
+  Exercise,
+  TemplateExercise,
+  WorkoutSet,
+  WorkoutTemplate,
+} from "../types";
 import api from "../utils/api";
+import { useMultipleExercisesPreviousSets } from "../hooks/usePreviousSetValues";
 
 type OnSaveRoutine = (
   name: string,
@@ -78,6 +84,13 @@ export function ModifyRoutine({
     setName(routine.name);
     setNotes(routine.notes || "");
   }, [routine?.id]);
+
+  const { previousMap } = useMultipleExercisesPreviousSets(
+    selectedExercises?.map(e => ({
+      id: e.exercise_id,
+      sets: e.sets,
+    })) || []
+  );
 
   const loadExerciseDetails = async () => {
     const exerciseIds = selectedExercises.map(e => e.exercise_id);
@@ -154,16 +167,20 @@ export function ModifyRoutine({
   const updateSet = (
     exerciseIndex: number,
     setIndex: number,
-    field: string,
-    value: any
+    fields: Partial<WorkoutSet> // <---- TYPE!
   ) => {
     const newExercises = [...selectedExercises];
+
+    const oldExercise = newExercises[exerciseIndex];
+    const oldSets = oldExercise.sets;
+
     newExercises[exerciseIndex] = {
-      ...newExercises[exerciseIndex],
-      sets: newExercises[exerciseIndex].sets.map((set, i) =>
-        i === setIndex ? { ...set, [field]: value } : set
+      ...oldExercise,
+      sets: oldSets.map((set, i) =>
+        i === setIndex ? { ...set, ...fields } : set
       ),
     };
+
     setSelectedExercises(newExercises);
   };
 
@@ -299,12 +316,12 @@ export function ModifyRoutine({
                     onDelete={() => removeSet(index, setIndex)}
                   >
                     <SetRowInput
+                      previousSetData={previousMap?.[detail.id]?.[setIndex]}
+                      exerciseId={detail.id}
                       set={set}
                       setIndex={setIndex}
                       exerciseKind={exerciseKind}
-                      onUpdateSet={(field, value) =>
-                        updateSet(index, setIndex, field, value)
-                      }
+                      onUpdateSet={fields => updateSet(index, setIndex, fields)}
                       showCompleteButton={false}
                     />
                   </SwipeToDeleteRow>
