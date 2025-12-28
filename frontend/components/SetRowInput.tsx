@@ -22,6 +22,7 @@ import {
 } from "../types";
 import DecimalInput from "./DecimalInput";
 import DurationInput from "./DurationInput";
+import { SetNumber } from "./SetNumber";
 
 // Descriptions for each set type
 const SET_TYPE_DESCRIPTIONS: Record<SetType, string> = {
@@ -273,36 +274,6 @@ export default function SetRowInput({
 
   const previousText = formatPreviousToText(previousData, exerciseKind);
 
-  const renderSetNumber = () => {
-    if (setType === "normal") {
-      return (
-        <TouchableOpacity
-          style={styles.setNumberContainer}
-          onPress={() => setShowSetTypeDropdown(true)}
-        >
-          <Text
-            style={[styles.setNumber, isCompleted && styles.setNumberCompleted]}
-          >
-            {setIndex + 1}
-          </Text>
-        </TouchableOpacity>
-      );
-    }
-
-    return (
-      <TouchableOpacity
-        style={[
-          styles.setTypeIndicator,
-          { backgroundColor: typeConfig.bgColor },
-        ]}
-        onPress={() => setShowSetTypeDropdown(true)}
-      >
-        <Text style={[styles.setTypeInitial, { color: typeConfig.color }]}>
-          {typeConfig.initial}
-        </Text>
-      </TouchableOpacity>
-    );
-  };
   const handleApplyPrevious = () => {
     if (!previousData || isSameAsPrevious()) {
       runShakeAnimation();
@@ -357,7 +328,15 @@ export default function SetRowInput({
         ]}
       >
         {/* SET column (fixed width, matches header) */}
-        <View style={styles.setIndexColumn}>{renderSetNumber()}</View>
+        <View style={styles.setIndexColumn}>
+          {
+            <SetNumber
+              setIndex={setIndex}
+              setType={setType}
+              onClick={() => setShowSetTypeDropdown(!showSetTypeDropdown)}
+            />
+          }
+        </View>
 
         {/* PREVIOUS column (tap to apply) */}
         <View style={styles.setFieldColumn}>

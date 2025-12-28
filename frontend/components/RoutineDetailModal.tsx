@@ -22,7 +22,7 @@ interface RoutineDetailModalProps {
   onClose: () => void;
   onStartWorkout: (routine: WorkoutTemplate) => void;
   onSchedule?: (routine: WorkoutTemplate) => void;
-  onRoutineEdited?: EditRoutineModalProps["onRoutineEdited"];
+  onRoutineEdited: EditRoutineModalProps["onRoutineEdited"];
 }
 
 interface ExerciseWithDetails {
@@ -220,7 +220,7 @@ export default function RoutineDetailModal({
                           {setCount} × {detail?.name || "Loading..."}
                         </Text>
                         <Text style={styles.exerciseMuscle}>
-                          {detail?.muscle_group ||
+                          {
                             detail?.primary_body_parts?.[0] ||
                             ""}
                         </Text>

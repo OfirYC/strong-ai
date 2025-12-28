@@ -6,9 +6,10 @@ import os
 import logging
 import asyncio
 from pathlib import Path
-from typing import List, Optional, Dict, Set
+from typing import List, Optional, Dict, Set, Any
 from datetime import datetime, timedelta
 from bson import ObjectId
+from constants import EXERCISE_KIND_RULES  # add this
 
 from models import (
     User, UserCreate, UserLogin, UserResponse, UserProfile, ProfileUpdate, UserContext, ProfileInsights,
@@ -654,6 +655,128 @@ async def get_workout_history(
         ))
     
     return summaries
+
+@api_router.get("/workouts/history/by-exercise")
+async def get_workout_history_by_exercise(
+    exercise_id: str,
+    days_back: int = 120,
+    limit_workouts: int = 60,
+    user_id: str = Depends(get_current_user),
+):
+    """
+    Return FULL workout history for a specific exercise,
+    grouped by workout, preserving sets and workout metadata.
+    """
+
+    if not exercise_id:
+        raise HTTPException(status_code=400, detail="exercise_id is required")
+
+    # clamp inputs
+    days_back = max(1, min(int(days_back), 730))
+    limit_workouts = max(1, min(int(limit_workouts), 300))
+
+    end_date = datetime.utcnow()
+    start_date = end_date - timedelta(days=days_back)
+
+
+    EXERCISE_KIND_ENUM: List[str] = list(EXERCISE_KIND_RULES.keys())
+
+    # Stable fallback when unknown kinds appear
+    DEFAULT_EXERCISE_KIND = (
+        "Machine/Other"
+        if "Machine/Other" in EXERCISE_KIND_RULES
+        else (EXERCISE_KIND_ENUM[0] if EXERCISE_KIND_ENUM else "Machine/Other")
+    )
+
+    # Determine kind for record logic
+    ex_kind = DEFAULT_EXERCISE_KIND
+    if ObjectId.is_valid(exercise_id):
+        ex_doc = await db.exercises.find_one({"_id": ObjectId(exercise_id)})
+        if ex_doc and ex_doc.get("exercise_kind"):
+            ex_kind = ex_doc["exercise_kind"]
+    if ex_kind not in EXERCISE_KIND_RULES:
+        ex_kind = DEFAULT_EXERCISE_KIND
+
+    allowed = set((EXERCISE_KIND_RULES.get(ex_kind) or {}).get("fields", []) or [])
+
+    # Pull relevant workouts
+   
+    workouts = (
+        await db.workouts.find(
+            {
+                "user_id": user_id,
+                "ended_at": {"$ne": None},
+                "started_at": {"$gte": start_date, "$lte": end_date},
+                "exercises.exercise_id": exercise_id,  # <- this is the new filter
+            }
+        )
+        .sort("started_at", -1)
+        .limit(limit_workouts)
+        .to_list(limit_workouts)
+    )
+
+    # build full workout history
+    history = []
+    max_weight = 0
+    max_reps = 0
+    best_e1rm = 0
+
+    def epley_1rm(wt: float, reps_i: int) -> float:
+        return wt * (1.0 + reps_i / 30.0)
+
+    for w in workouts:
+        w_date = w.get("started_at") or w.get("ended_at")
+        entry_sets = []
+        for ex in (w.get("exercises") or []):
+            if str(ex.get("exercise_id")) != exercise_id:
+                print("skipppp",str(ex.get("exercise_id")), exercise_id)
+                continue
+            else:
+                print("no ski")
+            for s in (ex.get("sets") or []):
+                reps = s.get("reps") or 0
+                weight = s.get("weight") or 0
+
+                # record tracking
+                if "reps" in allowed:
+                    if reps > max_reps:
+                        max_reps = reps
+                if "weight" in allowed and weight > max_weight:
+                    max_weight = weight
+                if weight > 0 and reps > 0:
+                    e = epley_1rm(weight, reps)
+                    if e > best_e1rm:
+                        best_e1rm = e
+
+                entry_sets.append({
+                    "reps": reps,
+                    "weight": weight,
+                    "duration": s.get("duration"),
+                    "distance": s.get("distance"),
+                    "set_type": s.get("set_type", "normal"),
+                })
+
+        if entry_sets:
+            history.append({
+                "workout_id": str(w["_id"]),
+                "workout_name": w.get("name") or "Workout",
+                "date": w_date.isoformat() if w_date else None,
+                "sets": entry_sets,
+            })
+
+    history.sort(key=lambda x: x["date"] or "", reverse=True)
+
+
+    return {
+        "exercise_id": exercise_id,
+        "exercise_kind": ex_kind,
+        "window_days": days_back,
+        "workouts_scanned": len(workouts),
+        "history": history,
+        "max_weight": max_weight or None,
+        "max_reps": max_reps or None,
+        "best_e1rm": round(best_e1rm, 2) if best_e1rm > 0 else None,
+    }
 
 
 @api_router.get("/workouts/{workout_id}", response_model=WorkoutSession)
