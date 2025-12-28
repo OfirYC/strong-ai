@@ -419,7 +419,7 @@ async def start_workout(
     user_id: str = Depends(get_current_user)
 ):
     # If template_id is provided, load the template and pre-populate exercises
-    exercises = []
+    exercises = workout_data.exercises or []
     name = workout_data.name
     notes = workout_data.notes
     

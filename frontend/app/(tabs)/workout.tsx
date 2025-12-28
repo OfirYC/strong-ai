@@ -13,7 +13,11 @@ import { useFocusEffect, useRouter } from "expo-router";
 import Button from "../../components/Button";
 import api from "../../utils/api";
 import { useWorkoutStore } from "../../store/workoutStore";
-import { WorkoutTemplate } from "../../types";
+import {
+  TemplateExercise,
+  WorkoutExercise,
+  WorkoutTemplate,
+} from "../../types";
 import RoutineDetailModal from "../../components/RoutineDetailModal";
 import ScheduleWorkoutModal from "../../components/ScheduleWorkoutModal";
 import CalendarModal from "../../components/CalendarModal";
@@ -29,6 +33,8 @@ interface PlannedWorkout {
   notes?: string;
   status: "planned" | "in_progress" | "completed" | "skipped";
   workout_session_id?: string;
+  inline_exercises?: TemplateExercise[];
+
   order: number;
   is_recurring: boolean;
   recurrence_type?: string;
@@ -375,6 +381,9 @@ export default function WorkoutScreen() {
       // If it has a template, use it
       if (plannedWorkout.template_id) {
         payload.template_id = plannedWorkout.template_id;
+      } else if (plannedWorkout.inline_exercises?.length) {
+        payload.exercises =
+          plannedWorkout.inline_exercises satisfies WorkoutExercise[];
       }
 
       const response = await api.post("/workouts", payload);
