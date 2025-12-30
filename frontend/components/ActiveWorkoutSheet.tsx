@@ -187,6 +187,10 @@ export default function ActiveWorkoutSheet({
     })) || []
   );
 
+  const getDefaultRestTimer = () => {
+    return 3 * 60;
+  };
+
   const loadExerciseDetails = async () => {
     if (!activeWorkout) return;
 
@@ -245,7 +249,10 @@ export default function ActiveWorkoutSheet({
     const detail = exerciseDetails[exercise.exercise_id];
     const fields = getExerciseFields(detail?.exercise_kind || "Barbell");
 
-    const newSet: WorkoutSet = { set_type: "normal" };
+    const newSet: WorkoutSet = {
+      set_type: "normal",
+      rest_timer: getDefaultRestTimer(),
+    };
     if (fields.includes("weight")) newSet.weight = 0;
     if (fields.includes("reps")) newSet.reps = 0;
     if (fields.includes("distance")) newSet.distance = 0;

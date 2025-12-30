@@ -158,6 +158,7 @@ class TemplateSetItem(BaseModel):
     duration: Optional[float] = None  # in seconds (supports decimals for centiseconds)
     distance: Optional[float] = None  # in km
     set_type: Literal["normal", "warmup", "cooldown", "failure"] = "normal"
+    rest_timer: Optional[int] = None
 
 
 class TemplateExerciseItem(BaseModel):
@@ -192,29 +193,29 @@ class WorkoutTemplate(BaseModel):
         populate_by_name = True
         json_encoders = {ObjectId: str}
 
-
-# Workout Session Models
 class WorkoutSetItem(BaseModel):
-    # Set type: normal, warmup, cooldown, or failure
+    # Set type
     set_type: Literal["normal", "warmup", "cooldown", "failure"] = "normal"
     completed_at: Optional[datetime] = None
     completed: Optional[bool] = False
-    
-    # Weight + Reps (Barbell, Dumbbell, Machine, Weighted Bodyweight, Assisted Bodyweight, Reps Only)
+
+    # Weight + Reps
     reps: Optional[int] = None
     weight: Optional[float] = None
-    
+
     # Cardio fields
-    distance: Optional[float] = None  # in km or miles
-    duration: Optional[float] = None  # in seconds (supports decimals for centiseconds)
+    distance: Optional[float] = None
+    duration: Optional[float] = None
     calories: Optional[int] = None
-    
-    # PR flags (computed when workout is completed)
+
+    # NEW – strict rest timer
+    rest_timer: Optional[int] = None
+
+    # PR flags
     is_volume_pr: bool = False
     is_weight_pr: bool = False
     is_reps_pr: bool = False
     is_duration_pr: bool = False
-
 
 class WorkoutExerciseItem(BaseModel):
     exercise_id: str

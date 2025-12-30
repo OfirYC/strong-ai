@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { TextInput, StyleSheet, ViewStyle } from 'react-native';
+import React, { useEffect, useState } from "react";
+import { StyleProp, StyleSheet, TextInput, TextStyle } from "react-native";
 
 interface DecimalInputProps {
   value: number;
   onChangeValue: (value: number) => void;
-  style?: ViewStyle;
+  style?: StyleProp<TextStyle>;
   placeholder?: string;
 }
 
@@ -12,32 +12,39 @@ interface DecimalInputProps {
  * A TextInput component that properly handles decimal number input
  * Preserves the decimal point while typing and only converts to number on blur
  */
-export default function DecimalInput({ value, onChangeValue, style, placeholder = '0' }: DecimalInputProps) {
+export default function DecimalInput({
+  value,
+  onChangeValue,
+  style,
+  placeholder = "0",
+}: DecimalInputProps) {
   const [textValue, setTextValue] = useState(value.toString());
   const [isFocused, setIsFocused] = useState(false);
 
   // Sync from parent value when not focused
   useEffect(() => {
     if (!isFocused) {
-      setTextValue(value === 0 ? '' : value.toString());
+      setTextValue(value === 0 ? "" : value.toString());
     }
   }, [value, isFocused]);
 
   const handleChangeText = (text: string) => {
     // Allow empty, digits, and one decimal point
-    let cleaned = text.replace(/[^0-9.]/g, '');
-    
+    let cleaned = text.replace(/[^0-9.]/g, "");
+
     // Only allow one decimal point
-    const dotIndex = cleaned.indexOf('.');
+    const dotIndex = cleaned.indexOf(".");
     if (dotIndex !== -1) {
-      cleaned = cleaned.substring(0, dotIndex + 1) + 
-                cleaned.substring(dotIndex + 1).replace(/\./g, '');
+      cleaned =
+        cleaned.substring(0, dotIndex + 1) +
+        cleaned.substring(dotIndex + 1).replace(/\./g, "");
     }
-    
+
     setTextValue(cleaned);
-    
+
     // Parse and send value to parent
-    const numValue = cleaned === '' || cleaned === '.' ? 0 : parseFloat(cleaned);
+    const numValue =
+      cleaned === "" || cleaned === "." ? 0 : parseFloat(cleaned);
     onChangeValue(isNaN(numValue) ? 0 : numValue);
   };
 
@@ -45,16 +52,17 @@ export default function DecimalInput({ value, onChangeValue, style, placeholder 
     setIsFocused(true);
     // Show empty field if value is 0
     if (value === 0) {
-      setTextValue('');
+      setTextValue("");
     }
   };
 
   const handleBlur = () => {
     setIsFocused(false);
     // Format the value on blur
-    const numValue = textValue === '' || textValue === '.' ? 0 : parseFloat(textValue);
+    const numValue =
+      textValue === "" || textValue === "." ? 0 : parseFloat(textValue);
     const finalValue = isNaN(numValue) ? 0 : numValue;
-    setTextValue(finalValue === 0 ? '' : finalValue.toString());
+    setTextValue(finalValue === 0 ? "" : finalValue.toString());
     onChangeValue(finalValue);
   };
 
@@ -74,13 +82,13 @@ export default function DecimalInput({ value, onChangeValue, style, placeholder 
 
 const styles = StyleSheet.create({
   input: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 16,
-    textAlign: 'center',
+    textAlign: "center",
     borderWidth: 1,
-    borderColor: '#D1D1D6',
+    borderColor: "#D1D1D6",
   },
 });

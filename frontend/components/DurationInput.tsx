@@ -1,113 +1,228 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   TextInput,
   StyleSheet,
-} from 'react-native';
+  StyleProp,
+  TextStyle,
+  Platform,
+} from "react-native";
 
 interface DurationInputProps {
-  value: number; // value in seconds (can be decimal, e.g. 1.50 = 1 second 50 centiseconds)
+  value: number; // value in seconds (can be decimal when using ms)
   onChangeValue: (seconds: number) => void;
-  style?: object;
+  style?: StyleProp<TextStyle>;
+  onChangeFocus?: (focused: boolean) => void;
+  enableMilliseconds?: boolean;
 }
 
-/**
- * Calculator-style duration input with centisecond support
- * As you type digits, they fill from right to left like a stopwatch
- * 
- * Format: MM:SS.cc or H:MM:SS.cc
- * The last 2 digits are always centiseconds
- * 
- * Examples:
- * - Type "1" → displays "0:00.01" (0.01 seconds)
- * - Type "50" → displays "0:00.50" (0.50 seconds)
- * - Type "150" → displays "0:01.50" (1.50 seconds)
- * - Type "3000" → displays "0:30.00" (30 seconds)
- * - Type "10000" → displays "1:00.00" (1 minute)
- */
-export default function DurationInput({ value, onChangeValue, style }: DurationInputProps) {
-  // Store the raw digits entered by user
-  const [rawDigits, setRawDigits] = useState<string>('');
-  const [isFocused, setIsFocused] = useState(false);
+const pad2 = (n: number | string) => n.toString().padStart(2, "0");
 
-  // Initialize rawDigits from value prop when component mounts or value changes externally
-  useEffect(() => {
-    if (!isFocused && value > 0) {
-      // Convert seconds (with decimals) to raw digit string
-      const totalCentiseconds = Math.round(value * 100);
-      const hours = Math.floor(totalCentiseconds / 360000);
-      const minutes = Math.floor((totalCentiseconds % 360000) / 6000);
-      const seconds = Math.floor((totalCentiseconds % 6000) / 100);
-      const centis = totalCentiseconds % 100;
-      
-      // Build digit string (remove leading zeros but keep structure)
-      let digits = '';
-      if (hours > 0) {
-        digits = `${hours}${minutes.toString().padStart(2, '0')}${seconds.toString().padStart(2, '0')}${centis.toString().padStart(2, '0')}`;
-      } else if (minutes > 0) {
-        digits = `${minutes}${seconds.toString().padStart(2, '0')}${centis.toString().padStart(2, '0')}`;
-      } else if (seconds > 0) {
-        digits = `${seconds}${centis.toString().padStart(2, '0')}`;
-      } else if (centis > 0) {
-        digits = centis.toString();
-      }
-      setRawDigits(digits);
-    } else if (!isFocused && value === 0) {
-      setRawDigits('');
-    }
-  }, [value, isFocused]);
+// -----------------------------------
+// value (seconds) -> 'calculator digits'
+// -----------------------------------
+export function formatDurationValueToDigitString(
+  value: number,
+  enableMilliseconds: boolean
+): string {
+  if (!Number.isFinite(value) || value <= 0) return "";
 
-  // Convert raw digits to formatted time string (MM:SS.cc or H:MM:SS.cc)
-  const formatDigitsToTime = (digits: string): string => {
-    if (!digits || digits === '0') return '0:00.00';
-    
-    // Pad to at least 6 digits for proper formatting (MMSSCC)
-    const padded = digits.padStart(6, '0');
-    const len = padded.length;
-    
-    // Extract from right to left: centiseconds, seconds, minutes, hours
-    const centis = parseInt(padded.slice(-2), 10);
-    const secs = parseInt(padded.slice(-4, -2), 10);
-    const mins = parseInt(padded.slice(-6, -4), 10);
-    const hrs = len > 6 ? parseInt(padded.slice(0, -6), 10) : 0;
-    
+  if (enableMilliseconds) {
+    const totalCentis = Math.round(value * 100);
+
+    const centis = totalCentis % 100;
+    const totalSeconds = Math.floor(totalCentis / 100);
+
+    const secs = totalSeconds % 60;
+    const totalMinutes = Math.floor(totalSeconds / 60);
+
+    const mins = totalMinutes % 60;
+    const hrs = Math.floor(totalMinutes / 60);
+
+    let digits = "";
     if (hrs > 0) {
-      return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${centis.toString().padStart(2, '0')}`;
+      digits = `${hrs}${pad2(mins)}${pad2(secs)}${pad2(centis)}`;
+    } else if (mins > 0) {
+      digits = `${mins}${pad2(secs)}${pad2(centis)}`;
+    } else if (secs > 0) {
+      digits = `${secs}${pad2(centis)}`;
     } else {
-      return `${mins}:${secs.toString().padStart(2, '0')}.${centis.toString().padStart(2, '0')}`;
+      digits = `${centis}`;
     }
-  };
 
-  // Convert raw digits to total seconds (with decimal for centiseconds)
-  const digitsToSeconds = (digits: string): number => {
-    if (!digits) return 0;
-    
-    const padded = digits.padStart(6, '0');
-    const len = padded.length;
-    
-    const centis = parseInt(padded.slice(-2), 10);
-    const secs = parseInt(padded.slice(-4, -2), 10);
-    const mins = parseInt(padded.slice(-6, -4), 10);
-    const hrs = len > 6 ? parseInt(padded.slice(0, -6), 10) : 0;
-    
-    return hrs * 3600 + mins * 60 + secs + (centis / 100);
-  };
+    return digits.replace(/^0+/, "") || "";
+  }
 
+  // seconds-only mode
+  const totalSecs = Math.round(value);
+  const secs = totalSecs % 60;
+  const totalMinutes = Math.floor(totalSecs / 60);
+  const mins = totalMinutes % 60;
+  const hrs = Math.floor(totalMinutes / 60);
+
+  let digits = "";
+  if (hrs > 0) {
+    digits = `${hrs}${pad2(mins)}${pad2(secs)}`;
+  } else if (mins > 0) {
+    digits = `${mins}${pad2(secs)}`;
+  } else {
+    digits = `${secs}`;
+  }
+
+  return digits.replace(/^0+/, "") || "";
+}
+
+// -----------------------------------
+// raw digits -> formatted time string
+// -----------------------------------
+export const formatDigitsToTime = (
+  digits: string,
+  enableMilliseconds: boolean
+): string => {
+  const clean = digits.replace(/\D/g, "");
+  if (!clean) return enableMilliseconds ? "0:00.00" : "0:00";
+
+  if (enableMilliseconds) {
+    const cStr = clean.slice(-2) || "0";
+    const sStr = clean.length > 2 ? clean.slice(-4, -2) : "0";
+    const mStr = clean.length > 4 ? clean.slice(-6, -4) : "0";
+    const hStr = clean.length > 6 ? clean.slice(0, -6) : "";
+
+    const c = parseInt(cStr, 10) || 0;
+    const s = parseInt(sStr, 10) || 0;
+    const m = parseInt(mStr, 10) || 0;
+    const h = hStr ? parseInt(hStr, 10) || 0 : 0;
+
+    // NEW: nicer display rules for ms mode
+    if (h > 0) {
+      // H:MM:SS.cc
+      return `${h}:${pad2(m)}:${pad2(s)}.${pad2(c)}`;
+    }
+    if (m > 0) {
+      // M:SS.cc
+      return `${m}:${pad2(s)}.${pad2(c)}`;
+    }
+    // seconds only: S.cc (no leading "0:")
+    return `${s}.${pad2(c)}`;
+  }
+
+  // seconds-only
+  const sStr = clean.slice(-2) || "0";
+  const mStr = clean.length > 2 ? clean.slice(-4, -2) : "0";
+  const hStr = clean.length > 4 ? clean.slice(0, -4) : "";
+
+  const s = parseInt(sStr, 10) || 0;
+  const m = parseInt(mStr, 10) || 0;
+  const h = hStr ? parseInt(hStr, 10) || 0 : 0;
+
+  if (h > 0) {
+    return `${h}:${pad2(m)}:${pad2(s)}`;
+  }
+  return `${m}:${pad2(s)}`;
+};
+
+// -----------------------------------
+// raw digits -> seconds
+// -----------------------------------
+const digitsToSeconds = (
+  digits: string,
+  enableMilliseconds: boolean
+): number => {
+  const clean = digits.replace(/\D/g, "");
+  if (!clean) return 0;
+
+  if (enableMilliseconds) {
+    const cStr = clean.slice(-2) || "0";
+    const sStr = clean.length > 2 ? clean.slice(-4, -2) : "0";
+    const mStr = clean.length > 4 ? clean.slice(-6, -4) : "0";
+    const hStr = clean.length > 6 ? clean.slice(0, -6) : "";
+
+    const c = parseInt(cStr, 10) || 0;
+    const s = parseInt(sStr, 10) || 0;
+    const m = parseInt(mStr, 10) || 0;
+    const h = hStr ? parseInt(hStr, 10) || 0 : 0;
+
+    return h * 3600 + m * 60 + s + c / 100;
+  }
+
+  // seconds-only
+  const sStr = clean.slice(-2) || "0";
+  const mStr = clean.length > 2 ? clean.slice(-4, -2) : "0";
+  const hStr = clean.length > 4 ? clean.slice(0, -4) : "";
+
+  const s = parseInt(sStr, 10) || 0;
+  const m = parseInt(mStr, 10) || 0;
+  const h = hStr ? parseInt(hStr, 10) || 0 : 0;
+
+  return h * 3600 + m * 60 + s;
+};
+
+/**
+ * Calculator-style duration input.
+ *
+ * While focused:
+ *   - 1–2 digits: show raw ("5", "50")
+ *   - 3+ digits: show formatted ("5:00", "5.00", "1:02.50", etc.)
+ *
+ * On blur:
+ *   - compute seconds and call onChangeValue once
+ *   - always show formatted.
+ */
+export default function DurationInput({
+  value,
+  onChangeValue,
+  style,
+  onChangeFocus,
+  enableMilliseconds = true,
+}: DurationInputProps) {
+  const [rawDigits, setRawDigits] = useState<string>("");
+  const [isFocused, setIsFocused] = useState(false);
+  const [initiatedFocus, setInitiatedFocus] = useState(false);
+
+  // Focus callbacks
+  useEffect(() => {
+    if (!initiatedFocus) {
+      setInitiatedFocus(true);
+      return;
+    }
+    onChangeFocus?.(isFocused);
+  }, [isFocused, onChangeFocus]);
+  // Sync external value -> rawDigits ONLY when we truly lose focus
+  useEffect(() => {
+    if (isFocused) return; // <- BLOCK SYNC 100% WHILE FOCUSED
+
+    // If value is zero or invalid, we leave rawDigits alone
+    if (!Number.isFinite(value) || value <= 0) {
+      return; // <- DO NOT setRawDigits("") here; user may have cleared it
+    }
+
+    const digits = formatDurationValueToDigitString(value, enableMilliseconds);
+
+    // Only update if different AND not focused
+    setRawDigits(prev => {
+      return prev === digits ? prev : digits;
+    });
+  }, [value, isFocused, enableMilliseconds]);
+
+  // Typing handler – local only, no parent calls
   const handleTextChange = (text: string) => {
-    // Only allow numeric input - strip any non-digits
-    const numericOnly = text.replace(/[^0-9]/g, '');
-    
-    // Limit to 8 digits (max 99:59:59.99)
-    const limitedDigits = numericOnly.slice(0, 8);
-    
-    // Remove leading zeros for storage
-    const cleanedDigits = limitedDigits.replace(/^0+/, '') || '';
-    
-    setRawDigits(cleanedDigits);
-    
-    // Convert to seconds and notify parent
-    const seconds = digitsToSeconds(cleanedDigits);
-    onChangeValue(seconds);
+    const numericOnly = text.replace(/[^0-9]/g, "");
+    const maxDigits = enableMilliseconds ? 8 : 6; // HHMMSSCC or HHMMSS
+    const limited = numericOnly.slice(0, maxDigits);
+    const cleaned = limited.replace(/^0+/, "") || "";
+
+    setRawDigits(cleaned);
   };
+
+  // What to show in the input?
+  const formatted = useMemo(
+    () => formatDigitsToTime(rawDigits, enableMilliseconds),
+    [rawDigits, enableMilliseconds]
+  );
+
+  const displayValue =
+    isFocused && rawDigits.length > 0 && rawDigits.length <= 2
+      ? rawDigits // "5", "50"
+      : formatted;
 
   const handleFocus = () => {
     setIsFocused(true);
@@ -115,46 +230,51 @@ export default function DurationInput({ value, onChangeValue, style }: DurationI
 
   const handleBlur = () => {
     setIsFocused(false);
-  };
 
-  const displayValue = formatDigitsToTime(rawDigits);
+    // On blur: commit to parent once
+    const seconds = digitsToSeconds(rawDigits, enableMilliseconds);
+    onChangeValue(seconds);
+  };
 
   return (
     <TextInput
-      style={[
-        styles.input,
-        isFocused && styles.inputFocused,
-        style
-      ]}
+      keyboardType={Platform.select({
+        ios: "numbers-and-punctuation",
+        android: "number-pad",
+      })}
+      returnKeyType="done"
+      submitBehavior="blurAndSubmit"
+      style={[styles.input, isFocused && styles.inputFocused, style]}
       value={displayValue}
       onChangeText={handleTextChange}
       onFocus={handleFocus}
       onBlur={handleBlur}
       keyboardType="number-pad"
-      maxLength={12}
-      placeholder="0:00.00"
+      maxLength={enableMilliseconds ? 12 : 10}
+      placeholder={enableMilliseconds ? "0:00.00" : "0:00"}
       placeholderTextColor="#999"
-      selectTextOnFocus={true}
+      selectTextOnFocus
+      autoFocus
     />
   );
 }
 
 const styles = StyleSheet.create({
   input: {
-    backgroundColor: '#F5F5F7',
+    backgroundColor: "#F5F5F7",
     borderRadius: 8,
     paddingVertical: 10,
     paddingHorizontal: 8,
     borderWidth: 1,
-    borderColor: '#D1D1D6',
+    borderColor: "#D1D1D6",
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1C1C1E',
-    textAlign: 'center',
+    fontWeight: "600",
+    color: "#1C1C1E",
+    textAlign: "center",
     minWidth: 80,
   },
   inputFocused: {
-    borderColor: '#007AFF',
+    borderColor: "#007AFF",
     borderWidth: 2,
   },
 });

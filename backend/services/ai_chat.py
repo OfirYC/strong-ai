@@ -250,7 +250,7 @@ TOOLS: List[Dict[str, Any]] = [
                                 "exercise_id": {"type": "string"},
                                 "sets": {
                                     "type": "array",
-                                    "description": "Array of set objects. Each set has set_type, reps, weight, duration, distance as needed.",
+                                    "description": "Array of set objects. Each set has set_type, reps, weight, duration, distance, rest_timer as needed.",
                                     "items": {
                                         "type": "object",
                                         "properties": {
@@ -263,6 +263,10 @@ TOOLS: List[Dict[str, Any]] = [
                                             "weight": {"type": "number"},
                                             "duration": {"type": "number"},
                                             "distance": {"type": "number"},
+                                            "rest_timer": {
+                                                "type": "integer",
+                                                "description": "Optional rest time in seconds after this set.",
+                                            },
                                         },
                                     },
                                 },
@@ -328,6 +332,10 @@ TOOLS: List[Dict[str, Any]] = [
                                             "weight": {"type": "number"},
                                             "duration": {"type": "number"},
                                             "distance": {"type": "number"},
+                                            "rest_timer": {
+                                                "type": "integer",
+                                                "description": "Optional rest time in seconds after this set.",
+                                            },
                                         },
                                     },
                                 },
@@ -390,23 +398,28 @@ TOOLS: List[Dict[str, Any]] = [
             "properties": {
               "exercise_id": { "type": "string" },
               "sets": {
-                "type": "array",
-                "description": "Array of set objects.",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "set_type": {
-                      "type": "string",
-                      "enum": ["normal", "warmup", "cooldown", "failure"],
-                      "description": "Type of set (default normal if omitted)"
-                    },
-                    "reps": { "type": "integer" },
-                    "weight": { "type": "number" },
-                    "duration": { "type": "number" },
-                    "distance": { "type": "number" }
-                  }
-                }
-              },
+                    "type": "array",
+                    "description": "Array of set objects.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "set_type": {
+                                "type": "string",
+                                "enum": ["normal", "warmup", "cooldown", "failure"],
+                                "description": "Type of set (default normal if omitted)"
+                            },
+                            "reps": { "type": "integer" },
+                            "weight": { "type": "number" },
+                            "duration": { "type": "number" },
+                            "distance": { "type": "number" },
+                            "rest_timer": {
+                                "type": "integer",
+                                "description": "Optional rest time in seconds after this set."
+                            }
+                        }
+                    }
+                },
+
               "reps": { "type": "integer" },
               "weight": { "type": "number" },
               "duration": { "type": "number" },
@@ -503,7 +516,7 @@ TOOLS: List[Dict[str, Any]] = [
                             "properties": {
                                 "exercise_id": { "type": "string" },
                                 "sets": {
-                                    "type": "array",
+                                "type": "array",
                                     "description": "Array of set objects.",
                                     "items": {
                                         "type": "object",
@@ -516,7 +529,11 @@ TOOLS: List[Dict[str, Any]] = [
                                             "reps": { "type": "integer" },
                                             "weight": { "type": "number" },
                                             "duration": { "type": "number" },
-                                            "distance": { "type": "number" }
+                                            "distance": { "type": "number" },
+                                            "rest_timer": {
+                                                "type": "integer",
+                                                "description": "Optional rest time in seconds after this set."
+                                            }
                                         }
                                     }
                                 },
@@ -732,7 +749,6 @@ def _normalize_set_fields_by_kind(
 
     return out
 
-
 async def _build_template_exercises_from_compact(
     exercises: List[Dict[str, Any]],
     db,
@@ -744,7 +760,7 @@ async def _build_template_exercises_from_compact(
 
     Input item supports:
     - exercise_id (required)
-    - sets: array of set objects [{set_type, reps, weight, duration, distance}, ...]
+    - sets: array of set objects [{set_type, reps, weight, duration, distance, rest_timer?}, ...]
       (if missing/invalid/empty, default sets will be auto-generated based only on exercise_kind)
     - notes (optional)
     """
@@ -778,6 +794,9 @@ async def _build_template_exercises_from_compact(
                 if set_type not in ("normal", "warmup", "cooldown", "failure"):
                     set_type = "normal"
 
+                # Optional rest timer (seconds)
+                rest_timer = set_item.get("rest_timer")
+
                 # Normalize fields based on exercise kind
                 normalized = _normalize_set_fields_by_kind(
                     kind,
@@ -786,7 +805,16 @@ async def _build_template_exercises_from_compact(
                     set_item.get("duration"),
                     set_item.get("distance"),
                 )
-                sets_arr.append({"set_type": set_type, **normalized})
+
+                set_dict: Dict[str, Any] = {"set_type": set_type, **normalized}
+
+                if rest_timer is not None:
+                    try:
+                        set_dict["rest_timer"] = int(rest_timer)
+                    except (TypeError, ValueError):
+                        set_dict["rest_timer"] = None
+
+                sets_arr.append(set_dict)
 
             # If array was empty or all invalid, create default sets
             if not sets_arr:
@@ -804,7 +832,13 @@ async def _build_template_exercises_from_compact(
                     None,
                 )
                 for _ in range(num_sets):
-                    sets_arr.append({"set_type": "normal", **base_fields})
+                    sets_arr.append(
+                        {
+                            "set_type": "normal",
+                            "rest_timer": None,
+                            **base_fields,
+                        }
+                    )
         else:
             # Non-array sets are ignored as invalid.
             # Auto-generate a reasonable default prescription based only on kind.
@@ -823,7 +857,13 @@ async def _build_template_exercises_from_compact(
             )
 
             for _ in range(num_sets):
-                sets_arr.append({"set_type": "normal", **base_fields})
+                sets_arr.append(
+                    {
+                        "set_type": "normal",
+                            "rest_timer": None,
+                        **base_fields,
+                    }
+                )
 
         num_sets = len(sets_arr)
         # Use first set's values for defaults (or fallback)
@@ -1496,6 +1536,7 @@ async def execute_tool(tool_name: str, arguments: Dict[str, Any], db, user_id: s
                                 "duration": s.get("duration"),
                                 "distance": s.get("distance"),
                                 "calories": s.get("calories"),
+                                "rest_timer": s.get("rest_timer"),
                             }
                         )
 

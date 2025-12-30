@@ -1,6 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -17,11 +16,7 @@ import DraggableFlatList, {
 } from "react-native-draggable-flatlist";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import CreateExerciseModal from "./CreateExerciseModal";
-import ExercisePickerModal from "./ExercisePickerModal";
-import Input from "./Input";
-import SetRowInput, { SetHeader } from "./SetRowInput";
-import SwipeToDeleteRow from "./SwipeToDeleteRow";
+import { useMultipleExercisesPreviousSets } from "../hooks/usePreviousSetValues";
 import {
   Exercise,
   TemplateExercise,
@@ -29,7 +24,11 @@ import {
   WorkoutTemplate,
 } from "../types";
 import api from "../utils/api";
-import { useMultipleExercisesPreviousSets } from "../hooks/usePreviousSetValues";
+import CreateExerciseModal from "./CreateExerciseModal";
+import ExercisePickerModal from "./ExercisePickerModal";
+import Input from "./Input";
+import SetRowInput, { SetHeader } from "./SetRowInput";
+import SwipeToDeleteRow from "./SwipeToDeleteRow";
 
 type OnSaveRoutine = (
   name: string,
@@ -92,6 +91,10 @@ export function ModifyRoutine({
     })) || []
   );
 
+  const getDefaultRestTimer = () => {
+    return 3 * 60;
+  };
+
   const loadExerciseDetails = async () => {
     const exerciseIds = selectedExercises.map(e => e.exercise_id);
     const missingIds = exerciseIds.filter(id => !exerciseDetails[id]);
@@ -119,7 +122,7 @@ export function ModifyRoutine({
     const newExercise: TemplateExercise = {
       exercise_id: exercise.id,
       order: selectedExercises.length,
-      sets: [{ set_type: "normal" }], // Start with one empty set
+      sets: [{ set_type: "normal", rest_timer: getDefaultRestTimer() }], // Start with one empty set
     };
     setSelectedExercises(prev => [...prev, newExercise]);
     // Add to details immediately
@@ -150,7 +153,10 @@ export function ModifyRoutine({
     const newExercises = [...selectedExercises];
     newExercises[exerciseIndex] = {
       ...newExercises[exerciseIndex],
-      sets: [...newExercises[exerciseIndex].sets, { set_type: "normal" }],
+      sets: [
+        ...newExercises[exerciseIndex].sets,
+        { set_type: "normal", rest_timer: getDefaultRestTimer() },
+      ],
     };
     setSelectedExercises(newExercises);
   };
@@ -316,8 +322,8 @@ export function ModifyRoutine({
                     onDelete={() => removeSet(index, setIndex)}
                   >
                     <SetRowInput
-                      previousSetData={previousMap?.[detail.id]?.[setIndex]}
-                      exerciseId={detail.id}
+                      previousSetData={previousMap?.[detail?.id]?.[setIndex]}
+                      exerciseId={detail?.id}
                       set={set}
                       setIndex={setIndex}
                       exerciseKind={exerciseKind}

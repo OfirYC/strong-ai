@@ -1,9 +1,18 @@
 import { Ionicons } from "@expo/vector-icons";
+import MaskedView from "@react-native-masked-view/masked-view";
 import * as Haptics from "expo-haptics";
-import React, { useState } from "react";
+import React, {
+  JSX,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Alert,
   Animated,
+  Easing,
   Modal,
   Pressable,
   StyleSheet,
@@ -41,6 +50,7 @@ export interface SetData {
   distance?: number; // km
   set_type?: SetType;
   completed?: boolean;
+  rest_timer: number | null; // seconds to rest after completing the set
 }
 
 interface SetRowInputProps {
@@ -48,7 +58,7 @@ interface SetRowInputProps {
   exerciseId: string;
   setIndex: number;
   exerciseKind: ExerciseKind;
-  onUpdateSet: (fields: Partial<SetData>) => void; // <-- NEW
+  onUpdateSet: (fields: Partial<SetData>) => void;
   showCompleteButton?: boolean;
   containerStyle?: ViewStyle;
   previousSetData: PreviousSetData | null;
@@ -60,6 +70,44 @@ interface PreviousSetData {
   duration?: number; // seconds
   distance?: number; // km
   set_type?: SetType;
+}
+
+/* -------------------------------------------------------------------------- */
+/* SHARED REST TIMER REGISTRY (ONE ACTIVE TIMER AT A TIME)                    */
+/* -------------------------------------------------------------------------- */
+
+type TimerKey = string;
+type TimerStopper = () => void;
+
+const restTimerRegistry: {
+  activeKey: TimerKey | null;
+  listeners: Map<TimerKey, TimerStopper>;
+} = {
+  activeKey: null,
+  listeners: new Map(),
+};
+
+function registerRestTimer(key: TimerKey, stopper: TimerStopper) {
+  restTimerRegistry.listeners.set(key, stopper);
+
+  return () => {
+    restTimerRegistry.listeners.delete(key);
+    if (restTimerRegistry.activeKey === key) {
+      restTimerRegistry.activeKey = null;
+    }
+  };
+}
+
+function activateRestTimer(key: TimerKey) {
+  if (restTimerRegistry.activeKey && restTimerRegistry.activeKey !== key) {
+    const prevStopper = restTimerRegistry.listeners.get(
+      restTimerRegistry.activeKey
+    );
+    if (prevStopper) {
+      prevStopper();
+    }
+  }
+  restTimerRegistry.activeKey = key;
 }
 
 /**
@@ -118,6 +166,7 @@ function formatPreviousToText(
 export default function SetRowInput({
   set,
   setIndex,
+  exerciseId,
   exerciseKind,
   onUpdateSet,
   showCompleteButton = false,
@@ -128,6 +177,7 @@ export default function SetRowInput({
 
   const rowAnim = useState(new Animated.Value(1))[0];
   const rowShake = useState(new Animated.Value(0))[0];
+
   const isSameAsPrevious = (): boolean => {
     if (!previousData) return false;
 
@@ -138,6 +188,7 @@ export default function SetRowInput({
       (previousData.distance ?? null) === (set.distance ?? null)
     );
   };
+
   const runShakeAnimation = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(
       () => {}
@@ -169,8 +220,25 @@ export default function SetRowInput({
       }),
     ]).start();
   };
-  const isClickable = !!previousData && !isSameAsPrevious();
 
+  const runCompleteSuccessAnimation = () => {
+    // quick tap-expand animation on the entire row
+    Animated.sequence([
+      Animated.timing(rowAnim, {
+        toValue: 1.03,
+        duration: 80,
+        useNativeDriver: true,
+      }),
+      Animated.spring(rowAnim, {
+        toValue: 1,
+        tension: 140,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const isClickable = !!previousData && !isSameAsPrevious();
   const previousColor = isClickable ? "#3e3e41ff" : "#8E8E93";
 
   const fields = getExerciseFields(exerciseKind);
@@ -213,6 +281,25 @@ export default function SetRowInput({
     onUpdateSet(fields);
   };
 
+  const timerKey = `${exerciseId}-${setIndex}`;
+
+  const handleToggleComplete = () => {
+    const nextCompleted = !isCompleted;
+
+    if (nextCompleted) {
+      // Positive “success” feedback when completing a set
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+        () => {}
+      );
+      runCompleteSuccessAnimation();
+    } else {
+      // Optional: light haptic when un-completing
+      Haptics.selectionAsync().catch(() => {});
+    }
+
+    onUpdateSet({ completed: nextCompleted });
+  };
+
   return (
     <>
       <Animated.View
@@ -226,7 +313,7 @@ export default function SetRowInput({
               {
                 translateX: rowShake.interpolate({
                   inputRange: [-1, 1],
-                  outputRange: [-4, 4], // <-- reduced for a tight iOS shake
+                  outputRange: [-4, 4],
                 }),
               },
             ],
@@ -235,13 +322,11 @@ export default function SetRowInput({
       >
         {/* SET column (fixed width, matches header) */}
         <View style={styles.setIndexColumn}>
-          {
-            <SetNumber
-              setIndex={setIndex}
-              setType={setType}
-              onClick={() => setShowSetTypeDropdown(!showSetTypeDropdown)}
-            />
-          }
+          <SetNumber
+            setIndex={setIndex}
+            setType={setType}
+            onClick={() => setShowSetTypeDropdown(!showSetTypeDropdown)}
+          />
         </View>
 
         {/* PREVIOUS column (tap to apply) */}
@@ -265,7 +350,10 @@ export default function SetRowInput({
         {fields.includes("weight") && (
           <View style={styles.setFieldColumn}>
             <DecimalInput
-              style={[styles.setInput, isCompleted && styles.setInputCompleted]}
+              style={[
+                styles.setInput,
+                isCompleted ? styles.setInputCompleted : undefined,
+              ]}
               value={set.weight || 0}
               onChangeValue={value => onUpdateSet({ weight: value })}
               placeholder="0"
@@ -320,7 +408,7 @@ export default function SetRowInput({
                 styles.completeButton,
                 isCompleted && styles.completeButtonActive,
               ]}
-              onPress={() => onUpdateSet({ completed: !isCompleted })}
+              onPress={handleToggleComplete}
             >
               <Ionicons
                 name="checkmark"
@@ -331,6 +419,13 @@ export default function SetRowInput({
           </View>
         )}
       </Animated.View>
+
+      <RestTimerRow
+        timerKey={timerKey}
+        value={set.rest_timer ?? null}
+        isSetCompleted={!!set.completed}
+        onChangeValue={v => onUpdateSet({ rest_timer: v })}
+      />
 
       {/* Set Type Dropdown Modal */}
       <Modal
@@ -712,5 +807,463 @@ const styles = StyleSheet.create({
   infoButton: {
     padding: 4,
     marginLeft: 4,
+  },
+});
+
+/* -------------------------------------------------------------------------- */
+/* REST TIMER ROW                                                             */
+/* -------------------------------------------------------------------------- */
+
+function RestTimerRow({
+  timerKey,
+  value,
+  isSetCompleted,
+  onChangeValue,
+}: {
+  timerKey: string;
+  value: number | null;
+  isSetCompleted: boolean;
+  onChangeValue: (v: number | null) => void;
+}) {
+  const [mode, setMode] = useState<"display" | "edit" | "running" | "done">(
+    "display"
+  );
+  const [remaining, setRemaining] = useState(value ?? 0);
+  const [showModal, setShowModal] = useState(false);
+
+  const progress = useRef(new Animated.Value(1)).current;
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const hasAutoStartedRef = useRef(false);
+
+  const modeRef = useRef(mode);
+  const progressRef = useRef(progress);
+  const remainingRef = useRef(remaining);
+
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
+
+  useEffect(() => {
+    remainingRef.current = remaining;
+  }, [remaining]);
+
+  const planned = useMemo(() => (value != null ? value : 0), [value]);
+  const hasTimer = useMemo(() => planned > 0, [planned]);
+
+  const handleDurationChange = (sec: number | null) => {
+    const safe = sec ?? 0;
+    setRemaining(safe);
+    onChangeValue(safe);
+  };
+
+  const fmt = (s: number) => {
+    const safe = Math.max(0, Math.floor(s));
+    const m = Math.floor(safe / 60);
+    const sec = safe % 60;
+    return `${m}:${sec.toString().padStart(2, "0")}`;
+  };
+
+  const clear = () => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  };
+
+  const start = () => {
+    if (!hasTimer) return;
+
+    activateRestTimer(timerKey);
+
+    clear();
+    setMode("running");
+    setRemaining(planned);
+    progress.setValue(1);
+
+    // @ts-ignore
+    intervalRef.current = setInterval(() => {
+      setRemaining(prev => {
+        if (prev <= 1) {
+          clear();
+          setMode("done");
+          setShowModal(true);
+
+          Haptics.notificationAsync(
+            Haptics.NotificationFeedbackType.Success
+          ).catch(() => {});
+
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    Animated.timing(progress, {
+      toValue: 0,
+      duration: planned * 1000,
+      useNativeDriver: false,
+      easing: Easing.linear,
+    }).start();
+  };
+
+  useEffect(() => {
+    const unregister = registerRestTimer(timerKey, () => {
+      if (modeRef.current === "running") {
+        clear();
+        setMode("done");
+        progressRef.current.stopAnimation?.();
+        progressRef.current.setValue(0);
+        setRemaining(0);
+      }
+    });
+
+    return unregister;
+  }, [timerKey]);
+  useEffect(() => {
+    // Auto-start ONLY once per completion for timers > 0
+    if (isSetCompleted && hasTimer) {
+      if (!hasAutoStartedRef.current && mode === "display") {
+        hasAutoStartedRef.current = true;
+        start();
+      }
+    } else {
+      hasAutoStartedRef.current = false;
+    }
+
+    // NEW: if set is completed but timer is 0, show "done" pill instead of "display"
+    if (isSetCompleted && !hasTimer && value !== null && mode === "display") {
+      // no countdown, just mark as done visually
+      clear();
+      setMode("done");
+      setRemaining(0);
+      progress.setValue(0);
+    }
+
+    // If user un-completes set, cancel timer / done state
+    if (!isSetCompleted && ["running", "done"].includes(mode)) {
+      clear();
+      setMode("display");
+      progress.setValue(1);
+      setRemaining(planned);
+    }
+  }, [isSetCompleted, hasTimer, mode, planned, value]);
+
+  useEffect(() => {
+    if (mode === "display") {
+      setRemaining(planned);
+      progress.setValue(1);
+    }
+  }, [planned, mode, progress]);
+
+  useEffect(() => {
+    return () => clear();
+  }, []);
+
+  if (value == null && mode === "display") return null;
+
+  const onChangeFocus = useCallback(
+    (focused: boolean) => {
+      if (!focused) {
+        setMode(isSetCompleted ? "done" : "display");
+      }
+    },
+    [isSetCompleted]
+  );
+
+  let content: JSX.Element | null = null;
+
+  if (mode === "display") {
+    content = (
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={() => setMode("edit")}
+        style={rtStyles.displayRow}
+      >
+        <View style={rtStyles.line} />
+        <Text style={[rtStyles.pillText]}>{fmt(remaining)}</Text>
+        <View style={rtStyles.line} />
+      </TouchableOpacity>
+    );
+  } else if (mode === "edit") {
+    content = (
+      <View style={{ paddingHorizontal: 8 }}>
+        <DurationInput
+          value={remaining}
+          onChangeValue={handleDurationChange}
+          style={[rtStyles.pill, rtStyles.pillText]}
+          enableMilliseconds={false}
+          onChangeFocus={onChangeFocus}
+        />
+      </View>
+    );
+  } else if (mode === "running") {
+    const widthInterpolate = progress.interpolate({
+      inputRange: [0, 1],
+      outputRange: ["0%", "100%"],
+    });
+
+    content = (
+      <View style={{ paddingHorizontal: 8, height: 32 }}>
+        <MaskedView
+          style={{ flex: 1 }}
+          maskElement={
+            <View
+              style={{
+                flex: 1,
+                backgroundColor: "black",
+                borderRadius: 8,
+              }}
+            />
+          }
+        >
+          {/* Gray background bar */}
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: "#f0ebebff",
+              borderRadius: 8,
+            }}
+          />
+
+          {/* Blue progress bar */}
+          <Animated.View
+            style={{
+              position: "absolute",
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: widthInterpolate,
+              backgroundColor: "#0A84FF",
+              borderRadius: 0,
+            }}
+          />
+
+          {/* Text masking */}
+          <MaskedView
+            style={StyleSheet.absoluteFillObject}
+            maskElement={
+              <View
+                style={{
+                  flex: 1,
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 16,
+                    fontWeight: "700",
+                    color: "black",
+                  }}
+                >
+                  {fmt(remaining)}
+                </Text>
+              </View>
+            }
+          >
+            <View style={{ flex: 1, flexDirection: "row" }}>
+              <Animated.View
+                style={{
+                  width: widthInterpolate,
+                  backgroundColor: "white",
+                }}
+              />
+              <View
+                style={{
+                  flex: 1,
+                  backgroundColor: "#0A84FF",
+                }}
+              />
+            </View>
+          </MaskedView>
+        </MaskedView>
+      </View>
+    );
+  } else if (mode === "done") {
+    content = (
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={() => setMode("edit")}
+        style={rtStyles.displayRow}
+      >
+        <View style={rtStyles.lineDone} />
+        {
+          <View style={rtStyles.pillDone}>
+            <Text style={rtStyles.pillDoneText}>{fmt(planned)}</Text>
+          </View>
+        }
+        <View style={rtStyles.lineDone} />
+      </TouchableOpacity>
+    );
+  }
+
+  return (
+    <>
+      <View style={{ marginTop: -4, marginBottom: 8 }}>{content}</View>
+
+      {/* Completion modal */}
+      <Modal
+        visible={showModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowModal(false)}
+      >
+        <Pressable
+          style={rtStyles.modalOverlay}
+          onPress={() => setShowModal(false)}
+        >
+          <Pressable
+            style={rtStyles.modalCard}
+            onPress={e => e.stopPropagation()}
+          >
+            <View style={rtStyles.modalHeader}>
+              <Text style={rtStyles.modalTitle}>Get Back To Work 💪</Text>
+              <TouchableOpacity onPress={() => setShowModal(false)}>
+                <Ionicons name="close" size={22} color="#8E8E93" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={rtStyles.modalBody}>
+              Your rest period is over. Time for the next set.
+            </Text>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* RestTimerRow styles                                                        */
+/* -------------------------------------------------------------------------- */
+
+const rtStyles = StyleSheet.create({
+  displayRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    gap: 8,
+  },
+  line: {
+    flex: 1,
+    height: 2,
+    backgroundColor: "#DDE9FF",
+    borderRadius: 2,
+  },
+  pill: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 20,
+    backgroundColor: "#E5F2FF",
+    borderWidth: 1,
+    borderColor: "#C7DCFF",
+    marginHorizontal: 6,
+  },
+  pillText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#0A84FF",
+  },
+
+  /* Running */
+  runningWrap: {
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+  },
+  progressOuter: {
+    width: "100%",
+    height: 32,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#2a2a2a9b",
+    backgroundColor: "#F2F2F7",
+    overflow: "hidden",
+  },
+  progressInner: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: "#0A84FF",
+  },
+  centerTextWrap: {
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  progressText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "white",
+  },
+  plannedLabel: {
+    fontSize: 12,
+    color: "#34C759",
+  },
+
+  /* Done state */
+  lineDone: {
+    flex: 1,
+    height: 2,
+    backgroundColor: "#B8F5C7",
+    borderRadius: 2,
+  },
+  pillDone: {
+    paddingVertical: 4,
+  },
+  pillDoneText: {
+    color: "#34C759",
+    fontWeight: "600",
+    fontSize: 14,
+  },
+
+  /* Modal */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 32,
+  },
+  modalCard: {
+    width: "100%",
+    backgroundColor: "white",
+    padding: 16,
+    borderRadius: 16,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#1C1C1E",
+  },
+  modalBody: {
+    fontSize: 15,
+    color: "#3A3A3C",
+  },
+  progressTextMask: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "black",
+  },
+  progressTextInside: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  textLayer: {
+    position: "absolute",
+    inset: 0,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  textBase: {
+    fontSize: 16,
+    fontWeight: "700",
   },
 });

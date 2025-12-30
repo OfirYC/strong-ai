@@ -68,7 +68,6 @@ export const SET_TYPE_CONFIG: Record<
     bgColor: "rgba(239, 68, 68, 0.15)",
   },
 };
-
 export interface WorkoutSet {
   // Set type
   set_type?: SetType;
@@ -84,6 +83,9 @@ export interface WorkoutSet {
 
   completed?: boolean;
   completed_at?: string;
+
+  // Rest timer (NEW)
+  rest_timer: number | null;
 
   // PR flags
   is_volume_pr?: boolean;
@@ -178,6 +180,9 @@ export interface TemplateSet {
   duration?: number;
   distance?: number;
   set_type?: SetType;
+
+  // NEW
+  rest_timer: number | null;
 }
 
 export interface TemplateExercise {
@@ -298,9 +303,9 @@ export interface ExerciseHistory {
     duration?: number;
     distance?: number;
     set_type: SetType;
+    rest_timer: number | null;
   }[];
 }
-
 
 export interface ExerciseHistoryResponse {
   exercise_id: string;

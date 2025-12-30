@@ -437,7 +437,7 @@ async def start_workout(
                 # Check if new format (has 'sets' array) or legacy format
                 tmpl_sets = tmpl_ex.get("sets", [])
                 if tmpl_sets:
-                    # New format: use the sets directly
+                    # New format: use the sets directly, including rest_timer
                     sets = []
                     for tmpl_set in tmpl_sets:
                         set_item = {
@@ -446,17 +446,33 @@ async def start_workout(
                             "reps": tmpl_set.get("reps"),
                             "duration": tmpl_set.get("duration"),
                             "distance": tmpl_set.get("distance"),
+                            # NEW: carry over rest_timer; strict number|null
+                            "rest_timer": tmpl_set.get("rest_timer", None),
                         }
-                        # Remove None values but keep set_type
-                        set_item = {k: v for k, v in set_item.items() if v is not None}
-                        set_item["set_type"] = tmpl_set.get("set_type", "normal")
+                
+                        # Remove None values but ALWAYS keep set_type & rest_timer key present
+                        set_item = {
+                            k: v
+                            for k, v in set_item.items()
+                            if (v is not None) or (k in ("set_type", "rest_timer"))
+                        }
+                
+                        # Ensure keys exist
+                        set_item.setdefault("set_type", "normal")
+                        if "rest_timer" not in set_item:
+                            set_item["rest_timer"] = None
+                
                         sets.append(set_item)
                 else:
                     # Legacy format: create default sets
                     sets = []
                     num_sets = tmpl_ex.get("default_sets", 3)
                     for _ in range(num_sets):
-                        set_item = {"set_type": "normal"}
+                        # NEW: default rest_timer is explicitly null
+                        set_item = {
+                            "set_type": "normal",
+                            "rest_timer": None,
+                        }
                         if tmpl_ex.get("default_weight") is not None:
                             set_item["weight"] = tmpl_ex["default_weight"]
                         if tmpl_ex.get("default_reps") is not None:
@@ -466,6 +482,7 @@ async def start_workout(
                         if tmpl_ex.get("default_distance") is not None:
                             set_item["distance"] = tmpl_ex["default_distance"]
                         sets.append(set_item)
+
                 
                 exercises.append({
                     "exercise_id": tmpl_ex["exercise_id"],
@@ -754,6 +771,7 @@ async def get_workout_history_by_exercise(
                     "duration": s.get("duration"),
                     "distance": s.get("distance"),
                     "set_type": s.get("set_type", "normal"),
+                    "rest_timer": s.get("rest_timer", None),  # NEW
                 })
 
         if entry_sets:
