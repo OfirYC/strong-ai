@@ -314,7 +314,7 @@ export function ModifyRoutine({
           <>
             {item.sets.length > 0 && (
               <View style={styles.setsContainer}>
-                <SetHeader exerciseKind={exerciseKind} />
+                <SetHeader exerciseKind={exerciseKind} showCompleteColumn />
 
                 {item.sets.map((set, setIndex) => (
                   <SwipeToDeleteRow
@@ -340,7 +340,7 @@ export function ModifyRoutine({
               onPress={() => addSet(index)}
               disabled={isDraggingList}
             >
-              <Ionicons name="add" size={20} color="#007AFF" />
+              <Ionicons name="add" size={20} color="" />
               <Text style={styles.addSetText}>Add Set</Text>
             </TouchableOpacity>
           </>
@@ -523,7 +523,7 @@ const styles = StyleSheet.create({
   },
   exerciseCard: {
     borderRadius: 12,
-    padding: 16,
+    // padding: 16,
     marginBottom: 16,
   },
   exerciseHeader: {
@@ -545,15 +545,16 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   addSetButton: {
+    backgroundColor: "#e9ebea",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 10,
+    paddingVertical: 2,
+    borderRadius: 8,
   },
   addSetText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#007AFF",
     marginLeft: 6,
   },
   addExerciseButton: {

@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   TouchableOpacity,
   Text,
@@ -6,13 +6,13 @@ import {
   ActivityIndicator,
   ViewStyle,
   TextStyle,
-} from 'react-native';
-import { colors } from '../constants/colors';
+} from "react-native";
+import { colors } from "../constants/colors";
 
 interface ButtonProps {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'outline';
+  variant?: "primary" | "secondary" | "outline" | "tint"; // <-- added
   disabled?: boolean;
   loading?: boolean;
   style?: ViewStyle;
@@ -22,7 +22,7 @@ interface ButtonProps {
 export default function Button({
   title,
   onPress,
-  variant = 'primary',
+  variant = "primary",
   disabled = false,
   loading = false,
   style,
@@ -32,9 +32,10 @@ export default function Button({
     <TouchableOpacity
       style={[
         styles.button,
-        variant === 'primary' && styles.primary,
-        variant === 'secondary' && styles.secondary,
-        variant === 'outline' && styles.outline,
+        variant === "primary" && styles.primary,
+        variant === "secondary" && styles.secondary,
+        variant === "outline" && styles.outline,
+        variant === "tint" && styles.tint, // <-- added
         (disabled || loading) && styles.disabled,
         style,
       ]}
@@ -43,14 +44,17 @@ export default function Button({
       activeOpacity={0.7}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'outline' ? colors.primary : '#FFF'} />
+        <ActivityIndicator
+          color={variant === "outline" ? colors.primary : "#FFF"}
+        />
       ) : (
         <Text
           style={[
             styles.text,
-            variant === 'primary' && styles.primaryText,
-            variant === 'secondary' && styles.secondaryText,
-            variant === 'outline' && styles.outlineText,
+            variant === "primary" && styles.primaryText,
+            variant === "secondary" && styles.secondaryText,
+            variant === "outline" && styles.outlineText,
+            variant === "tint" && styles.tintText, // <-- added
             textStyle,
           ]}
         >
@@ -66,8 +70,8 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 24,
     borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     minHeight: 52,
   },
   primary: {
@@ -77,7 +81,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.backgroundSecondary,
   },
   outline: {
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     borderWidth: 2,
     borderColor: colors.primary,
   },
@@ -86,15 +90,22 @@ const styles = StyleSheet.create({
   },
   text: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   primaryText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
   },
   secondaryText: {
     color: colors.text,
   },
   outlineText: {
+    color: colors.primary,
+  },
+  tint: {
+    backgroundColor: `${colors.primary}15`, // 50% opacity in hex (80) or use rgba
+    // or: backgroundColor: 'rgba( <primary rgb>, 0.5 )'
+  },
+  tintText: {
     color: colors.primary,
   },
 });

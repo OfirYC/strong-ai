@@ -1,14 +1,17 @@
-import React from 'react';
-import { View, StyleSheet, Text, Animated } from 'react-native';
-import { Swipeable } from 'react-native-gesture-handler';
-import { Ionicons } from '@expo/vector-icons';
+import React from "react";
+import { View, StyleSheet, Text, Animated } from "react-native";
+import { Swipeable } from "react-native-gesture-handler";
+import { Ionicons } from "@expo/vector-icons";
 
 interface SwipeToDeleteRowProps {
   children: React.ReactNode;
   onDelete: () => void;
 }
 
-export default function SwipeToDeleteRow({ children, onDelete }: SwipeToDeleteRowProps) {
+export default function SwipeToDeleteRow({
+  children,
+  onDelete,
+}: SwipeToDeleteRowProps) {
   let swipeableRef: Swipeable | null = null;
 
   const renderRightActions = (
@@ -18,18 +21,20 @@ export default function SwipeToDeleteRow({ children, onDelete }: SwipeToDeleteRo
     const scale = dragX.interpolate({
       inputRange: [-100, -50, 0],
       outputRange: [1.2, 1, 0.8],
-      extrapolate: 'clamp',
+      extrapolate: "clamp",
     });
 
     const opacity = dragX.interpolate({
       inputRange: [-100, -50, 0],
       outputRange: [1, 0.8, 0],
-      extrapolate: 'clamp',
+      extrapolate: "clamp",
     });
 
     return (
       <View style={styles.deleteContainer}>
-        <Animated.View style={[styles.deleteContent, { transform: [{ scale }] }]}>
+        <Animated.View
+          style={[styles.deleteContent, { transform: [{ scale }] }]}
+        >
           <Ionicons name="trash" size={22} color="white" />
           <Animated.Text style={[styles.deleteText, { opacity }]}>
             Delete
@@ -39,8 +44,8 @@ export default function SwipeToDeleteRow({ children, onDelete }: SwipeToDeleteRo
     );
   };
 
-  const handleSwipeOpen = (direction: 'left' | 'right') => {
-    if (direction === 'right') {
+  const handleSwipeOpen = (direction: "left" | "right") => {
+    if (direction === "right") {
       onDelete();
       swipeableRef?.close();
     }
@@ -48,7 +53,7 @@ export default function SwipeToDeleteRow({ children, onDelete }: SwipeToDeleteRo
 
   return (
     <Swipeable
-      ref={(ref) => (swipeableRef = ref)}
+      ref={ref => (swipeableRef = ref)}
       renderRightActions={renderRightActions}
       onSwipeableOpen={handleSwipeOpen}
       rightThreshold={80}
@@ -56,35 +61,32 @@ export default function SwipeToDeleteRow({ children, onDelete }: SwipeToDeleteRo
       friction={2}
       containerStyle={styles.swipeContainer}
     >
-      <View style={styles.content}>
-        {children}
-      </View>
+      <View style={styles.content}>{children}</View>
     </Swipeable>
   );
 }
 
 const styles = StyleSheet.create({
   swipeContainer: {
-    marginBottom: 8,
     borderRadius: 8,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   deleteContainer: {
-    backgroundColor: '#FF3B30',
-    justifyContent: 'center',
-    alignItems: 'flex-end',
+    backgroundColor: "#FF3B30",
+    justifyContent: "center",
+    alignItems: "flex-end",
     paddingRight: 20,
     width: 100,
     borderTopRightRadius: 8,
     borderBottomRightRadius: 8,
   },
   deleteContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   deleteText: {
-    color: 'white',
-    fontWeight: '600',
+    color: "white",
+    fontWeight: "600",
     fontSize: 14,
     marginLeft: 6,
   },

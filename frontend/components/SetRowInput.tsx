@@ -1,6 +1,6 @@
-import { AppState, AppStateStatus } from "react-native";
+import { AppState, AppStateStatus, PixelRatio } from "react-native";
 import { Audio } from "expo-av";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import MaskedView from "@react-native-masked-view/masked-view";
 import * as Haptics from "expo-haptics";
 import React, {
@@ -34,6 +34,7 @@ import {
 import DecimalInput from "./DecimalInput";
 import DurationInput from "./DurationInput";
 import { SetNumber } from "./SetNumber";
+import { colors } from "../constants/colors";
 
 // Descriptions for each set type
 const SET_TYPE_DESCRIPTIONS: Record<SetType, string> = {
@@ -326,6 +327,7 @@ export default function SetRowInput({
         <View style={styles.setIndexColumn}>
           <SetNumber
             setIndex={setIndex}
+            completed={!!set.completed}
             setType={setType}
             onClick={() => setShowSetTypeDropdown(!showSetTypeDropdown)}
           />
@@ -412,8 +414,8 @@ export default function SetRowInput({
               ]}
               onPress={handleToggleComplete}
             >
-              <Ionicons
-                name="checkmark"
+              <MaterialCommunityIcons
+                name="check" // medium weight
                 size={18}
                 color={isCompleted ? "#FFFFFF" : "#000000"}
               />
@@ -537,7 +539,7 @@ export function SetHeader({
       {/* SET column */}
       <View style={styles.setIndexColumn}>
         <View style={styles.headerSetCell}>
-          <Text style={styles.setHeaderText}>SET</Text>
+          <Text style={styles.setHeaderText}>Set</Text>
         </View>
       </View>
 
@@ -552,7 +554,7 @@ export function SetHeader({
       {fields.includes("weight") && (
         <View style={styles.setFieldColumn}>
           <View style={styles.headerFieldCell}>
-            <Text style={styles.setHeaderText}>KG</Text>
+            <Text style={styles.setHeaderText}>+kg</Text>
           </View>
         </View>
       )}
@@ -560,7 +562,7 @@ export function SetHeader({
       {fields.includes("reps") && (
         <View style={styles.setFieldColumn}>
           <View style={styles.headerFieldCell}>
-            <Text style={styles.setHeaderText}>REPS</Text>
+            <Text style={styles.setHeaderText}>Reps</Text>
           </View>
         </View>
       )}
@@ -598,14 +600,14 @@ const styles = StyleSheet.create({
   setHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 2,
+    marginBottom: 6,
     paddingHorizontal: 4,
     gap: 8,
   },
   setHeaderText: {
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: "600",
-    color: "#8E8E93",
+    color: "#000000",
     textAlign: "center",
   },
   headerSetCell: {
@@ -615,7 +617,7 @@ const styles = StyleSheet.create({
   },
   headerFieldCell: {
     width: "100%",
-    paddingHorizontal: 12,
+    paddingHorizontal: 4,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -643,14 +645,16 @@ const styles = StyleSheet.create({
   setRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 8,
     gap: 8,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
+    borderRadius: 0,
+    paddingTop: 4,
+    paddingHorizontal: 20,
   },
   setRowCompleted: {
     opacity: 0.65,
+    paddingVertical: 8,
+    marginVertical: 0,
+    backgroundColor: "#eafbf0",
   },
   setNumberContainer: {
     width: 32,
@@ -699,38 +703,42 @@ const styles = StyleSheet.create({
   /* INPUTS */
   setInput: {
     width: "100%",
-    backgroundColor: "#FFFFFF",
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 8,
     fontSize: 16,
     textAlign: "center",
-    borderWidth: 1,
-    borderColor: "#D1D1D6",
+    backgroundColor: "#e9ebea",
+    borderColor: "transparent",
   },
   setInputCompleted: {
-    backgroundColor: "#E8F8ED",
-    borderColor: "#34C759",
+    backgroundColor: "transparent",
+    borderColor: "transparent",
   },
   durationInput: {
     width: "100%",
+    borderWidth: 0,
+    borderColor: "transparent",
+    backgroundColor: "#e9ebea",
   },
   durationInputCompleted: {
-    backgroundColor: "#E8F8ED",
-    borderColor: "#34C759",
+    backgroundColor: "transparent",
+    borderColor: "transparent",
   },
 
   /* COMPLETE BUTTON */
   completeButton: {
-    width: 36,
-    height: 36,
+    width: 30,
+    height: 26.666,
     borderRadius: 8,
     backgroundColor: "#F2F2F7",
     justifyContent: "center",
     alignItems: "center",
   },
   completeButtonActive: {
-    backgroundColor: "#34C759",
+    backgroundColor: "#28c36a",
+    borderWidth: 1,
+    borderColor: "#40bb77",
   },
 
   /* DROPDOWN */
@@ -867,7 +875,6 @@ function RestTimerRow({
           require("../assets/second_bell.mp3")
         );
 
-        console.log("SOund bruh", sound, isMounted);
         if (!isMounted) {
           await sound.unloadAsync();
           return;
@@ -903,7 +910,7 @@ function RestTimerRow({
   }, [progress]);
 
   // Shared finish function with "silent" flag
-   const finishTimer = useCallback(
+  const finishTimer = useCallback(
     (opts?: { silent?: boolean }) => {
       const silent = opts?.silent ?? false;
 
@@ -918,9 +925,7 @@ function RestTimerRow({
         if (!silent) {
           // Play bell sound
           if (bellSoundRef.current) {
-            bellSoundRef.current
-              .replayAsync()
-              .catch(() => {});
+            bellSoundRef.current.replayAsync().catch(() => {});
           }
 
           // Show modal + haptics
@@ -933,7 +938,6 @@ function RestTimerRow({
     },
     [clear, progress]
   );
-
 
   // Natural finish (used by tick + animation completion)
   const handleFinishNatural = useCallback(() => {
@@ -1101,12 +1105,14 @@ function RestTimerRow({
   if (mode === "display") {
     content = (
       <TouchableOpacity
-        activeOpacity={0.8}
+        activeOpacity={0.7}
         onPress={() => setMode("edit")}
         style={rtStyles.displayRow}
       >
         <View style={rtStyles.line} />
-        <Text style={[rtStyles.pillText]}>{fmt(remaining)}</Text>
+        <View style={rtStyles.pill}>
+          <Text style={[rtStyles.pillText]}>{fmt(remaining)}</Text>
+        </View>
         <View style={rtStyles.line} />
       </TouchableOpacity>
     );
@@ -1116,7 +1122,7 @@ function RestTimerRow({
         <DurationInput
           value={remaining}
           onChangeValue={handleDurationChange}
-          style={[rtStyles.pill, rtStyles.pillText]}
+          style={[rtStyles.pillEdit, rtStyles.pillText]}
           enableMilliseconds={false}
           onChangeFocus={onChangeFocus}
           autoFocus
@@ -1130,7 +1136,7 @@ function RestTimerRow({
     });
 
     content = (
-      <View style={{ paddingHorizontal: 8, height: 32 }}>
+      <View style={{ paddingHorizontal: 8, height: 32, marginVertical: 5 }}>
         <MaskedView
           style={{ flex: 1 }}
           maskElement={
@@ -1147,7 +1153,7 @@ function RestTimerRow({
           <View
             style={{
               flex: 1,
-              backgroundColor: "#f0ebebff",
+              backgroundColor: `${colors.primary}15`,
               borderRadius: 8,
             }}
           />
@@ -1209,9 +1215,12 @@ function RestTimerRow({
   } else if (mode === "done") {
     content = (
       <TouchableOpacity
-        activeOpacity={0.8}
+        activeOpacity={0.7}
         onPress={() => setMode("edit")}
-        style={rtStyles.displayRow}
+        style={[
+          rtStyles.displayRow,
+          { backgroundColor: "#eafbf0", opacity: 0.65 },
+        ]}
       >
         <View style={rtStyles.lineDone} />
         <View style={rtStyles.pillDone}>
@@ -1224,7 +1233,7 @@ function RestTimerRow({
 
   return (
     <>
-      <View style={{ marginTop: -4, marginBottom: 8 }}>{content}</View>
+      <View style={{ marginTop: 0, marginBottom: 0 }}>{content}</View>
 
       {/* Completion modal – only on NATURAL finish now */}
       <Modal
@@ -1266,26 +1275,38 @@ const rtStyles = StyleSheet.create({
   displayRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 8,
+    paddingHorizontal: 20,
     gap: 8,
+    paddingTop: 4,
+    paddingBottom: 0,
+    // marginBottom: 4,
+
+    // marginBottom: 4,
+    // marginTop: 4,
   },
   line: {
     flex: 1,
-    height: 2,
-    backgroundColor: "#DDE9FF",
+    height: 4,
+    backgroundColor: "#007bff10",
     borderRadius: 2,
   },
   pill: {
+    marginHorizontal: 10,
+  },
+  pillEdit: {
     paddingHorizontal: 12,
     paddingVertical: 4,
-    borderRadius: 20,
+    borderRadius: 8,
     backgroundColor: "#E5F2FF",
-    borderWidth: 1,
-    borderColor: "#C7DCFF",
-    marginHorizontal: 6,
+    borderWidth: 2,
+    borderColor: "#0A84FF",
+    // marginTop: 2,
+  },
+  pillDone: {
+    marginHorizontal: 10,
   },
   pillText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "600",
     color: "#0A84FF",
   },
@@ -1330,17 +1351,15 @@ const rtStyles = StyleSheet.create({
   /* Done state */
   lineDone: {
     flex: 1,
-    height: 2,
-    backgroundColor: "#B8F5C7",
+    height: 4,
+    backgroundColor: "#c2e0d17f",
     borderRadius: 2,
   },
-  pillDone: {
-    paddingVertical: 4,
-  },
+
   pillDoneText: {
     color: "#34C759",
     fontWeight: "600",
-    fontSize: 14,
+    fontSize: 16,
   },
 
   /* Modal */

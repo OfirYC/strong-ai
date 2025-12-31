@@ -18,22 +18,24 @@ export const SetNumber = ({
   if (setType === "normal") {
     return (
       <TouchableOpacity
-        style={styles.setNumberContainer}
+        style={[
+          styles.setNumberContainer,
+          completed && { backgroundColor: "transparent" },
+        ]}
         onPress={() => onClick?.()}
         disabled={!onClick}
       >
-        <Text
-          style={[styles.setNumber, completed && styles.setNumberCompleted]}
-        >
-          {setIndex + 1}
-        </Text>
+        <Text style={[styles.setNumber]}>{setIndex + 1}</Text>
       </TouchableOpacity>
     );
   }
 
   return (
     <TouchableOpacity
-      style={[styles.setTypeIndicator, { backgroundColor: typeConfig.bgColor }]}
+      style={[
+        styles.setTypeIndicator,
+        !completed && { backgroundColor: typeConfig.bgColor },
+      ]}
       onPress={() => onClick?.()}
       disabled={!onClick}
     >
@@ -107,6 +109,8 @@ const styles = StyleSheet.create({
     height: 32,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "#e9ebea",
+    borderRadius: 8,
   },
   setNumber: {
     fontSize: 16,

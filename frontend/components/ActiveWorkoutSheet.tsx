@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Animated,
@@ -20,6 +20,7 @@ import { useMultipleExercisesPreviousSets } from "../hooks/usePreviousSetValues"
 import { useWorkoutStore } from "../store/workoutStore";
 import {
   Exercise,
+  SetType,
   WorkoutExercise,
   WorkoutSet,
   getExerciseFields,
@@ -94,10 +95,33 @@ export default function ActiveWorkoutSheet({
   const [isDraggingList, setIsDraggingList] = useState(false);
   const [extraTopPadding, setExtraTopPadding] = useState(0);
 
+  // NEW: track scroll position for timer fade
+  const scrollY = useRef(new Animated.Value(0)).current;
+
+  const timerTopOpacity = useMemo(
+    () =>
+      scrollY.interpolate({
+        inputRange: [0, 40], // tweak as needed
+        outputRange: [0, 1],
+        extrapolate: "clamp",
+      }),
+    [scrollY]
+  );
+
+  const mainTimerOpacity = useMemo(
+    () =>
+      scrollY.interpolate({
+        inputRange: [0, 40], // same threshold so they crossfade
+        outputRange: [1, 0],
+        extrapolate: "clamp",
+      }),
+    [scrollY]
+  );
+
   // Calculate the maximum height for expanded state
   // Screen height minus top safe area minus tab bar (60px) minus bottom safe area
   // Extra 40px at top to avoid system gesture conflicts
-  const maxExpandedHeight = SCREEN_HEIGHT - insets.top - 100 - insets.bottom;
+  const maxExpandedHeight = SCREEN_HEIGHT - insets.top - 85 - insets.bottom;
 
   const animatedHeight = useRef(
     new Animated.Value(initialExpanded ? maxExpandedHeight : COLLAPSED_HEIGHT)
@@ -180,12 +204,13 @@ export default function ActiveWorkoutSheet({
     loadExerciseDetails();
   }, [activeWorkout?.exercises]);
 
-  const { previousMap } = useMultipleExercisesPreviousSets(
-    activeWorkout?.exercises?.map(e => ({
-      id: e.exercise_id,
-      sets: e.sets,
-    })) || []
-  );
+  const { previousMap, loadExercisePreviousSets } =
+    useMultipleExercisesPreviousSets(
+      activeWorkout?.exercises?.map(e => ({
+        id: e.exercise_id,
+        sets: e.sets,
+      })) || []
+    );
 
   const getDefaultRestTimer = () => {
     return 3 * 60;
@@ -224,12 +249,28 @@ export default function ActiveWorkoutSheet({
   };
 
   const handleAddExerciseToWorkout = async (exercise: Exercise) => {
-    console.log("Adding exercise:", exercise.id, exercise.name);
+    const previousSets = await loadExercisePreviousSets(exercise.id, true);
+    const sets =
+      !previousSets || previousSets.length === 0
+        ? [
+            {
+              set_type: "normal" as SetType,
+              rest_timer: getDefaultRestTimer(),
+            },
+          ]
+        : previousSets.flatMap(s =>
+            !s
+              ? []
+              : {
+                  ...s,
+                  rest_timer: s.rest_timer || getDefaultRestTimer(),
+                }
+          );
 
     const newExercise: WorkoutExercise = {
       exercise_id: exercise.id,
       order: exercises.length,
-      sets: [],
+      sets: sets,
     };
 
     const newExercises = [...exercises, newExercise];
@@ -611,7 +652,23 @@ export default function ActiveWorkoutSheet({
             ) : (
               // Expanded: just show Finish button
               <View style={styles.expandedTopBar}>
+                {/* Spacer to push Finish to the right, same as before */}
                 <View style={{ flex: 1 }} />
+
+                {/* Centered fading-in timer (overlay, does NOT move Finish) */}
+                <Animated.View
+                  pointerEvents="none"
+                  style={[
+                    styles.topBarTimerOverlay,
+                    { opacity: timerTopOpacity },
+                  ]}
+                >
+                  <Text style={styles.topBarTimerText}>
+                    {formatTime(timer)}
+                  </Text>
+                </Animated.View>
+
+                {/* Finish stays on the right exactly like before */}
                 <TouchableOpacity
                   style={styles.finishButton}
                   onPress={handleSaveAndFinish}
@@ -635,257 +692,280 @@ export default function ActiveWorkoutSheet({
         {/* Expanded Content */}
         {isExpanded && (
           <View style={styles.expandedContent}>
-            {/* Row 1: Workout Name + Menu */}
-            <View style={styles.nameRow}>
-              <Ionicons
-                name="barbell"
-                size={24}
-                color="#007AFF"
-                style={styles.nameBarbell}
-              />
-              <TextInput
-                style={styles.workoutNameInput}
-                value={activeWorkout?.name || ""}
-                onChangeText={updateWorkoutName}
-                placeholder="Workout Name"
-                placeholderTextColor="#8E8E93"
-              />
-              <TouchableOpacity
-                style={styles.menuButton}
-                onPress={() => setShowMenu(!showMenu)}
-              >
-                <Ionicons
-                  name="ellipsis-horizontal"
-                  size={24}
-                  color="#1C1C1E"
-                />
-              </TouchableOpacity>
-            </View>
-
-            {/* Row 2: Date */}
-            <View style={styles.dateRow}>
-              <Ionicons name="calendar-outline" size={18} color="#8E8E93" />
-              <Text style={styles.dateText}>
-                {new Date(workoutStartTime || Date.now()).toLocaleDateString(
-                  "en-US",
-                  {
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric",
-                  }
-                )}
-              </Text>
-            </View>
-
-            {/* Row 3: Timer */}
-            <View style={styles.timerRow}>
-              <Ionicons name="time-outline" size={18} color="#007AFF" />
-              <Text style={styles.timerTextLarge}>{formatTime(timer)}</Text>
-            </View>
-
-            {/* Dropdown Menu */}
-            {showMenu && (
-              <View style={styles.menuDropdown}>
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={handleToggleDescription}
-                >
-                  <Ionicons
-                    name={
-                      showDescription
-                        ? "remove-circle-outline"
-                        : "add-circle-outline"
-                    }
-                    size={20}
-                    color="#1C1C1E"
-                  />
-                  <Text style={styles.menuItemText}>
-                    {showDescription ? "Remove Description" : "Add Description"}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {/* Description Input */}
-            {showDescription && (
-              <View style={styles.descriptionContainer}>
-                <TextInput
-                  style={styles.descriptionInput}
-                  value={activeWorkout?.notes || ""}
-                  onChangeText={updateWorkoutNotes}
-                  placeholder="Add workout description..."
-                  placeholderTextColor="#8E8E93"
-                  multiline
-                  numberOfLines={2}
-                />
-              </View>
-            )}
-
-            <View
-              style={{
-                ...styles.exercisesList,
-                flex: 1, // THIS is what fixes overflow + footer
-                overflow: "hidden",
-                paddingHorizontal: isDraggingList
-                  ? 0
-                  : styles.exercisesList.paddingHorizontal,
+            <DraggableFlatList
+              ref={listRef as any}
+              data={exercises || []}
+              // ALL scrollable interior padding lives here
+              contentContainerStyle={{
+                paddingTop: 4,
+                paddingBottom: isDraggingList ? extraTopPadding : 32,
+                paddingHorizontal: isDraggingList ? 0 : 20,
               }}
-            >
-              <DraggableFlatList
-                ref={listRef as any}
-                data={exercises || []}
-                contentContainerStyle={{
-                  // paddingBottom: 120, // leaves room for footer
-                  paddingTop: 4,
-                  paddingBottom: isDraggingList ? extraTopPadding : 0,
-                }}
-                keyExtractor={item => `${item.exercise_id}-${item.order}`}
-                onDragBegin={() => {
-                  // we actually trigger drag manually from onLongPress, so this is just a safety
-                  setIsDraggingList(true);
-                }}
-                onDragEnd={({ data }) => {
-                  setIsDraggingList(false);
-                  setExtraTopPadding(0);
-                  handleReorderExercises(data);
-                  Haptics.selectionAsync(); // <<< added (confirmation tap)
-                }}
-                onPlaceholderIndexChange={i => Haptics.selectionAsync()}
-                animationConfig={{
-                  stiffness: 400,
-                  damping: 50,
-                  mass: 0.2,
-                  overshootClamping: true,
-                  // @ts-ignore
-                  restSpeedThreshold: 0.05,
-                  restDisplacementThreshold: 0.05,
-                }}
-                renderItem={({ item, drag, getIndex, isActive }) => {
-                  const index = getIndex?.();
-                  if (index == null) return null;
-                  const detail = exerciseDetails[item.exercise_id];
-
-                  const itemKey = `${item.exercise_id}-${item.order}`;
-
-                  const handleLongPress = (e: GestureResponderEvent) => {
-                    // Enter compact mode + haptic
-                    setIsDraggingList(true);
-                    Haptics.impactAsync(
-                      Haptics.ImpactFeedbackStyle.Light
-                    ).catch(() => {});
-
-                    // Wait one frame so collapsed layout takes effect, then measure + scroll
-                    requestAnimationFrame(() => {
-                      const ref = itemRefs.current[itemKey];
-                      if (!ref) {
-                        drag();
-                        return;
-                      }
-
-                      ref.measure((x, y, width, height, pageX, pageY) => {
-                        const desiredY = e.nativeEvent.locationY; // finger position on screen
-                        // All heights are same when collapsed
-                        const cumlativeHeightsOfOtherItems = index * height;
-
-                        const baseAbsoluteLocation = pageY;
-
-                        const diff = baseAbsoluteLocation - desiredY;
-
-                        setExtraTopPadding(cumlativeHeightsOfOtherItems); // clamp so we don't get negative padding
-                        setTimeout(() => {
-                          // @ts-ignore
-                          listRef.current?.scrollToOffset({
-                            offset: cumlativeHeightsOfOtherItems,
-                            animated: false,
-                          });
-                          // Finally, start the drag
-                          drag();
-                        }, 0);
-                      });
-                    });
-                  };
-                  const isCompact = isDraggingList; // all items compact while dragging
-
-                  return (
-                    <View
-                      ref={el => {
-                        itemRefs.current[itemKey] = el;
-                      }}
-                      style={[
-                        styles.exerciseCard,
-                        isDraggingList && {
-                          paddingHorizontal:
-                            styles.exercisesList.paddingHorizontal,
-                        },
-                      ]}
+              keyExtractor={item => `${item.exercise_id}-${item.order}`}
+              // SCROLL → drive the header timer fade
+              // ✅ use this instead
+              onScrollOffsetChange={offset => {
+                scrollY.setValue(offset);
+              }}
+              scrollEventThrottle={16}
+              // HEADER (scrolls)
+              ListHeaderComponentStyle={{ paddingLeft: 0 }}
+              ListHeaderComponent={
+                <View style={isDraggingList ? { paddingHorizontal: 20 } : {}}>
+                  {/* Row 1: Workout Name + Menu */}
+                  <View style={styles.nameRow}>
+                    <Ionicons
+                      name="barbell"
+                      size={24}
+                      color="#007AFF"
+                      style={styles.nameBarbell}
+                    />
+                    <TextInput
+                      style={styles.workoutNameInput}
+                      value={activeWorkout?.name || ""}
+                      onChangeText={updateWorkoutName}
+                      placeholder="Workout Name"
+                      placeholderTextColor="#8E8E93"
+                    />
+                    <TouchableOpacity
+                      style={styles.menuButton}
+                      onPress={() => setShowMenu(!showMenu)}
                     >
-                      {/* HEADER – always visible */}
-                      <View style={styles.exerciseHeader}>
-                        <TouchableOpacity
-                          style={styles.exerciseNameContainer}
-                          onPress={() => {
-                            if (!isDraggingList && detail) {
-                              setSelectedExercise(detail);
-                              setShowExerciseDetail(true);
-                            }
-                          }}
-                          onLongPress={handleLongPress}
-                          delayLongPress={150}
+                      <Ionicons
+                        name="ellipsis-horizontal"
+                        size={24}
+                        color="#1C1C1E"
+                      />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Row 2: Date */}
+                  <View style={styles.dateRow}>
+                    <Ionicons
+                      name="calendar-outline"
+                      size={18}
+                      color="#8E8E93"
+                    />
+                    <Text style={styles.dateText}>
+                      {new Date(
+                        workoutStartTime || Date.now()
+                      ).toLocaleDateString("en-US", {
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      })}
+                    </Text>
+                  </View>
+
+                  {/* Row 3: Big Timer – fades out on scroll */}
+                  <Animated.View
+                    style={[styles.timerRow, { opacity: mainTimerOpacity }]}
+                  >
+                    <Ionicons name="time-outline" size={18} color="#007AFF" />
+                    <Text style={styles.timerTextLarge}>
+                      {formatTime(timer)}
+                    </Text>
+                  </Animated.View>
+
+                  {/* Dropdown Menu */}
+                  {showMenu && (
+                    <View style={styles.menuDropdown}>
+                      <TouchableOpacity
+                        style={styles.menuItem}
+                        onPress={handleToggleDescription}
+                      >
+                        <Ionicons
+                          name={
+                            showDescription
+                              ? "remove-circle-outline"
+                              : "add-circle-outline"
+                          }
+                          size={20}
+                          color="#1C1C1E"
+                        />
+                        <Text style={styles.menuItemText}>
+                          {showDescription
+                            ? "Remove Description"
+                            : "Add Description"}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {/* Description Input */}
+                  {showDescription && (
+                    <View style={styles.descriptionContainer}>
+                      <TextInput
+                        style={styles.descriptionInput}
+                        value={activeWorkout?.notes || ""}
+                        onChangeText={updateWorkoutNotes}
+                        placeholder="Add workout description..."
+                        placeholderTextColor="#8E8E93"
+                        multiline
+                        numberOfLines={2}
+                      />
+                    </View>
+                  )}
+                </View>
+              }
+              // FOOTER (scrolls)
+              ListFooterComponent={
+                <View style={styles.footer}>
+                  <Button
+                    title="Add Exercise"
+                    onPress={handleShowExercisePicker}
+                    variant="tint"
+                    style={styles.addExerciseButton}
+                  />
+                  <Button
+                    variant="tint"
+                    style={styles.cancelButton}
+                    onPress={handleCancelWorkout}
+                    title="Cancel Workout"
+                    textStyle={styles.cancelButtonText}
+                  />
+                </View>
+              }
+              onDragBegin={() => {
+                setIsDraggingList(true);
+              }}
+              onDragEnd={({ data }) => {
+                setIsDraggingList(false);
+                setExtraTopPadding(0);
+                handleReorderExercises(data);
+                Haptics.selectionAsync();
+              }}
+              onPlaceholderIndexChange={() => Haptics.selectionAsync()}
+              animationConfig={{
+                stiffness: 400,
+                damping: 50,
+                mass: 0.2,
+                overshootClamping: true,
+                // @ts-ignore
+                restSpeedThreshold: 0.05,
+                restDisplacementThreshold: 0.05,
+              }}
+              renderItem={({ item, drag, getIndex, isActive }) => {
+                const index = getIndex?.();
+                if (index == null) return null;
+                const detail = exerciseDetails[item.exercise_id];
+                const itemKey = `${item.exercise_id}-${item.order}`;
+
+                const handleLongPress = (e: GestureResponderEvent) => {
+                  setIsDraggingList(true);
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
+                    () => {}
+                  );
+
+                  requestAnimationFrame(() => {
+                    const ref = itemRefs.current[itemKey];
+                    if (!ref) {
+                      drag();
+                      return;
+                    }
+
+                    ref.measure((x, y, width, height, pageX, pageY) => {
+                      const desiredY = e.nativeEvent.locationY;
+                      const cumulativeHeightsOfOtherItems = index * height;
+                      const baseAbsoluteLocation = pageY;
+                      const diff = baseAbsoluteLocation - desiredY;
+
+                      setExtraTopPadding(cumulativeHeightsOfOtherItems);
+                      setTimeout(() => {
+                        // @ts-ignore
+                        listRef.current?.scrollToOffset({
+                          offset: cumulativeHeightsOfOtherItems,
+                          animated: false,
+                        });
+                        drag();
+                      }, 0);
+                    });
+                  });
+                };
+
+                const isCompact = isDraggingList;
+
+                return (
+                  <View
+                    ref={el => {
+                      itemRefs.current[itemKey] = el;
+                    }}
+                    style={[
+                      styles.exerciseCard,
+                      isDraggingList && { paddingHorizontal: 20 },
+                    ]}
+                  >
+                    {/* HEADER – always visible */}
+                    <View style={styles.exerciseHeader}>
+                      <TouchableOpacity
+                        style={styles.exerciseNameContainer}
+                        onPress={() => {
+                          if (!isDraggingList && detail) {
+                            setSelectedExercise(detail);
+                            setShowExerciseDetail(true);
+                          }
+                        }}
+                        onLongPress={handleLongPress}
+                        delayLongPress={150}
+                      >
+                        <Text
+                          style={[
+                            styles.exerciseNameClickable,
+                            isActive && {
+                              opacity: 0.95,
+                              shadowColor: "#000",
+                              shadowOffset: { width: 0, height: 4 },
+                              shadowOpacity: 0.15,
+                              shadowRadius: 8,
+                            },
+                          ]}
                         >
-                          <Text
-                            style={[
-                              styles.exerciseNameClickable,
-                              isActive && {
-                                opacity: 0.95,
-                                shadowColor: "#000",
-                                shadowOffset: { width: 0, height: 4 },
-                                shadowOpacity: 0.15,
-                                shadowRadius: 8,
+                          {detail?.name ?? "Loading..."}
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.exerciseMenuButton}
+                        disabled={isDraggingList}
+                        onPress={() => {
+                          Alert.alert(
+                            detail?.name || "Exercise",
+                            "What would you like to do?",
+                            [
+                              { text: "Cancel", style: "cancel" },
+                              {
+                                text: "Delete Exercise",
+                                style: "destructive",
+                                onPress: () => removeExercise(index),
                               },
-                            ]}
-                          >
-                            {detail?.name ?? "Loading..."}
-                          </Text>
-                        </TouchableOpacity>
+                            ]
+                          );
+                        }}
+                      >
+                        <Ionicons
+                          name="ellipsis-horizontal"
+                          size={20}
+                          color="#8E8E93"
+                        />
+                      </TouchableOpacity>
+                    </View>
 
-                        <TouchableOpacity
-                          style={styles.exerciseMenuButton}
-                          disabled={isDraggingList}
-                          onPress={() => {
-                            Alert.alert(
-                              detail?.name || "Exercise",
-                              "What would you like to do?",
-                              [
-                                { text: "Cancel", style: "cancel" },
-                                {
-                                  text: "Delete Exercise",
-                                  style: "destructive",
-                                  onPress: () => removeExercise(index),
-                                },
-                              ]
-                            );
-                          }}
-                        >
-                          <Ionicons
-                            name="ellipsis-horizontal"
-                            size={20}
-                            color="#8E8E93"
-                          />
-                        </TouchableOpacity>
-                      </View>
+                    {/* BODY – only rendered in full mode */}
+                    {!isCompact && (
+                      <>
+                        {item.sets.length > 0 && (
+                          <View style={styles.setsContainer}>
+                            <SetHeader
+                              exerciseKind={detail?.exercise_kind || "Barbell"}
+                              showCompleteColumn
+                            />
 
-                      {/* BODY – only rendered in full mode */}
-                      {!isCompact && (
-                        <>
-                          {item.sets.length > 0 && (
-                            <View style={styles.setsContainer}>
-                              <SetHeader
-                                exerciseKind={
-                                  detail?.exercise_kind || "Barbell"
-                                }
-                                showCompleteColumn
-                              />
-
+                            {/* Full-bleed rows: cancel out list/card horizontal padding */}
+                            <View
+                              style={{
+                                marginHorizontal: -20, // cancels the 20px horizontal padding from list/card
+                              }}
+                            >
                               {item.sets.map((set, setIndex) => (
                                 <SwipeToDeleteRow
                                   key={setIndex}
@@ -909,37 +989,22 @@ export default function ActiveWorkoutSheet({
                                 </SwipeToDeleteRow>
                               ))}
                             </View>
-                          )}
+                          </View>
+                        )}
 
-                          <TouchableOpacity
-                            style={styles.addSetButton}
-                            onPress={() => addSet(index)}
-                          >
-                            <Ionicons name="add" size={20} color="#007AFF" />
-                            <Text style={styles.addSetText}>Add Set</Text>
-                          </TouchableOpacity>
-                        </>
-                      )}
-                    </View>
-                  );
-                }}
-              />
-            </View>
-
-            <View style={styles.footer}>
-              <Button
-                title="Add Exercise"
-                onPress={handleShowExercisePicker}
-                variant="outline"
-                style={styles.addExerciseButton}
-              />
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={handleCancelWorkout}
-              >
-                <Text style={styles.cancelButtonText}>Cancel Workout</Text>
-              </TouchableOpacity>
-            </View>
+                        <TouchableOpacity
+                          style={styles.addSetButton}
+                          onPress={() => addSet(index)}
+                        >
+                          <Ionicons name="add" size={20} color="" />
+                          <Text style={styles.addSetText}>Add Set</Text>
+                        </TouchableOpacity>
+                      </>
+                    )}
+                  </View>
+                );
+              }}
+            />
           </View>
         )}
       </Animated.View>
@@ -1009,7 +1074,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#D1D1D6",
     borderRadius: 2,
     alignSelf: "center",
-    marginBottom: 12,
+    marginBottom: 8,
   },
   collapsedContent: {
     flexDirection: "row",
@@ -1048,14 +1113,33 @@ const styles = StyleSheet.create({
   expandedTopBar: {
     flexDirection: "row",
     alignItems: "center",
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    // minHeight: 44,
   },
+
+  topBarTimerOverlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  topBarTimerText: {
+    fontSize: 16, // slightly larger
+    fontWeight: "600",
+    color: "#1c1c1ed2", // normal text color, not purple
+  },
+
   expandedContent: {
     flex: 1,
   },
   nameRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 20,
     paddingTop: 8,
   },
   nameBarbell: {
@@ -1071,7 +1155,6 @@ const styles = StyleSheet.create({
   dateRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 20,
     paddingTop: 6,
     gap: 8,
   },
@@ -1082,7 +1165,6 @@ const styles = StyleSheet.create({
   timerRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 20,
     paddingTop: 6,
     paddingBottom: 12,
     gap: 8,
@@ -1121,7 +1203,7 @@ const styles = StyleSheet.create({
     color: "#1C1C1E",
   },
   descriptionContainer: {
-    paddingHorizontal: 20,
+    // paddingHorizontal: 20,
     paddingVertical: 8,
   },
   descriptionInput: {
@@ -1132,8 +1214,8 @@ const styles = StyleSheet.create({
   },
   finishButton: {
     backgroundColor: "#007AFF",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
     borderRadius: 8,
   },
   finishButtonText: {
@@ -1181,40 +1263,53 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   setsContainer: {
-    marginBottom: 12,
+    marginBottom: 0,
   },
   addSetButton: {
+    backgroundColor: "#e9ebea",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 10,
+    paddingVertical: 3,
+    borderRadius: 8,
+    marginTop: 12,
   },
   addSetText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#007AFF",
+    // color: "#007AFF",
     marginLeft: 6,
   },
   bottomSpacer: {
     height: 100,
   },
   footer: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 0,
     paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: "#E5E5EA",
+
     backgroundColor: "#FFFFFF",
   },
   addExerciseButton: {
     marginBottom: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 0,
+    minHeight: 0,
   },
   cancelButton: {
-    paddingVertical: 12,
     alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 0,
+    minHeight: 0,
+    backgroundColor: "#FF3B3015",
   },
   cancelButtonText: {
     fontSize: 16,
     fontWeight: "600",
     color: "#FF3B30",
+  },
+  topBarTimerContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingLeft: 20,
   },
 });
