@@ -1,3 +1,5 @@
+import { AppState, AppStateStatus } from "react-native";
+import { Audio } from "expo-av";
 import { Ionicons } from "@expo/vector-icons";
 import MaskedView from "@react-native-masked-view/masked-view";
 import * as Haptics from "expo-haptics";
@@ -825,139 +827,257 @@ function RestTimerRow({
   isSetCompleted: boolean;
   onChangeValue: (v: number | null) => void;
 }) {
+  const planned = useMemo(() => (value != null ? value : 0), [value]);
+  const hasTimer = useMemo(() => planned > 0, [planned]);
+
   const [mode, setMode] = useState<"display" | "edit" | "running" | "done">(
-    "display"
+    () => {
+      if (isSetCompleted && hasTimer) return "done";
+      return "display";
+    }
   );
-  const [remaining, setRemaining] = useState(value ?? 0);
+
+  const [remaining, setRemaining] = useState<number>(() => {
+    if (isSetCompleted && hasTimer) return 0;
+    return planned;
+  });
+
   const [showModal, setShowModal] = useState(false);
 
+  const bellSoundRef = useRef<Audio.Sound | null>(null);
   const progress = useRef(new Animated.Value(1)).current;
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const hasAutoStartedRef = useRef(false);
-
+  const endTimeRef = useRef<number | null>(null);
   const modeRef = useRef(mode);
-  const progressRef = useRef(progress);
-  const remainingRef = useRef(remaining);
+  const prevCompletedRef = useRef(isSetCompleted);
+  const hasAutoStartedRef = useRef(false);
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
   useEffect(() => {
     modeRef.current = mode;
   }, [mode]);
-
+  // NEW: load second_bell.mp3 once per RestTimerRow
   useEffect(() => {
-    remainingRef.current = remaining;
-  }, [remaining]);
+    let isMounted = true;
 
-  const planned = useMemo(() => (value != null ? value : 0), [value]);
-  const hasTimer = useMemo(() => planned > 0, [planned]);
+    (async () => {
+      try {
+        const { sound } = await Audio.Sound.createAsync(
+          // adjust the path to where second_bell.mp3 actually lives
+          require("../assets/second_bell.mp3")
+        );
 
-  const handleDurationChange = (sec: number | null) => {
-    const safe = sec ?? 0;
-    setRemaining(safe);
-    onChangeValue(safe);
-  };
+        console.log("SOund bruh", sound, isMounted);
+        if (!isMounted) {
+          await sound.unloadAsync();
+          return;
+        }
+        bellSoundRef.current = sound;
+      } catch (e) {
+        // fail silently – timer still works without sound
+        console.warn("Failed to load second_bell.mp3", e);
+      }
+    })();
 
-  const fmt = (s: number) => {
+    return () => {
+      isMounted = false;
+      if (bellSoundRef.current) {
+        bellSoundRef.current.unloadAsync().catch(() => {});
+        bellSoundRef.current = null;
+      }
+    };
+  }, []);
+  const fmt = useCallback((s: number) => {
     const safe = Math.max(0, Math.floor(s));
     const m = Math.floor(safe / 60);
     const sec = safe % 60;
     return `${m}:${sec.toString().padStart(2, "0")}`;
-  };
+  }, []);
 
-  const clear = () => {
+  const clear = useCallback(() => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-  };
+    progress.stopAnimation?.();
+  }, [progress]);
 
-  const start = () => {
-    if (!hasTimer) return;
+  // Shared finish function with "silent" flag
+   const finishTimer = useCallback(
+    (opts?: { silent?: boolean }) => {
+      const silent = opts?.silent ?? false;
+
+      clear();
+      endTimeRef.current = null;
+
+      if (modeRef.current !== "done") {
+        setMode("done");
+        progress.setValue(0);
+        setRemaining(0);
+
+        if (!silent) {
+          // Play bell sound
+          if (bellSoundRef.current) {
+            bellSoundRef.current
+              .replayAsync()
+              .catch(() => {});
+          }
+
+          // Show modal + haptics
+          setShowModal(true);
+          Haptics.notificationAsync(
+            Haptics.NotificationFeedbackType.Success
+          ).catch(() => {});
+        }
+      }
+    },
+    [clear, progress]
+  );
+
+
+  // Natural finish (used by tick + animation completion)
+  const handleFinishNatural = useCallback(() => {
+    finishTimer({ silent: false });
+  }, [finishTimer]);
+
+  const tick = useCallback(() => {
+    if (!endTimeRef.current) return;
+
+    const msLeft = endTimeRef.current - Date.now();
+    const nextRemaining = Math.max(0, Math.ceil(msLeft / 1000));
+    setRemaining(nextRemaining);
+
+    if (nextRemaining <= 0) {
+      handleFinishNatural();
+    }
+  }, [handleFinishNatural]);
+
+  const startBarAnimation = useCallback(
+    (durationMs: number) => {
+      Animated.timing(progress, {
+        toValue: 0,
+        duration: durationMs,
+        easing: Easing.linear,
+        useNativeDriver: false,
+      }).start(({ finished }) => {
+        if (finished) {
+          // In case tick didn't already fire exactly at 0
+          handleFinishNatural();
+        }
+      });
+    },
+    [handleFinishNatural, progress]
+  );
+
+  const start = useCallback(() => {
+    if (!hasTimer || planned <= 0) return;
 
     activateRestTimer(timerKey);
 
     clear();
+    const now = Date.now();
+    endTimeRef.current = now + planned * 1000;
+
     setMode("running");
     setRemaining(planned);
     progress.setValue(1);
 
+    startBarAnimation(planned * 1000);
     // @ts-ignore
-    intervalRef.current = setInterval(() => {
-      setRemaining(prev => {
-        if (prev <= 1) {
-          clear();
-          setMode("done");
-          setShowModal(true);
+    intervalRef.current = setInterval(tick, 1000);
+  }, [clear, hasTimer, planned, progress, startBarAnimation, tick, timerKey]);
 
-          Haptics.notificationAsync(
-            Haptics.NotificationFeedbackType.Success
-          ).catch(() => {});
-
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    Animated.timing(progress, {
-      toValue: 0,
-      duration: planned * 1000,
-      useNativeDriver: false,
-      easing: Easing.linear,
-    }).start();
-  };
-
+  // Registry: if another timer starts, we force-finish silently
   useEffect(() => {
     const unregister = registerRestTimer(timerKey, () => {
       if (modeRef.current === "running") {
-        clear();
-        setMode("done");
-        progressRef.current.stopAnimation?.();
-        progressRef.current.setValue(0);
-        setRemaining(0);
+        // forced finish → NO modal, NO haptic
+        finishTimer({ silent: true });
       }
     });
 
     return unregister;
-  }, [timerKey]);
+  }, [timerKey, finishTimer]);
+
+  // React to completion toggles
   useEffect(() => {
-    // Auto-start ONLY once per completion for timers > 0
-    if (isSetCompleted && hasTimer) {
-      if (!hasAutoStartedRef.current && mode === "display") {
+    const prev = prevCompletedRef.current;
+
+    // not completed -> completed
+    if (!prev && isSetCompleted && hasTimer) {
+      if (!hasAutoStartedRef.current) {
         hasAutoStartedRef.current = true;
         start();
       }
-    } else {
+    }
+
+    // completed -> not completed
+    if (prev && !isSetCompleted) {
+      clear();
+      endTimeRef.current = null;
+      setMode("display");
+      setRemaining(planned);
+      progress.setValue(1);
       hasAutoStartedRef.current = false;
     }
 
-    // NEW: if set is completed but timer is 0, show "done" pill instead of "display"
+    prevCompletedRef.current = isSetCompleted;
+  }, [isSetCompleted, hasTimer, planned, start, clear, progress]);
+
+  // Completed + timer = 0 → show done pill with no countdown
+  useEffect(() => {
     if (isSetCompleted && !hasTimer && value !== null && mode === "display") {
-      // no countdown, just mark as done visually
       clear();
       setMode("done");
       setRemaining(0);
       progress.setValue(0);
     }
+  }, [isSetCompleted, hasTimer, value, mode, clear, progress]);
 
-    // If user un-completes set, cancel timer / done state
-    if (!isSetCompleted && ["running", "done"].includes(mode)) {
-      clear();
-      setMode("display");
-      progress.setValue(1);
-      setRemaining(planned);
-    }
-  }, [isSetCompleted, hasTimer, mode, planned, value]);
-
+  // Sync when planned changes while idle
   useEffect(() => {
-    if (mode === "display") {
+    if (mode === "display" || mode === "edit") {
       setRemaining(planned);
       progress.setValue(1);
     }
   }, [planned, mode, progress]);
 
+  // AppState listener: when returning to foreground, fix bar for remaining time
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", nextState => {
+      const prevState = appStateRef.current;
+      appStateRef.current = nextState;
+
+      if (
+        prevState.match(/inactive|background/) &&
+        nextState === "active" &&
+        modeRef.current === "running" &&
+        endTimeRef.current &&
+        planned > 0
+      ) {
+        const msLeft = endTimeRef.current - Date.now();
+
+        if (msLeft <= 0) {
+          handleFinishNatural();
+          return;
+        }
+
+        const fraction = msLeft / (planned * 1000);
+        progress.stopAnimation?.();
+        progress.setValue(fraction);
+
+        startBarAnimation(msLeft);
+      }
+    });
+
+    return () => {
+      sub.remove();
+    };
+  }, [handleFinishNatural, planned, progress, startBarAnimation]);
+
   useEffect(() => {
     return () => clear();
-  }, []);
+  }, [clear]);
 
   if (value == null && mode === "display") return null;
 
@@ -969,6 +1089,12 @@ function RestTimerRow({
     },
     [isSetCompleted]
   );
+
+  const handleDurationChange = (sec: number | null) => {
+    const safe = sec ?? 0;
+    setRemaining(safe);
+    onChangeValue(safe);
+  };
 
   let content: JSX.Element | null = null;
 
@@ -1088,11 +1214,9 @@ function RestTimerRow({
         style={rtStyles.displayRow}
       >
         <View style={rtStyles.lineDone} />
-        {
-          <View style={rtStyles.pillDone}>
-            <Text style={rtStyles.pillDoneText}>{fmt(planned)}</Text>
-          </View>
-        }
+        <View style={rtStyles.pillDone}>
+          <Text style={rtStyles.pillDoneText}>{fmt(planned)}</Text>
+        </View>
         <View style={rtStyles.lineDone} />
       </TouchableOpacity>
     );
@@ -1102,7 +1226,7 @@ function RestTimerRow({
     <>
       <View style={{ marginTop: -4, marginBottom: 8 }}>{content}</View>
 
-      {/* Completion modal */}
+      {/* Completion modal – only on NATURAL finish now */}
       <Modal
         visible={showModal}
         transparent

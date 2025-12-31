@@ -241,7 +241,7 @@ export default function DurationInput({
   return (
     <TextInput
       keyboardType={Platform.select({
-        ios: "numbers-and-punctuation",
+        ios: "number-pad",
         android: "number-pad",
       })}
       returnKeyType="done"
