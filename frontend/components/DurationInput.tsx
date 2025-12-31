@@ -13,6 +13,7 @@ interface DurationInputProps {
   style?: StyleProp<TextStyle>;
   onChangeFocus?: (focused: boolean) => void;
   enableMilliseconds?: boolean;
+  autoFocus?: boolean;
 }
 
 const pad2 = (n: number | string) => n.toString().padStart(2, "0");
@@ -173,6 +174,7 @@ export default function DurationInput({
   style,
   onChangeFocus,
   enableMilliseconds = true,
+  autoFocus = false,
 }: DurationInputProps) {
   const [rawDigits, setRawDigits] = useState<string>("");
   const [isFocused, setIsFocused] = useState(false);
@@ -249,12 +251,11 @@ export default function DurationInput({
       onChangeText={handleTextChange}
       onFocus={handleFocus}
       onBlur={handleBlur}
-      keyboardType="number-pad"
       maxLength={enableMilliseconds ? 12 : 10}
       placeholder={enableMilliseconds ? "0:00.00" : "0:00"}
       placeholderTextColor="#999"
       selectTextOnFocus
-      autoFocus
+      autoFocus={autoFocus}
     />
   );
 }

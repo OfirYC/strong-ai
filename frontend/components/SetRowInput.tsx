@@ -993,6 +993,7 @@ function RestTimerRow({
           style={[rtStyles.pill, rtStyles.pillText]}
           enableMilliseconds={false}
           onChangeFocus={onChangeFocus}
+          autoFocus
         />
       </View>
     );
