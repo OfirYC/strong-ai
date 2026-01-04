@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import api from "../utils/api";
 import { Exercise } from "../types";
 import { LoadingData } from "./LoadingData";
+import { useExercises } from "../store/exercisesStore";
 
 const MUSCLE_GROUPS = [
   "All",
@@ -39,40 +40,23 @@ export default function ExercisePickerModal({
   onSelectExercise,
   onCreateNew,
 }: ExercisePickerModalProps) {
-  const [exercises, setExercises] = useState<Exercise[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { byId, getAll, loading, list } = useExercises();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedMuscleGroup, setSelectedMuscleGroup] = useState("All");
 
-  useEffect(() => {
-    if (visible) {
-      loadExercises();
-      setSearchQuery("");
-      setSelectedMuscleGroup("All");
-    }
-  }, [visible]);
-
-  const loadExercises = async () => {
-    setLoading(true);
-    try {
-      const response = await api.get("/exercises");
-      setExercises(response.data);
-    } catch (error) {
-      console.error("Failed to load exercises:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filteredExercises = exercises.filter(exercise => {
-    const matchesSearch =
-      !searchQuery ||
-      exercise.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesMuscleGroup =
-      selectedMuscleGroup === "All" ||
-      exercise.primary_body_parts.some(p => p == selectedMuscleGroup);
-    return matchesSearch && matchesMuscleGroup;
-  });
+  const filteredExercises = useMemo(
+    () =>
+      list.filter(exercise => {
+        const matchesSearch =
+          !searchQuery ||
+          exercise.name.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesMuscleGroup =
+          selectedMuscleGroup === "All" ||
+          exercise.primary_body_parts.some(p => p == selectedMuscleGroup);
+        return matchesSearch && matchesMuscleGroup;
+      }),
+    [searchQuery, selectedMuscleGroup, list, list.length]
+  );
 
   const handleSelectExercise = (exercise: Exercise) => {
     onSelectExercise(exercise);

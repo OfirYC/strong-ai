@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -8,34 +8,36 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import Input from '../../components/Input';
-import Button from '../../components/Button';
-import api from '../../utils/api';
-import { useAuthStore } from '../../store/authStore';
+} from "react-native";
+import { useRouter } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
+import Input from "../../components/Input";
+import Button from "../../components/Button";
+import api from "../../utils/api";
+import { useAuthStore } from "../../store/authStore";
 
 export default function LoginScreen() {
   const router = useRouter();
-  const setUser = useAuthStore((state) => state.setUser);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const setUser = useAuthStore(state => state.setUser);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+      Alert.alert("Error", "Please fill in all fields");
       return;
     }
 
     try {
       setLoading(true);
-      const response = await api.post('/auth/login', { email, password });
+      console.log("GONNA POST");
+      const response = await api.post("/auth/login", { email, password });
+      console.log("POSTED", response.data);
       await setUser(response.data);
-      router.replace('/(tabs)/workout');
+      router.replace("/(tabs)/workout");
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.detail || 'Login failed');
+      Alert.alert("Error", error.response?.data?.detail || "Login failed");
     } finally {
       setLoading(false);
     }
@@ -44,7 +46,7 @@ export default function LoginScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardView}
       >
         <ScrollView
@@ -82,12 +84,15 @@ export default function LoginScreen() {
             />
 
             <TouchableOpacity
-              onPress={() => router.push('/(auth)/register')}
+              onPress={() => router.push("/(auth)/register")}
               style={styles.linkContainer}
             >
               <Text style={styles.linkText}>
-                <Text>{process.env.EXPO_PUBLIC_BACKEND_URL ?? "BACKEND URL IS UNDEFINED"}</Text>
-                Don't have an account?{' '}
+                <Text>
+                  {process.env.EXPO_PUBLIC_BACKEND_URL ??
+                    "BACKEND URL IS UNDEFINED"}
+                </Text>
+                Don't have an account?{" "}
                 <Text style={styles.linkTextBold}>Sign Up</Text>
               </Text>
             </TouchableOpacity>
@@ -101,46 +106,46 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F7',
+    backgroundColor: "#F5F5F7",
   },
   keyboardView: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     padding: 24,
   },
   header: {
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 48,
   },
   title: {
     fontSize: 48,
-    fontWeight: 'bold',
-    color: '#007AFF',
+    fontWeight: "bold",
+    color: "#007AFF",
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 18,
-    color: '#8E8E93',
+    color: "#8E8E93",
   },
   form: {
-    width: '100%',
+    width: "100%",
   },
   button: {
     marginTop: 8,
   },
   linkContainer: {
     marginTop: 24,
-    alignItems: 'center',
+    alignItems: "center",
   },
   linkText: {
-    color: '#8E8E93',
+    color: "#8E8E93",
     fontSize: 14,
   },
   linkTextBold: {
-    color: '#007AFF',
-    fontWeight: '600',
+    color: "#007AFF",
+    fontWeight: "600",
   },
 });

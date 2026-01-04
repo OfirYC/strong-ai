@@ -23,12 +23,14 @@ import {
   WorkoutSet,
   WorkoutTemplate,
 } from "../types";
-import api from "../utils/api";
 import CreateExerciseModal from "./CreateExerciseModal";
 import ExercisePickerModal from "./ExercisePickerModal";
 import Input from "./Input";
 import SetRowInput, { SetHeader } from "./SetRowInput";
 import SwipeToDeleteRow from "./SwipeToDeleteRow";
+
+// ✅ NEW
+import { useExercises } from "../store/exercisesStore";
 
 type OnSaveRoutine = (
   name: string,
@@ -56,10 +58,10 @@ export function ModifyRoutine({
   >([]);
   const [showExercisePicker, setShowExercisePicker] = useState(false);
   const [showCreateExercise, setShowCreateExercise] = useState(false);
-  const [exerciseDetails, setExerciseDetails] = useState<{
-    [key: string]: Exercise;
-  }>({});
   const [saving, setSaving] = useState(false);
+
+  // ✅ pull exercises from global store (auto-hydrates via your new hook behavior)
+  const { byId, getAll, upsert } = useExercises();
 
   // Drag / collapse logic copied from ActiveWorkoutSheet
   const [isDraggingList, setIsDraggingList] = useState(false);
@@ -68,10 +70,6 @@ export function ModifyRoutine({
     null
   );
   const itemRefs = useRef<Record<string, View | null>>({});
-
-  useEffect(() => {
-    loadExerciseDetails();
-  }, [selectedExercises]);
 
   // On injected routine into modal
   useEffect(() => {
@@ -84,6 +82,17 @@ export function ModifyRoutine({
     setNotes(routine.notes || "");
   }, [routine?.id]);
 
+  // ✅ Ensure missing exercise details are loaded (cache-first)
+  useEffect(() => {
+    const ids = selectedExercises.map(e => e.exercise_id);
+    const missing = ids.filter(id => !byId[id]);
+
+    if (missing.length === 0) return;
+
+    // getAll() is cache-first and will populate byId once if needed
+    getAll().catch(console.warn);
+  }, [selectedExercises, byId, getAll]);
+
   const { previousMap } = useMultipleExercisesPreviousSets(
     selectedExercises?.map(e => ({
       id: e.exercise_id,
@@ -95,38 +104,17 @@ export function ModifyRoutine({
     return 3 * 60;
   };
 
-  const loadExerciseDetails = async () => {
-    const exerciseIds = selectedExercises.map(e => e.exercise_id);
-    const missingIds = exerciseIds.filter(id => !exerciseDetails[id]);
-
-    if (missingIds.length > 0) {
-      try {
-        const response = await api.get("/exercises");
-        const allExercises: Exercise[] = response.data;
-        const detailsMap: { [key: string]: Exercise } = { ...exerciseDetails };
-
-        allExercises.forEach(ex => {
-          if (missingIds.includes(ex.id)) {
-            detailsMap[ex.id] = ex;
-          }
-        });
-
-        setExerciseDetails(detailsMap);
-      } catch (error) {
-        console.error("Failed to load exercise details:", error);
-      }
-    }
-  };
-
   const addExercise = (exercise: Exercise) => {
     const newExercise: TemplateExercise = {
       exercise_id: exercise.id,
       order: selectedExercises.length,
       sets: [{ set_type: "normal", rest_timer: getDefaultRestTimer() }], // Start with one empty set
     };
+
     setSelectedExercises(prev => [...prev, newExercise]);
-    // Add to details immediately
-    setExerciseDetails(prev => ({ ...prev, [exercise.id]: exercise }));
+
+    // ✅ update global cache immediately
+    upsert(exercise);
   };
 
   const removeExercise = (index: number) => {
@@ -222,7 +210,7 @@ export function ModifyRoutine({
   };
 
   const getExerciseName = (exerciseId: string) => {
-    return exerciseDetails[exerciseId]?.name || "Loading...";
+    return byId[exerciseId]?.name || "Loading...";
   };
 
   const renderExerciseItem = ({
@@ -234,7 +222,7 @@ export function ModifyRoutine({
     const index = getIndex?.();
     if (index == null) return null;
 
-    const detail = exerciseDetails[item.exercise_id];
+    const detail = byId[item.exercise_id];
     const exerciseKind = detail?.exercise_kind || "Barbell";
     const itemKey = `${item.exercise_id}-${item.order}`;
     const isCompact = isDraggingList; // collapse sets while dragging, same as ActiveWorkoutSheet
@@ -322,8 +310,10 @@ export function ModifyRoutine({
                     onDelete={() => removeSet(index, setIndex)}
                   >
                     <SetRowInput
-                      previousSetData={previousMap?.[detail?.id]?.[setIndex]}
-                      exerciseId={detail?.id}
+                      previousSetData={
+                        previousMap?.[item.exercise_id]?.[setIndex]
+                      }
+                      exerciseId={item.exercise_id}
                       set={set}
                       setIndex={setIndex}
                       exerciseKind={exerciseKind}

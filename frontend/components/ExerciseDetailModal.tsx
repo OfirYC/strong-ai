@@ -21,6 +21,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Exercise, ExerciseHistory, ExerciseHistoryResponse } from "../types";
 import api from "../utils/api";
 import { SetNumber } from "./SetNumber";
+import { useExercises } from "../store/exercisesStore";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const PLACEHOLDER_IMAGE =
@@ -32,7 +33,7 @@ interface ExerciseDetailModalProps {
   visible: boolean;
   exercise: Exercise | null;
   onClose: () => void;
-  onExerciseUpdated: () => void;
+  onExerciseUpdated: (newExercise: Exercise) => void;
 }
 
 interface PersonalRecords {
@@ -57,6 +58,8 @@ export default function ExerciseDetailModal({
   onClose,
   onExerciseUpdated,
 }: ExerciseDetailModalProps) {
+  const { upsert } = useExercises();
+
   const [activeTab, setActiveTab] = useState<TabType>("about");
   const [isEditing, setIsEditing] = useState(false);
   const [instructions, setInstructions] = useState("");
@@ -90,6 +93,7 @@ export default function ExerciseDetailModal({
       setActiveTab("about");
       loadExerciseData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, exercise]);
 
   const loadExerciseData = async () => {
@@ -192,11 +196,16 @@ export default function ExerciseDetailModal({
 
     try {
       setSaving(true);
-      await api.patch(`/exercises/${exercise.id}`, {
+      const response = await api.patch(`/exercises/${exercise.id}`, {
         instructions: instructions.trim(),
       });
+      const newExercise = response.data as Exercise;
+
+      // ✅ keep store cache in sync
+      upsert(newExercise);
+
       setIsEditing(false);
-      onExerciseUpdated();
+      onExerciseUpdated(newExercise);
       Alert.alert("Success", "Instructions saved!");
     } catch (error: any) {
       Alert.alert(
@@ -236,10 +245,16 @@ export default function ExerciseDetailModal({
     if (!result.canceled && result.assets[0].base64) {
       try {
         setUploadingImage(true);
-        await api.patch(`/exercises/${exercise.id}`, {
+        const response = await api.patch(`/exercises/${exercise.id}`, {
           image: `data:image/jpeg;base64,${result.assets[0].base64}`,
         });
-        onExerciseUpdated();
+
+        const newExercise = response.data as Exercise;
+
+        // ✅ keep store cache in sync
+        upsert(newExercise);
+
+        onExerciseUpdated(newExercise);
         Alert.alert("Success", "Image uploaded!");
       } catch (error: any) {
         Alert.alert(

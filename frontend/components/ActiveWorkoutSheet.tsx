@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useExercises } from "../store/exercisesStore";
 import * as Haptics from "expo-haptics";
-
+import { useDebounce } from "use-debounce";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -54,12 +55,15 @@ const COLLAPSED_HEIGHT = 80;
 
 interface ActiveWorkoutSheetProps {
   onFinishWorkout: () => void;
+  onMetaCommitted?: () => void; // NEW: “name/notes saved to backend”
+
   initialExpanded?: boolean;
 }
 
 export default function ActiveWorkoutSheet({
   onFinishWorkout,
   initialExpanded = true,
+  onMetaCommitted,
 }: ActiveWorkoutSheetProps) {
   const insets = useSafeAreaInsets();
 
@@ -71,15 +75,17 @@ export default function ActiveWorkoutSheet({
     endWorkout,
     workoutStartTime,
   } = useWorkoutStore();
+  const workoutName = activeWorkout?.name ?? "";
+  const workoutNotes = activeWorkout?.notes ?? "";
+  const [debouncedName] = useDebounce(workoutName, 800);
+  const [debouncedNotes] = useDebounce(workoutNotes, 800);
   const [isExpanded, setIsExpanded] = useState(initialExpanded);
   const isExpandedRef = useRef(initialExpanded); // Ref to track current expanded state
   const [showMenu, setShowMenu] = useState(false);
   const [showDescription, setShowDescription] = useState(
     !!activeWorkout?.notes
   );
-  const [exerciseDetails, setExerciseDetails] = useState<{
-    [key: string]: Exercise;
-  }>({});
+
   const [timer, setTimer] = useState(0);
   const [saving, setSaving] = useState(false);
   const [showExercisePicker, setShowExercisePicker] = useState(false);
@@ -88,12 +94,17 @@ export default function ActiveWorkoutSheet({
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(
     null
   );
-  const [availableExercises, setAvailableExercises] = useState<Exercise[]>([]);
   const [showWorkoutComplete, setShowWorkoutComplete] = useState(false);
   const [workoutSummary, setWorkoutSummary] =
     useState<WorkoutSummaryData | null>(null);
   const [isDraggingList, setIsDraggingList] = useState(false);
   const [extraTopPadding, setExtraTopPadding] = useState(0);
+  const {
+    byId: exercisesById,
+    refetchById,
+    upsert,
+    loading: exercisesLoading,
+  } = useExercises();
 
   // NEW: track scroll position for timer fade
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -201,8 +212,51 @@ export default function ActiveWorkoutSheet({
 
   // Load exercise details when exercises change
   useEffect(() => {
-    loadExerciseDetails();
-  }, [activeWorkout?.exercises]);
+    if (!activeWorkout?.exercises?.length) return;
+
+    for (const ex of activeWorkout.exercises) {
+      if (!exercisesById[ex.exercise_id]) {
+        // fire-and-forget is fine; store handles merging
+        refetchById(ex.exercise_id).catch(() => {});
+      }
+    }
+  }, [activeWorkout?.exercises, exercisesById, refetchById]);
+
+  const lastCommittedRef = useRef<{ name: string; notes: string }>({
+    name: workoutName,
+    notes: workoutNotes,
+  });
+
+  useEffect(() => {
+    if (!activeWorkout) return;
+
+    const prev = lastCommittedRef.current;
+
+    // Prevent redundant saves
+    if (debouncedName === prev.name && debouncedNotes === prev.notes) {
+      return;
+    }
+
+    const commit = async () => {
+      try {
+        await api.put(`/workouts/${activeWorkout.id}`, {
+          name: debouncedName,
+          notes: debouncedNotes,
+        });
+
+        lastCommittedRef.current = {
+          name: debouncedName,
+          notes: debouncedNotes,
+        };
+
+        onMetaCommitted?.(); // refresh today's workouts once
+      } catch (e) {
+        console.error("Failed to save workout meta:", e);
+      }
+    };
+
+    commit();
+  }, [debouncedName, debouncedNotes, activeWorkout?.id]);
 
   const { previousMap, loadExercisePreviousSets } =
     useMultipleExercisesPreviousSets(
@@ -214,34 +268,6 @@ export default function ActiveWorkoutSheet({
 
   const getDefaultRestTimer = () => {
     return 3 * 60;
-  };
-
-  const loadExerciseDetails = async () => {
-    if (!activeWorkout) return;
-
-    const details: { [key: string]: Exercise } = {};
-    for (const exercise of activeWorkout.exercises) {
-      if (!exerciseDetails[exercise.exercise_id]) {
-        try {
-          const response = await api.get(`/exercises/${exercise.exercise_id}`);
-          details[exercise.exercise_id] = response.data;
-        } catch (error) {
-          console.error("Failed to load exercise details:", error);
-        }
-      } else {
-        details[exercise.exercise_id] = exerciseDetails[exercise.exercise_id];
-      }
-    }
-    setExerciseDetails(details);
-  };
-
-  const loadAvailableExercises = async () => {
-    try {
-      const response = await api.get("/exercises");
-      setAvailableExercises(response.data);
-    } catch (error) {
-      console.error("Failed to load exercises:", error);
-    }
   };
 
   const handleShowExercisePicker = () => {
@@ -276,18 +302,14 @@ export default function ActiveWorkoutSheet({
     const newExercises = [...exercises, newExercise];
     updateWorkout(newExercises);
 
-    // Add to local exercise details
-    setExerciseDetails(prev => ({
-      ...prev,
-      [exercise.id]: exercise,
-    }));
+    upsert(exercise);
 
     setShowExercisePicker(false);
   };
 
   const addSet = (exerciseIndex: number) => {
     const exercise = exercises[exerciseIndex];
-    const detail = exerciseDetails[exercise.exercise_id];
+    const detail = exercisesById[exercise.exercise_id];
     const fields = getExerciseFields(detail?.exercise_kind || "Barbell");
 
     const newSet: WorkoutSet = {
@@ -339,8 +361,9 @@ export default function ActiveWorkoutSheet({
 
   const removeExercise = (exerciseIndex: number) => {
     const exerciseName =
-      exerciseDetails[exercises[exerciseIndex]?.exercise_id]?.name ||
+      exercisesById[exercises[exerciseIndex]?.exercise_id]?.name ||
       "this exercise";
+
     Alert.alert(
       "Delete Exercise",
       `Are you sure you want to remove ${exerciseName} from this workout?`,
@@ -430,7 +453,7 @@ export default function ActiveWorkoutSheet({
 
       // Build exercise summaries (use saved exercises, not original)
       const exerciseSummaries = exercisesToSave.map(ex => {
-        const detail = exerciseDetails[ex.exercise_id];
+        const detail = exercisesById[ex.exercise_id];
         const sets = ex.sets;
         let bestSet = "";
 
@@ -848,7 +871,7 @@ export default function ActiveWorkoutSheet({
               renderItem={({ item, drag, getIndex, isActive }) => {
                 const index = getIndex?.();
                 if (index == null) return null;
-                const detail = exerciseDetails[item.exercise_id];
+                const detail = exercisesById[item.exercise_id];
                 const itemKey = `${item.exercise_id}-${item.order}`;
 
                 const handleLongPress = (e: GestureResponderEvent) => {
@@ -973,9 +996,9 @@ export default function ActiveWorkoutSheet({
                                 >
                                   <SetRowInput
                                     previousSetData={
-                                      previousMap[detail?.id]?.[setIndex]
+                                      previousMap[item.exercise_id]?.[setIndex]
                                     }
-                                    exerciseId={detail?.id}
+                                    exerciseId={item.exercise_id}
                                     set={set}
                                     setIndex={setIndex}
                                     exerciseKind={
@@ -1023,8 +1046,8 @@ export default function ActiveWorkoutSheet({
       <CreateExerciseModal
         visible={showCreateExercise}
         onClose={() => setShowCreateExercise(false)}
-        onExerciseCreated={() => {
-          loadAvailableExercises();
+        onExerciseCreated={(ex?: Exercise) => {
+          if (ex) upsert(ex);
           setShowCreateExercise(false);
         }}
       />
@@ -1036,7 +1059,10 @@ export default function ActiveWorkoutSheet({
           setShowExerciseDetail(false);
           setSelectedExercise(null);
         }}
-        onExerciseUpdated={loadExerciseDetails}
+        onExerciseUpdated={(ex: Exercise) => {
+          upsert(ex);
+          setSelectedExercise(ex);
+        }}
       />
 
       <WorkoutCompleteModal

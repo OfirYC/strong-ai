@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -10,30 +10,31 @@ import {
   Alert,
   ActivityIndicator,
   Image,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
-import api from '../utils/api';
-import { EXERCISE_KINDS, ExerciseKind } from '../types';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
+import api from "../utils/api";
+import { Exercise, EXERCISE_KINDS, ExerciseKind } from "../types";
+import { useExercises } from "../store/exercisesStore"; // ✅ NEW
 
 const BODY_PARTS = [
-  'Arms',
-  'Back',
-  'Cardio',
-  'Chest',
-  'Core',
-  'Full-Body',
-  'Legs',
-  'Olympic',
-  'Other',
-  'Shoulders',
+  "Arms",
+  "Back",
+  "Cardio",
+  "Chest",
+  "Core",
+  "Full-Body",
+  "Legs",
+  "Olympic",
+  "Other",
+  "Shoulders",
 ];
 
 interface CreateExerciseModalProps {
   visible: boolean;
   onClose: () => void;
-  onExerciseCreated: () => void;
+  onExerciseCreated: (exercise: Exercise) => void;
 }
 
 export default function CreateExerciseModal({
@@ -41,30 +42,38 @@ export default function CreateExerciseModal({
   onClose,
   onExerciseCreated,
 }: CreateExerciseModalProps) {
-  const [name, setName] = useState('');
+  // ✅ This will trigger lazy hydration (via the new hook behavior)
+  const { loading: exercisesLoading, upsert } = useExercises();
+
+  const [name, setName] = useState("");
   const [selectedBodyPart, setSelectedBodyPart] = useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<ExerciseKind | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<ExerciseKind | null>(
+    null
+  );
   const [imageBase64, setImageBase64] = useState<string | null>(null);
-  const [instructions, setInstructions] = useState('');
+  const [instructions, setInstructions] = useState("");
   const [saving, setSaving] = useState(false);
 
   const resetForm = () => {
-    setName('');
+    setName("");
     setSelectedBodyPart(null);
     setSelectedCategory(null);
     setImageBase64(null);
-    setInstructions('');
+    setInstructions("");
   };
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Please grant camera roll permissions to upload images');
+    if (status !== "granted") {
+      Alert.alert(
+        "Permission needed",
+        "Please grant camera roll permissions to upload images"
+      );
       return;
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
+      mediaTypes: ["images"],
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.7,
@@ -87,39 +96,50 @@ export default function CreateExerciseModal({
 
   const handleCreate = async () => {
     if (!name.trim()) {
-      Alert.alert('Error', 'Please enter an exercise name');
+      Alert.alert("Error", "Please enter an exercise name");
       return;
     }
     if (!selectedBodyPart) {
-      Alert.alert('Error', 'Please select a body part');
+      Alert.alert("Error", "Please select a body part");
       return;
     }
     if (!selectedCategory) {
-      Alert.alert('Error', 'Please select a category');
+      Alert.alert("Error", "Please select a category");
       return;
     }
 
     try {
       setSaving(true);
-      await api.post('/exercises', {
-        name: name.trim(),
-        exercise_kind: selectedCategory,
-        primary_body_parts: [selectedBodyPart],
-        category: selectedCategory,
-        is_custom: true,
-        image: imageBase64 || null,
-        instructions: instructions.trim() || null,
-      });
+
+      const exercise = (
+        await api.post("/exercises", {
+          name: name.trim(),
+          exercise_kind: selectedCategory,
+          primary_body_parts: [selectedBodyPart],
+          category: selectedCategory,
+          is_custom: true,
+          image: imageBase64 || null,
+          instructions: instructions.trim() || null,
+        })
+      ).data as Exercise;
+
+      // ✅ update global cache immediately
+      upsert(exercise);
 
       resetForm();
-      onExerciseCreated();
+      onExerciseCreated(exercise);
       onClose();
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.detail || 'Failed to create exercise');
+      Alert.alert(
+        "Error",
+        error.response?.data?.detail || "Failed to create exercise"
+      );
     } finally {
       setSaving(false);
     }
   };
+
+  const disableCreate = saving || exercisesLoading;
 
   return (
     <Modal
@@ -132,9 +152,11 @@ export default function CreateExerciseModal({
           <TouchableOpacity onPress={handleClose}>
             <Text style={styles.cancelText}>Cancel</Text>
           </TouchableOpacity>
+
           <Text style={styles.title}>New Exercise</Text>
-          <TouchableOpacity onPress={handleCreate} disabled={saving}>
-            {saving ? (
+
+          <TouchableOpacity onPress={handleCreate} disabled={disableCreate}>
+            {disableCreate ? (
               <ActivityIndicator size="small" color="#007AFF" />
             ) : (
               <Text style={styles.createText}>Create</Text>
@@ -160,7 +182,7 @@ export default function CreateExerciseModal({
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Body Part</Text>
             <View style={styles.optionsGrid}>
-              {BODY_PARTS.map((part) => (
+              {BODY_PARTS.map(part => (
                 <TouchableOpacity
                   key={part}
                   style={[
@@ -186,7 +208,7 @@ export default function CreateExerciseModal({
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Category</Text>
             <View style={styles.optionsGrid}>
-              {EXERCISE_KINDS.map((kind) => (
+              {EXERCISE_KINDS.map(kind => (
                 <TouchableOpacity
                   key={kind}
                   style={[
@@ -213,8 +235,14 @@ export default function CreateExerciseModal({
             <Text style={styles.sectionTitle}>Image (Optional)</Text>
             {imageBase64 ? (
               <View style={styles.imagePreviewContainer}>
-                <Image source={{ uri: imageBase64 }} style={styles.imagePreview} />
-                <TouchableOpacity style={styles.removeImageButton} onPress={removeImage}>
+                <Image
+                  source={{ uri: imageBase64 }}
+                  style={styles.imagePreview}
+                />
+                <TouchableOpacity
+                  style={styles.removeImageButton}
+                  onPress={removeImage}
+                >
                   <Ionicons name="close-circle" size={28} color="#FF3B30" />
                 </TouchableOpacity>
               </View>
@@ -249,121 +277,80 @@ export default function CreateExerciseModal({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F5F7',
-  },
+  container: { flex: 1, backgroundColor: "#F5F5F7" },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
+    borderBottomColor: "#E5E5EA",
   },
-  cancelText: {
-    fontSize: 17,
-    color: '#007AFF',
-  },
-  title: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#1C1C1E',
-  },
-  createText: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#007AFF',
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  section: {
-    marginTop: 24,
-  },
+  cancelText: { fontSize: 17, color: "#007AFF" },
+  title: { fontSize: 17, fontWeight: "600", color: "#1C1C1E" },
+  createText: { fontSize: 17, fontWeight: "600", color: "#007AFF" },
+  content: { flex: 1, paddingHorizontal: 20 },
+  section: { marginTop: 24 },
   sectionTitle: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#8E8E93',
-    textTransform: 'uppercase',
+    fontWeight: "600",
+    color: "#8E8E93",
+    textTransform: "uppercase",
     marginBottom: 12,
   },
   textInput: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 17,
-    color: '#1C1C1E',
+    color: "#1C1C1E",
     borderWidth: 1,
-    borderColor: '#E5E5EA',
+    borderColor: "#E5E5EA",
   },
-  optionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
+  optionsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   optionChip: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#E5E5EA',
+    borderColor: "#E5E5EA",
   },
-  optionChipSelected: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
-  },
-  optionText: {
-    fontSize: 15,
-    color: '#1C1C1E',
-  },
-  optionTextSelected: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
+  optionChipSelected: { backgroundColor: "#007AFF", borderColor: "#007AFF" },
+  optionText: { fontSize: 15, color: "#1C1C1E" },
+  optionTextSelected: { color: "#FFFFFF", fontWeight: "600" },
   uploadButton: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 12,
     padding: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 2,
-    borderColor: '#007AFF',
-    borderStyle: 'dashed',
+    borderColor: "#007AFF",
+    borderStyle: "dashed",
   },
   uploadButtonText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#007AFF',
+    fontWeight: "600",
+    color: "#007AFF",
     marginTop: 8,
   },
   imagePreviewContainer: {
-    position: 'relative',
+    position: "relative",
     borderRadius: 12,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
-  imagePreview: {
-    width: '100%',
-    height: 180,
-    borderRadius: 12,
-  },
+  imagePreview: { width: "100%", height: 180, borderRadius: 12 },
   removeImageButton: {
-    position: 'absolute',
+    position: "absolute",
     top: 8,
     right: 8,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 14,
   },
-  textArea: {
-    minHeight: 100,
-    paddingTop: 14,
-  },
-  bottomSpacer: {
-    height: 40,
-  },
+  textArea: { minHeight: 100, paddingTop: 14 },
+  bottomSpacer: { height: 40 },
 });

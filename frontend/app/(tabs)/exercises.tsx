@@ -1,20 +1,20 @@
-import React, { useState, useEffect } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import React, { useEffect, useMemo, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
   FlatList,
-  TouchableOpacity,
-  TextInput,
   Image,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import api from "../../utils/api";
-import { Exercise } from "../../types";
 import CreateExerciseModal from "../../components/CreateExerciseModal";
 import ExerciseDetailModal from "../../components/ExerciseDetailModal";
 import { LoadingData } from "../../components/LoadingData";
+import { useExercises } from "../../store/exercisesStore";
+import { Exercise } from "../../types";
 
 const PLACEHOLDER_IMAGE =
   "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=100&h=100&fit=crop";
@@ -31,62 +31,47 @@ const MUSCLE_GROUPS = [
 ];
 
 export default function ExercisesScreen() {
-  const [exercises, setExercises] = useState<Exercise[]>([]);
-  const [filteredExercises, setFilteredExercises] = useState<Exercise[]>([]);
+  // Store
+  const { byId, loading, refetchAll, upsert, list: exercises } = useExercises();
+
+  // UI state
   const [selectedMuscleGroup, setSelectedMuscleGroup] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
-  const [loading, setLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(
+  const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(
     null
   );
+  const selectedExercise = selectedExerciseId ? byId[selectedExerciseId] : null;
+
   const [showDetailModal, setShowDetailModal] = useState(false);
 
+  // Initial load: explicit refetch (only if list is empty)
   useEffect(() => {
-    loadExercises();
-  }, []);
-
-  useEffect(() => {
-    filterExercises();
-  }, [exercises, selectedMuscleGroup, searchQuery]);
-
-  const loadExercises = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get("/exercises");
-      setExercises(response.data);
-    } catch (error) {
-      console.error("Failed to load exercises:", error);
-    } finally {
-      setLoading(false);
+    if (exercises.length === 0) {
+      refetchAll();
     }
-  };
+  }, [exercises.length, refetchAll]);
 
-  const filterExercises = () => {
+  const filteredExercises = useMemo(() => {
     let filtered = exercises;
 
     if (selectedMuscleGroup !== "All") {
-      filtered = filtered.filter(
-        ex => ex.primary_body_parts.some((p) => p == selectedMuscleGroup) 
+      filtered = filtered.filter(ex =>
+        ex.primary_body_parts?.some(p => p === selectedMuscleGroup)
       );
     }
 
     if (searchQuery) {
-      filtered = filtered.filter(ex =>
-        ex.name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(ex => ex.name.toLowerCase().includes(q));
     }
 
-    setFilteredExercises(filtered);
-  };
+    return filtered;
+  }, [exercises, selectedMuscleGroup, searchQuery]);
 
   const handleExercisePress = (exercise: Exercise) => {
-    setSelectedExercise(exercise);
+    setSelectedExerciseId(exercise.id);
     setShowDetailModal(true);
-  };
-
-  const handleExerciseUpdated = () => {
-    loadExercises();
   };
 
   const renderExercise = ({ item }: { item: Exercise }) => (
@@ -174,7 +159,7 @@ export default function ExercisesScreen() {
         renderItem={renderExercise}
         contentContainerStyle={styles.listContent}
         refreshing={loading}
-        onRefresh={loadExercises}
+        onRefresh={refetchAll}
         ListEmptyComponent={
           loading ? (
             <LoadingData loadingTitle="Loading Exercises..." />
@@ -190,7 +175,16 @@ export default function ExercisesScreen() {
       <CreateExerciseModal
         visible={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        onExerciseCreated={loadExercises}
+        onExerciseCreated={(exercise: Exercise) => {
+          // Add to list + cache, no network
+          upsert(exercise);
+
+          // Optional UX: open details immediately
+          setSelectedExerciseId(exercise.id);
+          setShowDetailModal(true);
+
+          setShowCreateModal(false);
+        }}
       />
 
       <ExerciseDetailModal
@@ -198,14 +192,20 @@ export default function ExercisesScreen() {
         exercise={selectedExercise}
         onClose={() => {
           setShowDetailModal(false);
-          setSelectedExercise(null);
+          setSelectedExerciseId(null);
         }}
-        onExerciseUpdated={handleExerciseUpdated}
+        onExerciseUpdated={updated => {
+          // Update cache + list entry, no network
+          upsert(updated);
+          // Keep currently-open item in sync
+          setSelectedExerciseId(updated.id);
+        }}
       />
     </SafeAreaView>
   );
 }
 
+// styles unchanged
 const styles = StyleSheet.create({
   container: {
     flex: 1,

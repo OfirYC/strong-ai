@@ -77,6 +77,29 @@ export default function WorkoutScreen() {
     }, [])
   );
 
+  const patchTodaysWorkoutMeta = useCallback(
+  (workoutSessionId: string, meta: { name?: string; notes?: string }) => {
+    setTodaysWorkouts(prev =>
+      prev.map(pw => {
+        if (pw.workout_session_id !== workoutSessionId) return pw;
+
+        return {
+          ...pw,
+          // These are what your UI displays first:
+          actualName: meta.name ?? pw.actualName,
+          actualNotes: meta.notes ?? pw.actualNotes,
+
+          // Optional: keep base fields aligned too, so you don't see drift elsewhere
+          name: meta.name ?? pw.name,
+          notes: meta.notes ?? pw.notes,
+        };
+      })
+    );
+  },
+  []
+);
+
+
   // Watch for active workout changes to refresh today's workouts
   useEffect(() => {
     // Refresh when workout starts or ends

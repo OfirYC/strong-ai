@@ -1,20 +1,21 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import React, { useEffect, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  Modal,
-  TouchableOpacity,
-  ScrollView,
-  Image,
   ActivityIndicator,
+  Image,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import api from "../utils/api";
+import { useExercises } from "../store/exercisesStore";
 import { Exercise, WorkoutTemplate } from "../types";
-import ExerciseDetailModal from "./ExerciseDetailModal";
+import api from "../utils/api";
 import { EditRoutineModal, EditRoutineModalProps } from "./EditRoutineModal";
+import ExerciseDetailModal from "./ExerciseDetailModal";
 
 interface RoutineDetailModalProps {
   visible: boolean;
@@ -39,9 +40,8 @@ export default function RoutineDetailModal({
   onSchedule,
   onRoutineEdited,
 }: RoutineDetailModalProps) {
-  const [exerciseDetails, setExerciseDetails] = useState<{
-    [key: string]: Exercise;
-  }>({});
+  const { byId, getAll, loading: exercisesLoading } = useExercises();
+
   const [loading, setLoading] = useState(false);
   const [lastPerformed, setLastPerformed] = useState<string | null>(null);
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(
@@ -52,38 +52,10 @@ export default function RoutineDetailModal({
 
   useEffect(() => {
     if (visible && routine) {
-      loadExerciseDetails();
       loadLastPerformed();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, routine]);
-
-  const loadExerciseDetails = async () => {
-    if (!routine) return;
-
-    setLoading(true);
-    try {
-      const exerciseIds = routine.exercises.map(e => e.exercise_id);
-      const uniqueIds = [...new Set(exerciseIds)];
-
-      const details: { [key: string]: Exercise } = {};
-      await Promise.all(
-        uniqueIds.map(async id => {
-          try {
-            const response = await api.get(`/exercises/${id}`);
-            details[id] = response.data;
-          } catch (error) {
-            console.error(`Failed to load exercise ${id}`);
-          }
-        })
-      );
-
-      setExerciseDetails(details);
-    } catch (error) {
-      console.error("Failed to load exercise details:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const loadLastPerformed = async () => {
     if (!routine) return;
@@ -132,6 +104,8 @@ export default function RoutineDetailModal({
   const handleEditRoutine = () => {
     setShowEditRoutineModal(true);
   };
+
+  const showLoading = loading || exercisesLoading;
 
   return (
     <Modal
@@ -183,7 +157,7 @@ export default function RoutineDetailModal({
               style={styles.exerciseList}
               showsVerticalScrollIndicator={false}
             >
-              {loading ? (
+              {showLoading ? (
                 <ActivityIndicator
                   size="large"
                   color="#007AFF"
@@ -191,7 +165,7 @@ export default function RoutineDetailModal({
                 />
               ) : (
                 routine.exercises.map((exercise, index) => {
-                  const detail = exerciseDetails[exercise.exercise_id];
+                  const detail = byId[exercise.exercise_id];
                   const setCount =
                     exercise.sets?.length || exercise.default_sets || 0;
 
@@ -220,9 +194,7 @@ export default function RoutineDetailModal({
                           {setCount} × {detail?.name || "Loading..."}
                         </Text>
                         <Text style={styles.exerciseMuscle}>
-                          {
-                            detail?.primary_body_parts?.[0] ||
-                            ""}
+                          {detail?.primary_body_parts?.[0] || ""}
                         </Text>
                       </View>
 
@@ -234,11 +206,12 @@ export default function RoutineDetailModal({
                             setShowExerciseDetail(true);
                           }
                         }}
+                        disabled={!detail}
                       >
                         <Ionicons
                           name="help-circle"
                           size={28}
-                          color="#007AFF"
+                          color={!detail ? "#C7C7CC" : "#007AFF"}
                         />
                       </TouchableOpacity>
                     </View>
@@ -291,11 +264,13 @@ export default function RoutineDetailModal({
           setShowExerciseDetail(false);
           setSelectedExercise(null);
         }}
-        onExerciseUpdated={() => {
-          // Reload exercise details if user updates the exercise
-          loadExerciseDetails();
+        onExerciseUpdated={(newExercise: Exercise) => {
+          // store already updated by ExerciseDetailModal (upsert there),
+          // but keep local selectedExercise in sync so modal reflects changes immediately
+          setSelectedExercise(newExercise);
         }}
       />
+
       <EditRoutineModal
         onRoutineEdited={onRoutineEdited}
         visible={showEditRoutineModal}
