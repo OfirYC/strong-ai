@@ -40,7 +40,7 @@ export default function RoutineDetailModal({
   onSchedule,
   onRoutineEdited,
 }: RoutineDetailModalProps) {
-  const { byId, getAll, loading: exercisesLoading } = useExercises();
+  const { byId, loading: exercisesLoading, getById } = useExercises();
 
   const [loading, setLoading] = useState(false);
   const [lastPerformed, setLastPerformed] = useState<string | null>(null);
@@ -62,7 +62,7 @@ export default function RoutineDetailModal({
 
     try {
       // Get workouts that used this template
-      const response = await api.get("/workouts/history?limit=100");
+      const response = await api.get("/workouts/history");
       const workouts = response.data;
 
       // Find the most recent workout using this template
@@ -99,13 +99,32 @@ export default function RoutineDetailModal({
     }
   };
 
-  if (!routine) return null;
-
   const handleEditRoutine = () => {
     setShowEditRoutineModal(true);
   };
 
   const showLoading = loading || exercisesLoading;
+
+  useEffect(() => {
+    if (!routine || routine.exercises.length === 0) return;
+    const nonAvailableExercises = routine.exercises.filter(
+      ex => !byId[ex.exercise_id]
+    );
+    if (nonAvailableExercises.length === 0) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    Promise.all(nonAvailableExercises.map(ex => getById(ex.exercise_id)))
+      .catch(err => {
+        console.error("Failed to load routine exercises:", err);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [routine, routine?.exercises, routine?.exercises.length, byId]);
+
+  if (!routine) return null;
 
   return (
     <Modal

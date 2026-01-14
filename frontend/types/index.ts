@@ -213,6 +213,7 @@ export interface WorkoutSession {
   name?: string;
   started_at: string;
   ended_at?: string;
+  skipped?: boolean
   notes?: string;
   exercises: WorkoutExercise[];
   planned_workout_id?: string;
@@ -239,6 +240,7 @@ export interface WorkoutSummary {
   total_volume_kg: number;
   pr_count: number;
   exercises: WorkoutExerciseSummary[];
+  template_id?: string;
 }
 
 export interface PRRecord {

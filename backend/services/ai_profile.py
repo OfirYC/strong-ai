@@ -6,6 +6,7 @@ from typing import Optional
 from dotenv import load_dotenv
 from openai import OpenAI
 from models import UserProfile, ProfileInsights, TrainingPhase
+from openai import AsyncOpenAI
 
 # Load environment variables from backend/.env
 ROOT_DIR = Path(__file__).parent.parent
@@ -19,7 +20,7 @@ if not OPENROUTER_API_KEY:
     raise ValueError("OPENROUTER_API_KEY environment variable is required")
 
 # Initialize OpenAI client with OpenRouter
-client = OpenAI(
+client = AsyncOpenAI(
     api_key=OPENROUTER_API_KEY,
     base_url=OPENROUTER_BASE_URL
 )
@@ -130,7 +131,7 @@ Return the data as valid JSON matching the schema."""
 
     try:
         # Call OpenAI with function calling for structured output
-        response = client.chat.completions.create(
+        response = await client.chat.completions.create(
             model="openai/gpt-5.1",  # Using GPT-4 mini via OpenRouter
             messages=[
                 {

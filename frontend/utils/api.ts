@@ -1,8 +1,4 @@
-import axios, {
-  AxiosInstance,
-  AxiosRequestConfig,
-  AxiosResponse,
-} from "axios";
+import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || "";
@@ -88,7 +84,7 @@ const Metrics = (() => {
 
   function dumpRecent(last = 50) {
     console.log(`=== API recent (${Math.min(last, recent.length)}) ===`);
-    recent.slice(-last).forEach((e) => console.log(e));
+    recent.slice(-last).forEach(e => console.log(e));
   }
 
   function reset() {
@@ -114,20 +110,17 @@ const Metrics = (() => {
 })();
 
 /* exported helpers (call from any screen / debug button) */
-export const dumpApiCounts = (top?: number) =>
-  Metrics.dumpCounts(top);
+export const dumpApiCounts = (top?: number) => Metrics.dumpCounts(top);
 
-export const dumpApiRecent = (last?: number) =>
-  Metrics.dumpRecent(last);
+export const dumpApiRecent = (last?: number) => Metrics.dumpRecent(last);
 
-export const resetApiMetrics = () =>
-  Metrics.reset();
+export const resetApiMetrics = () => Metrics.reset();
 
 /* =========================================
    Request interceptor
    ========================================= */
 
-api.interceptors.request.use(async (config) => {
+api.interceptors.request.use(async config => {
   const k = Metrics.key(config);
   Metrics.incCount(k);
 
@@ -173,11 +166,9 @@ api.interceptors.response.use(
     const totalMs = start ? Metrics.now() - start : null;
 
     const serverMsRaw =
-      res.headers?.["x-server-time-ms"] ??
-      res.headers?.["X-Server-Time-Ms"];
+      res.headers?.["x-server-time-ms"] ?? res.headers?.["X-Server-Time-Ms"];
 
-    const serverMs =
-      serverMsRaw != null ? Number(serverMsRaw) : null;
+    const serverMs = serverMsRaw != null ? Number(serverMsRaw) : null;
 
     const reqId = cfg.headers?.["X-Request-Id"];
     if (reqId) Metrics.clearInflight(k, reqId);
@@ -213,7 +204,7 @@ api.interceptors.response.use(
 
     return res;
   },
-  (err) => {
+  err => {
     const cfg = err.config as AxiosRequestConfig | undefined;
     const k = cfg ? Metrics.key(cfg) : "UNKNOWN";
     const start = Number(cfg?.headers?.["X-Request-Start"]) || null;
@@ -222,8 +213,7 @@ api.interceptors.response.use(
     const reqId = cfg?.headers?.["X-Request-Id"];
     if (reqId) Metrics.clearInflight(k, reqId);
 
-    const status: number | null =
-      err?.response?.status ?? null;
+    const status: number | null = err?.response?.status ?? null;
 
     Metrics.push({
       t: new Date().toISOString(),
@@ -248,4 +238,120 @@ api.interceptors.response.use(
   }
 );
 
-export default api;
+export default api; 
+
+type WsHandlers = {
+  onOpen?: () => void;
+  onClose?: (e: { code?: number; reason?: string }) => void;
+  onError?: (e: any) => void;
+  onMessage?: (evt: any) => void; // you already parse and route inside handlers
+};
+
+type WsClient = {
+  start: () => void;
+  stop: () => void;
+  setHandlers: (h: WsHandlers) => void; // <-- keep this
+  isConnected: () => boolean;
+};
+
+function httpToWs(base: string) {
+  return base.replace(/^http/, "ws").replace(/\/$/, "");
+}
+
+async function getToken(): Promise<string | null> {
+  const raw = await AsyncStorage.getItem("user");
+  if (!raw) return null;
+  try {
+    const u = JSON.parse(raw) as { token?: string };
+    return u?.token ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function createWsClient(baseHttpUrl: string): WsClient {
+  let ws: WebSocket | null = null;
+  let handlers: WsHandlers = {};
+  let started = false;
+
+  // basic reconnect (optional but minimal)
+  let retry = 0;
+  let reconnectTimer: any = null;
+
+  const connect = async () => {
+    const token = await getToken();
+    if (!token) return;
+
+    const wsUrl = `${httpToWs(baseHttpUrl)}/ws?token=${encodeURIComponent(
+      token
+    )}`;
+
+    // RN WebSocket DOES NOT support headers. Query param is the standard workaround.
+    ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+      retry = 0;
+      handlers.onOpen?.();
+    };
+
+    ws.onclose = (e: any) => {
+      handlers.onClose?.({ code: e?.code, reason: e?.reason });
+      ws = null;
+
+      if (!started) return;
+      const delay = Math.min(8000, 500 * Math.pow(2, retry));
+      retry += 1;
+      reconnectTimer = setTimeout(() => void connect(), delay);
+    };
+
+    ws.onerror = (e: any) => {
+      handlers.onError?.(e);
+    };
+
+    ws.onmessage = (msg: any) => {
+      let parsed: any = null;
+      try {
+        parsed = JSON.parse(msg.data);
+      } catch {
+        return;
+      }
+      handlers.onMessage?.(parsed);
+    };
+  };
+
+  return {
+    setHandlers(h) {
+      handlers = h || {};
+    },
+
+    start() {
+      if (started) return;
+      started = true;
+      retry = 0;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      void connect();
+    },
+
+    stop() {
+      started = false;
+      retry = 0;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+
+      if (ws) {
+        try {
+          ws.close();
+        } catch {}
+      }
+      ws = null;
+    },
+
+    isConnected() {
+      return !!ws && ws.readyState === WebSocket.OPEN;
+    },
+  };
+}
+
+export const wsClient = createWsClient(
+  process.env.EXPO_PUBLIC_BACKEND_URL || "http://localhost:8000"
+);

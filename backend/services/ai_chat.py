@@ -1890,7 +1890,7 @@ async def generate_ai_chat_response(user_id: str, messages: List[ChatMessage], d
         logger.info(f"[REQ-{request_id}] Sending {len(current_messages)} messages to OpenAI")
 
         try:
-            response = client.chat.completions.create(
+            response = await client.chat.completions.create(
                 model="openai/gpt-5.1",
                 messages=current_messages,
                 tools=TOOLS,

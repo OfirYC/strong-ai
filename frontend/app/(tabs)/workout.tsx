@@ -1,194 +1,139 @@
-import React, { useState, useEffect, useCallback } from "react";
+// app/(tabs)/workout.tsx (or wherever this screen lives)
+// Updated plan: plannedWorkoutsStore is the source of truth for today's planned workouts,
+// workoutsStore is the source of truth for workout sessions (name/notes/status), and we
+// only fetch what is missing. We also patch stores on local actions instead of refetching
+// on every activeWorkout change.
+
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import React, { useEffect, useMemo, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect, useRouter } from "expo-router";
 import Button from "../../components/Button";
-import api from "../../utils/api";
-import { useWorkoutStore } from "../../store/workoutStore";
-import {
-  TemplateExercise,
-  WorkoutExercise,
-  WorkoutTemplate,
-} from "../../types";
-import RoutineDetailModal from "../../components/RoutineDetailModal";
-import ScheduleWorkoutModal from "../../components/ScheduleWorkoutModal";
 import CalendarModal from "../../components/CalendarModal";
 import { LoadingData } from "../../components/LoadingData";
+import RoutineDetailModal from "../../components/RoutineDetailModal";
+import ScheduleWorkoutModal from "../../components/ScheduleWorkoutModal";
+import {
+  plannedWorkoutsStore,
+  PlannedWorkout as StorePlannedWorkout,
+  usePlannedWorkouts,
+} from "../../store/plannedWorkoutsStore";
+import { useTemplates } from "../../store/templatesStore";
+import { useWorkoutStore } from "../../store/workoutStore";
+import { useWorkouts, workoutsStore } from "../../store/workoutsStore";
+import { WorkoutExercise, WorkoutTemplate } from "../../types";
+import api from "../../utils/api";
 
-interface PlannedWorkout {
-  id: string;
-  user_id: string;
-  date: string;
-  name: string;
-  template_id?: string;
-  type?: string;
-  notes?: string;
-  status: "planned" | "in_progress" | "completed" | "skipped";
-  workout_session_id?: string;
-  inline_exercises?: TemplateExercise[];
-
-  order: number;
-  is_recurring: boolean;
-  recurrence_type?: string;
-  recurrence_days?: number[];
-  recurrence_end_date?: string;
-  recurrence_parent_id?: string;
-}
-
-interface EnrichedPlannedWorkout extends PlannedWorkout {
+// Keep your enriched shape for UI only
+type EnrichedPlannedWorkout = StorePlannedWorkout & {
   actualName?: string;
   actualNotes?: string;
-}
+};
 
 export default function WorkoutScreen() {
   const router = useRouter();
   const { activeWorkout, startWorkout, endWorkout } = useWorkoutStore();
-  const [templates, setTemplates] = useState<WorkoutTemplate[]>([]);
-  const [todaysWorkouts, setTodaysWorkouts] = useState<
-    EnrichedPlannedWorkout[]
-  >([]);
+
+  const { list: templatesList, loading: templatesLoading } = useTemplates();
+
+  const today = useMemo(() => new Date().toISOString().split("T")[0], []);
+
+  // Planned workouts for today
+  const {
+    list: todaysPlannedBase,
+    loading: plannedLoading,
+    getByDate,
+  } = usePlannedWorkouts({ date: today });
+
+  // Workouts sessions cache
+  const {
+    byId: workoutsById,
+    getManyByIds,
+    getById: getWorkoutById,
+  } = useWorkouts();
+
   const [loading, setLoading] = useState(false);
-  const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [selectedRoutine, setSelectedRoutine] =
     useState<WorkoutTemplate | null>(null);
   const [showRoutineModal, setShowRoutineModal] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
 
-  // Load templates and today's workouts on mount
+  // Initial load (cache-aware)
   useEffect(() => {
-    loadTemplates();
-    loadTodaysWorkouts();
-  }, []);
+    getByDate(today).catch(() => {});
+  }, [getByDate, today]);
 
-  // Reload data whenever the screen comes into focus
-  useFocusEffect(
-    useCallback(() => {
-      loadTemplates();
-      loadTodaysWorkouts();
-    }, [])
-  );
+  // Derive the set of workout session ids that we need for enrichment
+  const todaysWorkoutSessionIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const pw of todaysPlannedBase) {
+      if (pw.workout_session_id) ids.add(pw.workout_session_id);
+    }
+    return Array.from(ids);
+  }, [todaysPlannedBase]);
 
-  const patchTodaysWorkoutMeta = useCallback(
-  (workoutSessionId: string, meta: { name?: string; notes?: string }) => {
-    setTodaysWorkouts(prev =>
-      prev.map(pw => {
-        if (pw.workout_session_id !== workoutSessionId) return pw;
-
-        return {
-          ...pw,
-          // These are what your UI displays first:
-          actualName: meta.name ?? pw.actualName,
-          actualNotes: meta.notes ?? pw.actualNotes,
-
-          // Optional: keep base fields aligned too, so you don't see drift elsewhere
-          name: meta.name ?? pw.name,
-          notes: meta.notes ?? pw.notes,
-        };
-      })
-    );
-  },
-  []
-);
-
-
-  // Watch for active workout changes to refresh today's workouts
+  // Fetch missing workout sessions (once), and rely on workoutsStore afterwards
   useEffect(() => {
-    // Refresh when workout starts or ends
-    loadTodaysWorkouts();
-  }, [activeWorkout?.id]); // Watch the workout ID specifically
+    if (todaysWorkoutSessionIds.length === 0) return;
 
-  // Poll for updates while there's an active workout (to catch name/notes changes)
+    const missing = todaysWorkoutSessionIds.filter(id => !workoutsById[id]);
+    if (missing.length === 0) return;
+
+    getManyByIds(missing).catch(() => {});
+  }, [todaysWorkoutSessionIds, workoutsById, getManyByIds]);
+
+  // When active workout changes locally, upsert into workoutsStore so UI enriches immediately
   useEffect(() => {
-    if (!activeWorkout) return;
+    if (!activeWorkout?.id) return;
+    workoutsStore.getState().upsert(activeWorkout);
+  }, [
+    activeWorkout?.id,
+    activeWorkout?.name,
+    activeWorkout?.notes,
+    // include anything else you know changes locally
+  ]);
 
-    // Refresh every 5 seconds while workout is active
-    const interval = setInterval(() => {
-      loadTodaysWorkouts();
-    }, 5000);
+  // Also patch planned workout linkage when we know it (avoid refetch on activeWorkout change)
+  useEffect(() => {
+    if (!activeWorkout?.id) return;
+    const plannedId = (activeWorkout as any)?.planned_workout_id;
+    if (!plannedId) return;
 
-    return () => clearInterval(interval);
+    // plannedWorkoutsStore.getState().patch(plannedId, {
+    //   status: "in_progress",
+    //   workout_session_id: activeWorkout.id,
+    // });
   }, [activeWorkout?.id]);
 
-  const loadTemplates = async () => {
-    setLoadingTemplates(true);
-    try {
-      const response = await api.get("/templates");
-      setTemplates(response.data);
-    } catch (error) {
-      console.error("Failed to load templates:", error);
-    } finally {
-      setLoadingTemplates(false);
-    }
-  };
-
-  const loadTodaysWorkouts = async () => {
-    try {
-      const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
-      const response = await api.get(`/planned-workouts?date=${today}`);
-      const plannedWorkouts: PlannedWorkout[] = response.data;
-
-      // Enrich with actual workout session data if exists
-      const enriched: EnrichedPlannedWorkout[] = await Promise.all(
-        plannedWorkouts.map(async pw => {
-          if (pw.workout_session_id) {
-            try {
-              const workoutResponse = await api.get(
-                `/workouts/${pw.workout_session_id}`
-              );
-              const workout = workoutResponse.data;
-              return {
-                ...pw,
-                actualName: workout.name,
-                actualNotes: workout.notes,
-              };
-            } catch (error) {
-              console.error(
-                `Failed to load workout session ${pw.workout_session_id}:`,
-                error
-              );
-              return pw;
-            }
-          }
-          return pw;
-        })
-      );
-
-      setTodaysWorkouts(enriched);
-    } catch (error) {
-      console.error("Failed to load today's workouts:", error);
-    }
-  };
   const getActiveWorkout = () => useWorkoutStore.getState().activeWorkout;
 
   const discardCurrentAndRun = async (next: () => Promise<void>) => {
     const current = getActiveWorkout();
     if (current) {
-      // keep your current behavior about scheduled vs unscheduled
-      if (!current.planned_workout_id) {
+      if (!(current as any).planned_workout_id) {
         try {
           await api.delete(`/workouts/${current.id}`);
+          workoutsStore.getState().remove(current.id);
         } catch (error) {
           console.error("Failed to delete workout:", error);
         }
       }
       endWorkout();
     }
-
     await next();
   };
 
   const handleStartEmptyWorkout = async () => {
     const current = getActiveWorkout();
-
     if (current) {
       Alert.alert(
         "Active Workout",
@@ -204,6 +149,7 @@ export default function WorkoutScreen() {
                 await discardCurrentAndRun(async () => {
                   const response = await api.post("/workouts", { notes: "" });
                   startWorkout(response.data);
+                  workoutsStore.getState().upsert(response.data);
                 });
               } catch (error) {
                 console.error(error);
@@ -225,9 +171,9 @@ export default function WorkoutScreen() {
       setLoading(true);
       const response = await api.post("/workouts", { notes: "" });
       startWorkout(response.data);
+      workoutsStore.getState().upsert(response.data);
     } catch (error: any) {
       console.error(error);
-
       Alert.alert("Error", "Failed to start workout");
     } finally {
       setLoading(false);
@@ -238,6 +184,7 @@ export default function WorkoutScreen() {
     setSelectedRoutine(template);
     setShowRoutineModal(true);
   };
+
   const handleStartWorkoutFromRoutine = async (routine: WorkoutTemplate) => {
     const current = getActiveWorkout();
 
@@ -273,6 +220,7 @@ export default function WorkoutScreen() {
       setLoading(true);
       const response = await api.post("/workouts", { template_id: templateId });
       startWorkout(response.data);
+      workoutsStore.getState().upsert(response.data);
     } catch (error: any) {
       Alert.alert("Error", "Failed to start workout");
     } finally {
@@ -283,7 +231,6 @@ export default function WorkoutScreen() {
   const handleStartPlannedWorkout = async (
     plannedWorkout: EnrichedPlannedWorkout
   ) => {
-    // If completed, navigate to workout detail page
     if (
       plannedWorkout.status === "completed" &&
       plannedWorkout.workout_session_id
@@ -294,27 +241,20 @@ export default function WorkoutScreen() {
       return;
     }
 
-    // If skipped, don't allow any action
-    if (plannedWorkout.status === "skipped") {
-      return;
-    }
+    if (plannedWorkout.status === "skipped") return;
 
-    // If already in progress and it's the current active workout, just return (do nothing, modal already visible)
     if (
       plannedWorkout.status === "in_progress" &&
       plannedWorkout.workout_session_id &&
       activeWorkout?.id === plannedWorkout.workout_session_id
     ) {
-      // It's already the active workout, user can see the bottom sheet
       return;
     }
 
-    // If already in progress but it's a different workout, resume it
     if (
       plannedWorkout.status === "in_progress" &&
       plannedWorkout.workout_session_id
     ) {
-      // Check if there's a different active workout
       if (
         activeWorkout &&
         activeWorkout.id !== plannedWorkout.workout_session_id
@@ -331,10 +271,13 @@ export default function WorkoutScreen() {
                 try {
                   setLoading(true);
                   await discardCurrentAndRun(async () => {
-                    const response = await api.get(
-                      `/workouts/${plannedWorkout.workout_session_id}`
+                    const workout = await getWorkoutById(
+                      plannedWorkout.workout_session_id!
                     );
-                    startWorkout(response.data);
+                    if (workout) {
+                      startWorkout(workout);
+                      return;
+                    }
                   });
                 } catch (error) {
                   console.error("Failed to resume workout:", error);
@@ -349,12 +292,14 @@ export default function WorkoutScreen() {
         return;
       }
 
-      // No active workout, just resume this one
       try {
-        const response = await api.get(
-          `/workouts/${plannedWorkout.workout_session_id}`
+        const workout = await getWorkoutById(
+          plannedWorkout.workout_session_id!
         );
-        startWorkout(response.data);
+        if (workout) {
+          startWorkout(workout);
+          return;
+        }
         return;
       } catch (error) {
         console.error("Failed to resume workout:", error);
@@ -363,15 +308,12 @@ export default function WorkoutScreen() {
       }
     }
 
-    // Starting a new workout (status is 'planned')
-    // Check for active workout
     if (activeWorkout) {
       Alert.alert(
         "Active Workout",
         "You already have an Active Workout. Do you want to discard it and start a new one?",
         [
           { text: "Cancel", style: "cancel" },
-          // Inside the "status is 'planned' and activeWorkout exists" block
           {
             text: "Discard & Start New",
             style: "destructive",
@@ -399,12 +341,12 @@ export default function WorkoutScreen() {
   ) => {
     try {
       setLoading(true);
+
       const payload: any = {
         planned_workout_id: plannedWorkout.id,
         name: plannedWorkout.name,
       };
 
-      // If it has a template, use it
       if (plannedWorkout.template_id) {
         payload.template_id = plannedWorkout.template_id;
       } else if (plannedWorkout.inline_exercises?.length) {
@@ -414,9 +356,13 @@ export default function WorkoutScreen() {
 
       const response = await api.post("/workouts", payload);
       startWorkout(response.data);
+      workoutsStore.getState().upsert(response.data);
 
-      // Reload today's workouts to reflect status change
-      await loadTodaysWorkouts();
+      // // Patch planned workout immediately (no refetch needed)
+      // plannedWorkoutsStore.getState().patch(plannedWorkout.id, {
+      //   status: "in_progress",
+      //   workout_session_id: response.data.id,
+      // });
     } catch (error: any) {
       Alert.alert("Error", "Failed to start workout");
     } finally {
@@ -450,12 +396,29 @@ export default function WorkoutScreen() {
     }
   };
 
-  const todaysWorkoutsOrder = {
+  const todaysWorkoutsOrder: Record<string, number> = {
     in_progress: 0,
     planned: 1,
     completed: 2,
     skipped: 3,
   };
+
+  // Enrich planned workouts using workoutsStore (single source of truth for workout session fields)
+  const todaysWorkouts: EnrichedPlannedWorkout[] = useMemo(() => {
+    return (todaysPlannedBase ?? []).map(pw => {
+      const sid = pw.workout_session_id;
+      if (!sid) return pw as EnrichedPlannedWorkout;
+
+      const session = workoutsById[sid];
+      if (!session) return pw as EnrichedPlannedWorkout;
+
+      return {
+        ...(pw as EnrichedPlannedWorkout),
+        actualName: session.name ?? pw.name,
+        actualNotes: session.notes ?? pw.notes,
+      };
+    });
+  }, [todaysPlannedBase, workoutsById]);
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -475,82 +438,92 @@ export default function WorkoutScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Today's Workouts Section */}
-        {todaysWorkouts.length > 0 && (
+        {(plannedLoading || todaysWorkouts.length > 0) && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Today's Workouts</Text>
-            {todaysWorkouts
-              .sort(
-                (a, b) =>
-                  todaysWorkoutsOrder[a.status] - todaysWorkoutsOrder[b.status]
-              )
-              .map(plannedWorkout => (
-                <TouchableOpacity
-                  key={plannedWorkout.id}
-                  style={[
-                    styles.plannedWorkoutCard,
-                    plannedWorkout.status === "completed" &&
-                      styles.completedCard,
-                    plannedWorkout.status === "skipped" && styles.skippedCard,
-                  ]}
-                  onPress={() => handleStartPlannedWorkout(plannedWorkout)}
-                  disabled={plannedWorkout.status === "skipped"}
-                >
-                  <View style={styles.plannedWorkoutContent}>
-                    <View style={styles.plannedWorkoutHeader}>
-                      <Text style={styles.plannedWorkoutName}>
-                        {plannedWorkout.actualName || plannedWorkout.name}
-                      </Text>
-                      <View
-                        style={[
-                          styles.statusBadge,
-                          getStatusBadgeStyle(plannedWorkout.status),
-                        ]}
-                      >
-                        <Ionicons
-                          name={getStatusIcon(plannedWorkout.status) as any}
-                          size={14}
-                          color={
-                            getStatusBadgeStyle(plannedWorkout.status).color
-                          }
-                          style={styles.statusIcon}
-                        />
-                        <Text
+
+            {plannedLoading && todaysWorkouts.length === 0 ? (
+              <LoadingData loadingTitle="Loading Today's Workouts..." />
+            ) : (
+              todaysWorkouts
+                .slice()
+                .sort(
+                  (a, b) =>
+                    (todaysWorkoutsOrder[a.status] ?? 99) -
+                    (todaysWorkoutsOrder[b.status] ?? 99)
+                )
+                .map(plannedWorkout => (
+                  <TouchableOpacity
+                    key={plannedWorkout.id}
+                    style={[
+                      styles.plannedWorkoutCard,
+                      plannedWorkout.status === "completed" &&
+                        styles.completedCard,
+                      plannedWorkout.status === "skipped" && styles.skippedCard,
+                    ]}
+                    onPress={() => handleStartPlannedWorkout(plannedWorkout)}
+                    disabled={plannedWorkout.status === "skipped"}
+                  >
+                    <View style={styles.plannedWorkoutContent}>
+                      <View style={styles.plannedWorkoutHeader}>
+                        <Text style={styles.plannedWorkoutName}>
+                          {plannedWorkout.actualName || plannedWorkout.name}
+                        </Text>
+                        <View
                           style={[
-                            styles.statusText,
-                            {
-                              color: getStatusBadgeStyle(plannedWorkout.status)
-                                .color,
-                            },
+                            styles.statusBadge,
+                            getStatusBadgeStyle(plannedWorkout.status),
                           ]}
                         >
-                          {plannedWorkout.status.replace("_", " ")}
-                        </Text>
+                          <Ionicons
+                            name={getStatusIcon(plannedWorkout.status) as any}
+                            size={14}
+                            color={
+                              getStatusBadgeStyle(plannedWorkout.status).color
+                            }
+                            style={styles.statusIcon}
+                          />
+                          <Text
+                            style={[
+                              styles.statusText,
+                              {
+                                color: getStatusBadgeStyle(
+                                  plannedWorkout.status
+                                ).color,
+                              },
+                            ]}
+                          >
+                            {plannedWorkout.status.replace("_", " ")}
+                          </Text>
+                        </View>
                       </View>
+
+                      {(plannedWorkout.actualNotes || plannedWorkout.notes) && (
+                        <Text style={styles.plannedWorkoutNotes}>
+                          {plannedWorkout.actualNotes || plannedWorkout.notes}
+                        </Text>
+                      )}
+
+                      {plannedWorkout.type && !plannedWorkout.actualNotes && (
+                        <Text style={styles.plannedWorkoutType}>
+                          {plannedWorkout.type}
+                        </Text>
+                      )}
                     </View>
-                    {(plannedWorkout.actualNotes || plannedWorkout.notes) && (
-                      <Text style={styles.plannedWorkoutNotes}>
-                        {plannedWorkout.actualNotes || plannedWorkout.notes}
-                      </Text>
+
+                    {plannedWorkout.status === "planned" && (
+                      <Ionicons
+                        name="play-circle-outline"
+                        size={32}
+                        color="#007AFF"
+                      />
                     )}
-                    {plannedWorkout.type && !plannedWorkout.actualNotes && (
-                      <Text style={styles.plannedWorkoutType}>
-                        {plannedWorkout.type}
-                      </Text>
+                    {plannedWorkout.status === "in_progress" && (
+                      <Ionicons name="play-circle" size={32} color="#FF9500" />
                     )}
-                  </View>
-                  {plannedWorkout.status === "planned" && (
-                    <Ionicons
-                      name="play-circle-outline"
-                      size={32}
-                      color="#007AFF"
-                    />
-                  )}
-                  {plannedWorkout.status === "in_progress" && (
-                    <Ionicons name="play-circle" size={32} color="#FF9500" />
-                  )}
-                </TouchableOpacity>
-              ))}
+                  </TouchableOpacity>
+                ))
+            )}
           </View>
         )}
 
@@ -563,8 +536,8 @@ export default function WorkoutScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Recent Routines</Text>
-          {templates.length === 0 ? (
-            loadingTemplates ? (
+          {templatesList.length === 0 ? (
+            templatesLoading ? (
               <LoadingData loadingTitle="Loading Routines..." />
             ) : (
               <View style={styles.emptyState}>
@@ -576,7 +549,7 @@ export default function WorkoutScreen() {
               </View>
             )
           ) : (
-            templates.map(template => (
+            templatesList.map(template => (
               <TouchableOpacity
                 key={template.id}
                 style={styles.templateCard}
@@ -611,18 +584,14 @@ export default function WorkoutScreen() {
         visible={showScheduleModal}
         routine={selectedRoutine}
         onClose={() => setShowScheduleModal(false)}
-        onScheduled={() => {
-          loadTodaysWorkouts();
-          setShowScheduleModal(false);
-        }}
+        onScheduled={() => {}}
       />
 
       <CalendarModal
         visible={showCalendarModal}
         onClose={() => setShowCalendarModal(false)}
-        onDateSelect={(date, workouts) => {
-          // Just update selection, don't close the modal
-          // The modal will show the workouts for the selected date
+        onDateSelect={() => {
+          // no-op; CalendarModal handles internal rendering
         }}
       />
     </SafeAreaView>
@@ -774,29 +743,3 @@ const styles = StyleSheet.create({
     textTransform: "capitalize",
   },
 });
-
-[
-  {
-    actualName: "Pull-Up and Chin-Up ETOT",
-    actualNotes:
-      "Weekly ETOT pull-up and chin-up session. Maintain crisp technique and avoid going to failure early. Stop sets if reps degrade or elbow/shoulder starts to complain.",
-    created_at: "2025-12-21T20:15:52.086000",
-    date: "2025-12-27",
-    id: "69485578afba3337720f026e",
-    inline_exercises: null,
-    is_recurring: true,
-    name: "Pull-Up and Chin-Up ETOT",
-    notes:
-      "Weekly ETOT pull-up and chin-up session. Maintain crisp technique and avoid going to failure early. Stop sets if reps degrade or elbow/shoulder starts to complain.",
-    order: 0,
-    recurrence_days: [5],
-    recurrence_end_date: "",
-    recurrence_parent_id: "69485578afba3337720f026e",
-    recurrence_type: "weekly",
-    status: "in_progress",
-    template_id: "69485575afba3337720f026d",
-    type: "strength",
-    user_id: "692f3b3c82e3e5fe865428ac",
-    workout_session_id: "694ff0540af55e331931e875",
-  },
-];

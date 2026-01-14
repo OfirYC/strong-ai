@@ -1,5 +1,5 @@
 // store/exercisesStore.ts
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { create } from "zustand";
 import type { Exercise } from "../types";
 import api from "../utils/api";
@@ -15,14 +15,17 @@ type ExercisesStore = {
     force?: boolean;
     minCount?: number;
   }) => Promise<Record<string, Exercise>>;
+  getById: (id: string) => Promise<Exercise | undefined>;
 
   upsert: (exercise: Exercise) => void;
   patch: (id: string, partial: Partial<Exercise>) => void;
+  remove: (id: string) => void;
 };
 
 let inFlightAll: Promise<Record<string, Exercise>> | null = null;
+const inflightById = new Map<string, Promise<Exercise | undefined>>();
 
-const useExercisesStoreInternal = create<ExercisesStore>((set, get) => ({
+export const useExercisesStoreInternal = create<ExercisesStore>((set, get) => ({
   byId: {},
   loading: false,
 
@@ -68,7 +71,27 @@ const useExercisesStoreInternal = create<ExercisesStore>((set, get) => ({
 
     return inFlightAll;
   },
+  getById: async (id: string) => {
+    const cached = get().byId[id];
+    if (cached) return cached;
 
+    const existing = inflightById.get(id);
+    if (existing) return existing;
+
+    const p = (async () => {
+      try {
+        const res = await api.get(`/exercises/${id}`);
+        const ex = res.data as Exercise;
+        set(s => ({ byId: { ...s.byId, [id]: ex } }));
+        return ex;
+      } finally {
+        inflightById.delete(id);
+      }
+    })();
+
+    inflightById.set(id, p);
+    return p;
+  },
   upsert: exercise =>
     set(s => ({ byId: { ...s.byId, [exercise.id]: exercise } })),
 
@@ -77,6 +100,13 @@ const useExercisesStoreInternal = create<ExercisesStore>((set, get) => ({
       const prev = s.byId[id];
       if (!prev) return s;
       return { byId: { ...s.byId, [id]: { ...prev, ...partial } } };
+    }),
+
+  remove: id =>
+    set(s => {
+      const next = { ...s.byId };
+      delete next[id];
+      return { byId: next };
     }),
 }));
 
@@ -95,6 +125,7 @@ export function useExercises(opts?: Options) {
   const getAll = useExercisesStoreInternal(s => s.getAll);
   const upsert = useExercisesStoreInternal(s => s.upsert);
   const patch = useExercisesStoreInternal(s => s.patch);
+  const getById = useExercisesStoreInternal(s => s.getById);
 
   useEffect(() => {
     getAll(); // initial load if not cached already
@@ -128,7 +159,37 @@ export function useExercises(opts?: Options) {
     upsert,
     patch,
     list,
+    getById,
   };
+}
+
+export function useExercise(exerciseId: string | null | undefined) {
+  const byId = useExercisesStoreInternal(s => s.byId);
+  const getById = useExercisesStoreInternal(s => s.getById);
+
+  const [loading, setLoading] = useState(false);
+
+  const exercise = exerciseId ? byId[exerciseId] : undefined;
+
+  useEffect(() => {
+    if (!exerciseId) return;
+    if (byId[exerciseId]) return;
+
+    let cancelled = false;
+    setLoading(true);
+
+    getById(exerciseId)
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [exerciseId, byId, getById]);
+
+  return { exercise: exercise ?? null, loading };
 }
 
 // optional: export store for bootstrapping without subscribing

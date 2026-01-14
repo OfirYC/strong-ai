@@ -278,6 +278,7 @@ class WorkoutSummary(BaseModel):
     total_volume_kg: float = 0.0
     pr_count: int = 0
     exercises: List[WorkoutExerciseSummary] = []
+    template_id: Optional[str] = None
 
 
 # PR Record Models

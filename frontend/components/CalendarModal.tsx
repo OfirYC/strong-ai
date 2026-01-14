@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -12,10 +12,14 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import api from "../utils/api";
 import RoutineDetailModal from "./RoutineDetailModal";
 import { TemplateExercise, WorkoutTemplate } from "../types";
 import { useAuthStore } from "../store/authStore";
+
+// STORES
+import { usePlannedWorkouts } from "../store/plannedWorkoutsStore";
+import { useWorkouts } from "../store/workoutsStore";
+import { templatesStore } from "../store/templatesStore";
 
 interface PlannedWorkout {
   id: string;
@@ -43,14 +47,12 @@ export default function CalendarModal({
   const router = useRouter();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [workoutsByDate, setWorkoutsByDate] = useState<{
-    [key: string]: PlannedWorkout[];
-  }>({});
-  const [loading, setLoading] = useState(false);
+
   const [selectedRoutine, setSelectedRoutine] =
     useState<WorkoutTemplate | null>(null);
   const [showRoutineModal, setShowRoutineModal] = useState(false);
   const [loadingTemplate, setLoadingTemplate] = useState(false);
+
   const { user } = useAuthStore();
 
   const monthNames = [
@@ -69,46 +71,83 @@ export default function CalendarModal({
   ];
   const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+  // ---- DATE RANGE (MONTH) ----
+  const { startDate, endDate } = useMemo(() => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+
+    return {
+      startDate: firstDay.toISOString().split("T")[0],
+      endDate: lastDay.toISOString().split("T")[0],
+    };
+  }, [currentDate]);
+
+  // Planned workouts store: month range
+  // Assumption (matching your store pattern): it supports range queries.
+  const {
+    list: monthPlannedWorkouts,
+    loading: plannedLoading,
+    getRange,
+  } = usePlannedWorkouts({ startDate, endDate });
+
+  // Workouts store: session enrichment
+  const { byId: workoutsById, getManyByIds } = useWorkouts();
+
+  // Load month planned workouts when modal opens / month changes
   useEffect(() => {
-    if (visible) {
-      loadMonthWorkouts();
+    if (!visible) return;
+    getRange(startDate, endDate).catch(() => {});
+  }, [visible, startDate, endDate, getRange]);
+
+  // Group by date (YYYY-MM-DD)
+  const workoutsByDate = useMemo(() => {
+    const grouped: Record<string, PlannedWorkout[]> = {};
+    for (const w of monthPlannedWorkouts as PlannedWorkout[]) {
+      if (!grouped[w.date]) grouped[w.date] = [];
+      grouped[w.date].push(w);
     }
-  }, [visible, currentDate]);
+    return grouped;
+  }, [monthPlannedWorkouts]);
 
-  const loadMonthWorkouts = async () => {
-    try {
-      setLoading(true);
-      const year = currentDate.getFullYear();
-      const month = currentDate.getMonth();
+  // Fetch missing workout sessions for enrichment (name/notes/status consistency)
+  const monthWorkoutSessionIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const pw of monthPlannedWorkouts as PlannedWorkout[]) {
+      if (pw.workout_session_id) ids.add(pw.workout_session_id);
+    }
+    return Array.from(ids);
+  }, [monthPlannedWorkouts]);
 
-      // Get first and last day of the month
-      const firstDay = new Date(year, month, 1);
-      const lastDay = new Date(year, month + 1, 0);
+  useEffect(() => {
+    if (!visible) return;
+    if (monthWorkoutSessionIds.length === 0) return;
 
-      const startDate = firstDay.toISOString().split("T")[0];
-      const endDate = lastDay.toISOString().split("T")[0];
+    const missing = monthWorkoutSessionIds.filter(id => !workoutsById[id]);
+    if (missing.length === 0) return;
 
-      const response = await api.get(
-        `/planned-workouts?start_date=${startDate}&end_date=${endDate}`
-      );
-      const workouts: PlannedWorkout[] = response.data;
+    getManyByIds(missing).catch(() => {});
+  }, [visible, monthWorkoutSessionIds, workoutsById, getManyByIds]);
 
-      // Group workouts by date
-      const grouped: { [key: string]: PlannedWorkout[] } = {};
-      workouts.forEach(workout => {
-        if (!grouped[workout.date]) {
-          grouped[workout.date] = [];
-        }
-        grouped[workout.date].push(workout);
+  // Enrich a date’s workouts on the fly (use cached sessions if present)
+  const getWorkoutsForDate = useCallback(
+    (dateStr: string) => {
+      const base = workoutsByDate[dateStr] || [];
+      return base.map(pw => {
+        if (!pw.workout_session_id) return pw;
+        const session = workoutsById[pw.workout_session_id];
+        if (!session) return pw;
+
+        return {
+          ...pw,
+          name: session.name ?? pw.name,
+          notes: session.notes ?? pw.notes,
+        };
       });
-
-      setWorkoutsByDate(grouped);
-    } catch (error) {
-      console.error("Failed to load month workouts:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    [workoutsByDate, workoutsById]
+  );
 
   const getDaysInMonth = () => {
     const year = currentDate.getFullYear();
@@ -116,13 +155,11 @@ export default function CalendarModal({
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
 
-    // Get day of week for first day (0 = Sunday, 1 = Monday, etc.)
-    // Adjust so Monday = 0
+    // JS: 0=Sun...6=Sat; we want Mon=0...Sun=6
     let firstDayOfWeek = firstDay.getDay() - 1;
     if (firstDayOfWeek === -1) firstDayOfWeek = 6;
 
     const daysInMonth = lastDay.getDate();
-
     return { firstDayOfWeek, daysInMonth };
   };
 
@@ -139,18 +176,21 @@ export default function CalendarModal({
   };
 
   const goToToday = () => {
-    setCurrentDate(new Date());
-    const today = new Date().toISOString().split("T")[0];
-    setSelectedDate(today);
+    const d = new Date();
+    setCurrentDate(d);
+    setSelectedDate(d.toISOString().split("T")[0]);
   };
 
   const handleWorkoutClick = async (workout: PlannedWorkout) => {
-    // If workout has a template, show routine detail modal
+    // If workout has a template, show routine detail modal (use templatesStore, not API)
     if (workout.template_id) {
       try {
         setLoadingTemplate(true);
-        const response = await api.get(`/templates/${workout.template_id}`);
-        setSelectedRoutine(response.data);
+        const tpl = await templatesStore
+          .getState()
+          .getById(workout.template_id);
+        if (!tpl) throw new Error("Template not found");
+        setSelectedRoutine(tpl);
         setShowRoutineModal(true);
       } catch (error) {
         console.error("Failed to load template:", error);
@@ -159,16 +199,16 @@ export default function CalendarModal({
         setLoadingTemplate(false);
       }
       return;
-    } else if (
-      workout.inline_exercises &&
-      workout.inline_exercises.length > 0
-    ) {
+    }
+
+    // Inline exercises -> build a template-like object
+    if (workout.inline_exercises && workout.inline_exercises.length > 0) {
       const templateLike: WorkoutTemplate = {
         id: `inline-${workout.id}`,
         user_id: user!.id,
         name: workout.name,
         notes: workout.notes,
-        exercises: workout.inline_exercises!,
+        exercises: workout.inline_exercises,
         created_at: workout.date,
         updated_at: workout.date,
       };
@@ -177,21 +217,17 @@ export default function CalendarModal({
       return;
     }
 
-    // If no template but has a workout session (completed/in-progress), navigate to detail page
+    // If no template but has a workout session, navigate
     if (workout.workout_session_id) {
-      onClose(); // Close the calendar modal first
+      onClose();
       router.push(`/workout-detail?workoutId=${workout.workout_session_id}`);
       return;
     }
 
-    // Fallback: No template and no workout session - show alert with notes/type
-    const details = [];
-    if (workout.type) {
-      details.push(`Type: ${workout.type}`);
-    }
-    if (workout.notes) {
-      details.push(workout.notes);
-    }
+    // Fallback
+    const details: string[] = [];
+    if (workout.type) details.push(`Type: ${workout.type}`);
+    if (workout.notes) details.push(workout.notes);
 
     const message =
       details.length > 0
@@ -203,10 +239,8 @@ export default function CalendarModal({
 
   const handleDatePress = (dateStr: string) => {
     setSelectedDate(dateStr);
-    const workouts = workoutsByDate[dateStr] || [];
-    if (onDateSelect) {
-      onDateSelect(dateStr, workouts);
-    }
+    const workouts = getWorkoutsForDate(dateStr);
+    onDateSelect?.(dateStr, workouts);
   };
 
   const getStatusColor = (workouts: PlannedWorkout[]) => {
@@ -221,68 +255,73 @@ export default function CalendarModal({
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
 
-    const days = [];
+    const cells: React.ReactNode[] = [];
     const totalCells = Math.ceil((firstDayOfWeek + daysInMonth) / 7) * 7;
+
+    const todayStr = new Date().toISOString().split("T")[0];
 
     for (let i = 0; i < totalCells; i++) {
       const dayNumber = i - firstDayOfWeek + 1;
       const isValidDay = dayNumber > 0 && dayNumber <= daysInMonth;
 
-      if (isValidDay) {
-        const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(
-          dayNumber
-        ).padStart(2, "0")}`;
-        const workouts = workoutsByDate[dateStr] || [];
-        const hasWorkouts = workouts.length > 0;
-        const isToday = dateStr === new Date().toISOString().split("T")[0];
-        const isSelected = dateStr === selectedDate;
-
-        days.push(
-          <TouchableOpacity
-            key={i}
-            style={[
-              styles.dayCell,
-              isToday && styles.todayCell,
-              isSelected && styles.selectedCell,
-            ]}
-            onPress={() => handleDatePress(dateStr)}
-          >
-            <Text
-              style={[
-                styles.dayText,
-                isToday && styles.todayText,
-                isSelected && styles.selectedText,
-              ]}
-            >
-              {dayNumber}
-            </Text>
-            {hasWorkouts && (
-              <View style={styles.indicatorContainer}>
-                {workouts.slice(0, 3).map((_, idx) => (
-                  <View
-                    key={idx}
-                    style={[
-                      styles.workoutIndicator,
-                      { backgroundColor: getStatusColor(workouts) },
-                    ]}
-                  />
-                ))}
-              </View>
-            )}
-          </TouchableOpacity>
-        );
-      } else {
-        days.push(<View key={i} style={styles.dayCell} />);
+      if (!isValidDay) {
+        cells.push(<View key={i} style={styles.dayCell} />);
+        continue;
       }
+
+      const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(
+        dayNumber
+      ).padStart(2, "0")}`;
+
+      const workouts = getWorkoutsForDate(dateStr);
+      const hasWorkouts = workouts.length > 0;
+      const isToday = dateStr === todayStr;
+      const isSelected = dateStr === selectedDate;
+
+      cells.push(
+        <TouchableOpacity
+          key={i}
+          style={[
+            styles.dayCell,
+            isToday && styles.todayCell,
+            isSelected && styles.selectedCell,
+          ]}
+          onPress={() => handleDatePress(dateStr)}
+        >
+          <Text
+            style={[
+              styles.dayText,
+              isToday && styles.todayText,
+              isSelected && styles.selectedText,
+            ]}
+          >
+            {dayNumber}
+          </Text>
+
+          {hasWorkouts && (
+            <View style={styles.indicatorContainer}>
+              {workouts.slice(0, 3).map((_, idx) => (
+                <View
+                  key={idx}
+                  style={[
+                    styles.workoutIndicator,
+                    { backgroundColor: getStatusColor(workouts) },
+                  ]}
+                />
+              ))}
+            </View>
+          )}
+        </TouchableOpacity>
+      );
     }
 
-    return days;
+    return cells;
   };
 
   const renderSelectedDateWorkouts = () => {
     if (!selectedDate) return null;
 
-    const workouts = workoutsByDate[selectedDate] || [];
+    const workouts = getWorkoutsForDate(selectedDate);
     if (workouts.length === 0) return null;
 
     const dateObj = new Date(selectedDate + "T00:00:00");
@@ -295,6 +334,7 @@ export default function CalendarModal({
     return (
       <View style={styles.selectedDateSection}>
         <Text style={styles.selectedDateTitle}>{formattedDate}</Text>
+
         {workouts.map(workout => (
           <TouchableOpacity
             key={workout.id}
@@ -314,7 +354,7 @@ export default function CalendarModal({
                 {workout.status.replace("_", " ")}
               </Text>
             </View>
-            {<Ionicons name="chevron-forward" size={20} color="#8E8E93" />}
+            <Ionicons name="chevron-forward" size={20} color="#8E8E93" />
           </TouchableOpacity>
         ))}
       </View>
@@ -362,10 +402,12 @@ export default function CalendarModal({
                 >
                   <Ionicons name="chevron-back" size={24} color="#007AFF" />
                 </TouchableOpacity>
+
                 <Text style={styles.monthTitle}>
                   {monthNames[currentDate.getMonth()]}{" "}
                   {currentDate.getFullYear()}
                 </Text>
+
                 <TouchableOpacity
                   onPress={goToNextMonth}
                   style={styles.navButton}
@@ -384,7 +426,7 @@ export default function CalendarModal({
               </View>
 
               {/* Calendar Grid */}
-              {loading ? (
+              {plannedLoading ? (
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator size="large" color="#007AFF" />
                 </View>

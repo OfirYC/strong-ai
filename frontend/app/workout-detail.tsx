@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -11,7 +11,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { format, parseISO } from "date-fns";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import api from "../utils/api";
+import { useWorkout, useWorkouts } from "../store/workoutsStore";
+import { useExercises } from "../store/exercisesStore";
+import { useTemplatesStoreInternal } from "../store/templatesStore";
 import {
   WorkoutSummary,
   WorkoutSession,
@@ -25,6 +27,7 @@ import {
   ExerciseKind,
 } from "../types";
 import RoutineDetailModal from "../components/RoutineDetailModal";
+import { usePRs } from "../store/prsStore";
 
 interface ExerciseWithSets {
   exercise_id: string;
@@ -33,77 +36,184 @@ interface ExerciseWithSets {
   sets: WorkoutSet[];
   estimated_1rm?: number;
 }
+function safeParseISO(s?: string) {
+  if (!s) return null;
+  try {
+    return parseISO(s);
+  } catch {
+    return null;
+  }
+}
+
+function estimate1RM(weight: number, reps: number) {
+  if (weight <= 0 || reps <= 0) return 0;
+  if (reps >= 37) return weight;
+  return weight * (36 / (37 - reps));
+}
+
+function bestSetDisplay(args: {
+  kind: ExerciseKind;
+  bestWeight: number;
+  bestReps: number;
+  bestDuration: number;
+}) {
+  const { kind, bestWeight, bestReps, bestDuration } = args;
+
+  if (kind === "Cardio" || kind === "Duration") {
+    return bestDuration > 0 ? formatDuration(bestDuration) : "0:00";
+  }
+
+  if (kind === "Reps Only") {
+    return bestReps > 0 ? `${bestReps} reps` : "-";
+  }
+
+  if (bestWeight > 0 && bestReps > 0) return `${bestWeight}kg × ${bestReps}`;
+  if (bestReps > 0) return `${bestReps} reps`;
+  return "-";
+}
+
+/**
+ * Build WorkoutSummary purely client-side from:
+ * - WorkoutSession
+ * - PRRecord[] (filtered by workout_id)
+ * - optional exercise lookup { [exercise_id]: { name, exercise_kind } }
+ */
+function computeWorkoutSummary(params: {
+  workout: WorkoutSession;
+  prs: { id: string }[]; // only need count
+  exerciseLookup?: Record<
+    string,
+    { name?: string; exercise_kind?: ExerciseKind }
+  >;
+}): WorkoutSummary {
+  const { workout, prs, exerciseLookup } = params;
+
+  const started = safeParseISO(workout.started_at);
+  const ended = safeParseISO(workout.ended_at);
+
+  const duration_seconds =
+    started && ended ? Math.max(0, Math.floor((+ended - +started) / 1000)) : 0;
+
+  let set_count = 0;
+  let total_volume_kg = 0;
+
+  const exercises = workout.exercises.map(ex => {
+    const exMeta = exerciseLookup?.[ex.exercise_id];
+    const kind = (exMeta?.exercise_kind ?? "Barbell") as ExerciseKind;
+    const name = exMeta?.name ?? "Unknown Exercise";
+
+    set_count += ex.sets.length;
+
+    let bestWeight = 0;
+    let bestReps = 0;
+    let bestDuration = 0;
+    let bestE1RM = 0;
+
+    for (const s of ex.sets) {
+      const setType = s.set_type ?? "normal";
+      if (setType === "warmup" || setType === "cooldown") continue;
+
+      const weight = s.weight ?? 0;
+      const reps = s.reps ?? 0;
+      const duration = s.duration ?? 0;
+
+      // Volume + 1RM
+      if (weight > 0 && reps > 0) {
+        total_volume_kg += weight * reps;
+
+        const e1rm = estimate1RM(weight, reps);
+        if (e1rm > bestE1RM) {
+          bestE1RM = e1rm;
+          bestWeight = weight;
+          bestReps = reps;
+        }
+      }
+
+      // Duration-based best
+      if (duration > bestDuration) bestDuration = duration;
+
+      // Reps-only best
+      if (kind === "Reps Only" && reps > bestReps) bestReps = reps;
+    }
+
+    return {
+      exercise_id: ex.exercise_id,
+      name,
+      exercise_kind: kind,
+      set_count: ex.sets.length,
+      best_set_display: bestSetDisplay({
+        kind,
+        bestWeight,
+        bestReps,
+        bestDuration,
+      }),
+      estimated_1rm: bestE1RM > 0 ? bestE1RM : undefined,
+    };
+  });
+
+  return {
+    id: workout.id,
+    name: workout.name,
+    started_at: workout.started_at,
+    ended_at: workout.ended_at,
+    duration_seconds,
+    exercise_count: workout.exercises.length,
+    set_count,
+    total_volume_kg,
+    pr_count: prs.length,
+    exercises,
+  };
+}
+
+function computeExercisesWithSets(params: {
+  workout: WorkoutSession;
+  summary: WorkoutSummary;
+}): ExerciseWithSets[] {
+  const { workout, summary } = params;
+
+  return workout.exercises.map(ex => {
+    const sumEx = summary.exercises.find(s => s.exercise_id === ex.exercise_id);
+    return {
+      exercise_id: ex.exercise_id,
+      name: sumEx?.name || "Unknown Exercise",
+      exercise_kind: (sumEx?.exercise_kind || "Barbell") as ExerciseKind,
+      sets: ex.sets,
+      estimated_1rm: sumEx?.estimated_1rm,
+    };
+  });
+}
 
 export default function WorkoutDetailScreen() {
   const router = useRouter();
   const { workoutId } = useLocalSearchParams<{ workoutId: string }>();
 
-  const [summary, setSummary] = useState<WorkoutSummary | null>(null);
-  const [workout, setWorkout] = useState<WorkoutSession | null>(null);
-  const [exercisesWithSets, setExercisesWithSets] = useState<
-    ExerciseWithSets[]
-  >([]);
-  const [loading, setLoading] = useState(true);
+  const { workout, loading: workoutLoading } = useWorkout(workoutId);
+  const { byId: prsById, getByWorkoutId: getPRsByWorkoutId, loading: prsLoading } = usePRs();
+  const { byId: exercisesById, getAll: getAllExercises } = useExercises();
+
+  useEffect(() => {
+    if (!workoutId) return;
+    getPRsByWorkoutId(workoutId, { minCount: 1 }).catch(() => {});
+    getAllExercises({ minCount: 1 }).catch(() => {});
+  }, [workoutId, getPRsByWorkoutId, getAllExercises]);
+
+  const summary = useMemo(() => {
+    if (!workout) return null;
+    return computeWorkoutSummary({
+      workout,
+      prs: Object.values(prsById).filter(pr => pr.workout_id === workout.id),
+      exerciseLookup: Object.fromEntries(
+        Object.values(exercisesById).map(ex => [
+          ex.id,
+          { name: ex.name, exercise_kind: ex.exercise_kind },
+        ])
+      ),
+    });
+  }, [workout, exercisesById, prsById]);
+
   const [showFullDetail, setShowFullDetail] = useState(false);
   const [routine, setRoutine] = useState<WorkoutTemplate | null>(null);
   const [showRoutineModal, setShowRoutineModal] = useState(false);
-
-  useEffect(() => {
-    if (workoutId) {
-      loadWorkoutDetail();
-    }
-  }, [workoutId]);
-
-  const loadWorkoutDetail = async () => {
-    try {
-      setLoading(true);
-
-      // Load summary and full workout data
-      const [summaryRes, workoutRes] = await Promise.all([
-        api.get(`/workouts/${workoutId}/detail`),
-        api.get(`/workouts/${workoutId}`),
-      ]);
-
-      setSummary(summaryRes.data);
-      setWorkout(workoutRes.data);
-
-      // Combine exercise info with sets
-      const exercises: ExerciseWithSets[] = [];
-      const workoutData = workoutRes.data as WorkoutSession;
-      const summaryData = summaryRes.data as WorkoutSummary;
-
-      workoutData.exercises.forEach((ex, idx) => {
-        const summaryEx = summaryData.exercises.find(
-          s => s.exercise_id === ex.exercise_id
-        );
-        exercises.push({
-          exercise_id: ex.exercise_id,
-          name: summaryEx?.name || "Unknown Exercise",
-          exercise_kind: summaryEx?.exercise_kind || "Barbell",
-          sets: ex.sets,
-          estimated_1rm: summaryEx?.estimated_1rm,
-        });
-      });
-
-      setExercisesWithSets(exercises);
-
-      // Load routine if workout was created from a template
-      if (workoutData.template_id) {
-        try {
-          const routineRes = await api.get(
-            `/templates/${workoutData.template_id}`
-          );
-          setRoutine(routineRes.data);
-        } catch (error) {
-          console.error("Failed to load routine:", error);
-        }
-      }
-    } catch (error) {
-      console.error("Failed to load workout detail:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const formatWorkoutDate = (dateStr: string): string => {
     const date = parseISO(dateStr);
@@ -140,6 +250,11 @@ export default function WorkoutDetailScreen() {
         return "";
     }
   };
+
+  const exercisesWithSets = useMemo(() => {
+    if (!workout || !summary) return [];
+    return computeExercisesWithSets({ workout, summary });
+  }, [workout, summary]);
 
   const renderPRBadge = (type: string) => (
     <View style={styles.prBadge} key={type}>
@@ -238,7 +353,7 @@ export default function WorkoutDetailScreen() {
     }
   };
 
-  if (loading) {
+  if (workoutLoading || prsLoading) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>

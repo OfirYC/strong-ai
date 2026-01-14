@@ -6,6 +6,7 @@ import { Stack } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useAuthStore } from "../store/authStore";
+import { registerRealtime } from "../realtime/registerRealtime";
 
 export default function RootLayout() {
   const loadUser = useAuthStore(state => state.loadUser);
@@ -13,6 +14,12 @@ export default function RootLayout() {
 
   useEffect(() => {
     loadUser();
+  }, []);
+
+  useEffect(() => {
+    console.log("Registering realtime...");
+    const stop = registerRealtime();
+    return () => stop();
   }, []);
 
   return (

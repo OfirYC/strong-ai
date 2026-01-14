@@ -1,5 +1,7 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Header
 from dotenv import load_dotenv
+from ws_manager import WSManager
+from fastapi import Query, WebSocketDisconnect, WebSocket
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
@@ -10,6 +12,8 @@ from typing import List, Optional, Dict, Set, Any
 from datetime import datetime, timedelta
 from bson import ObjectId
 from constants import EXERCISE_KIND_RULES  # add this
+import json 
+from observable_db import ObservableDB
 
 from models import (
     User, UserCreate, UserLogin, UserResponse, UserProfile, ProfileUpdate, UserContext, ProfileInsights,
@@ -31,6 +35,9 @@ load_dotenv(ROOT_DIR / '.env')
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ.get('DB_NAME', 'workout_tracker')]
+
+def get_db(user_id: str):
+    return ObservableDB(db, user_id=user_id, emit=ws_manager.send)
 
 # Create the main app without a prefix
 app = FastAPI(title="Strong Workout Tracker API")
@@ -69,12 +76,31 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> str:
     
     return payload["user_id"]
 
+async def get_current_user_ws(ws: WebSocket) -> str:
+    """
+    WS can't use Header() dependency the same way.
+    We accept: /ws?token=...
+    """
+    token = ws.query_params.get("token")
+
+    if not token:
+        # 1008 = policy violation (auth failure)
+        await ws.close(code=1008)
+        raise WebSocketDisconnect(code=1008)
+
+    payload = decode_access_token(token)
+
+    if not payload or "user_id" not in payload:
+        await ws.close(code=1008)
+        raise WebSocketDisconnect(code=1008)
+
+    return payload["user_id"]
 
 # ============= AUTH ROUTES =============
 @api_router.post("/auth/register", response_model=UserResponse)
 async def register(user_data: UserCreate):
     # Check if user exists
-    existing_user = await db.users.find_one({"email": user_data.email})
+    existing_user = await get_db(user_id).users.find_one({"email": user_data.email})
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     
@@ -85,7 +111,7 @@ async def register(user_data: UserCreate):
         password_hash=password_hash
     )
     
-    result = await db.users.insert_one(user.dict(by_alias=True, exclude={"id"}))
+    result = await get_db(user_id).users.insert_one(user.dict(by_alias=True, exclude={"id"}))
     user_id = str(result.inserted_id)
     
     # Create token
@@ -97,7 +123,7 @@ async def register(user_data: UserCreate):
 @api_router.post("/auth/login", response_model=UserResponse)
 async def login(credentials: UserLogin):
     # Find user
-    user_doc = await db.users.find_one({"email": credentials.email})
+    user_doc = await get_db(user_id).users.find_one({"email": credentials.email})
     if not user_doc:
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
@@ -113,11 +139,27 @@ async def login(credentials: UserLogin):
     return UserResponse(id=user_id, email=user_doc["email"], token=token)
 
 
+# ============= Web Socket =============
+ws_manager = WSManager()
+@app.websocket("/ws")
+async def websocket_endpoint(ws: WebSocket):
+    user_id = await get_current_user_ws(ws)
+
+    await ws_manager.connect(user_id, ws)
+
+    try:
+        while True:
+            _ = await ws.receive_text()
+    except WebSocketDisconnect:
+        await ws_manager.disconnect(user_id, ws)
+    except Exception:
+        await ws_manager.disconnect(user_id, ws)
+
 # ============= PROFILE ROUTES =============
 @api_router.get("/profile", response_model=UserProfile)
 async def get_profile(user_id: str = Depends(get_current_user)):
     """Get user profile"""
-    user_doc = await db.users.find_one({"_id": ObjectId(user_id)})
+    user_doc = await get_db(user_id).users.find_one({"_id": ObjectId(user_id)})
     if not user_doc:
         raise HTTPException(status_code=404, detail="User not found")
     
@@ -139,13 +181,13 @@ async def update_profile(
             update_dict[f"profile.{field}"] = value
     
     if update_dict:
-        await db.users.update_one(
+        await get_db(user_id).users.update_one(
             {"_id": ObjectId(user_id)},
             {"$set": update_dict}
         )
     
     # Get updated profile
-    user_doc = await db.users.find_one({"_id": ObjectId(user_id)})
+    user_doc = await get_db(user_id).users.find_one({"_id": ObjectId(user_id)})
     profile_dict = user_doc.get("profile", {})
     profile = UserProfile(**profile_dict)
     
@@ -153,7 +195,7 @@ async def update_profile(
     try:
         insights = await generate_profile_insights(profile)
         # Save insights to database
-        await db.users.update_one(
+        await get_db(user_id).users.update_one(
             {"_id": ObjectId(user_id)},
             {"$set": {"profile.insights": insights.dict()}}
         )
@@ -172,7 +214,7 @@ async def update_profile(
 @api_router.get("/profile/context", response_model=UserContext)
 async def get_user_context(user_id: str = Depends(get_current_user)):
     """Get aggregated user context for AI and UI logic"""
-    user_doc = await db.users.find_one({"_id": ObjectId(user_id)})
+    user_doc = await get_db(user_id).users.find_one({"_id": ObjectId(user_id)})
     if not user_doc:
         raise HTTPException(status_code=404, detail="User not found")
     
@@ -231,7 +273,7 @@ async def get_user_context(user_id: str = Depends(get_current_user)):
 @api_router.post("/profile/insights/generate", response_model=dict)
 async def generate_insights(user_id: str = Depends(get_current_user)):
     """Generate AI-powered insights from user's profile"""
-    user_doc = await db.users.find_one({"_id": ObjectId(user_id)})
+    user_doc = await get_db(user_id).users.find_one({"_id": ObjectId(user_id)})
     if not user_doc:
         raise HTTPException(status_code=404, detail="User not found")
     
@@ -243,7 +285,7 @@ async def generate_insights(user_id: str = Depends(get_current_user)):
         insights = await generate_profile_insights(profile)
         
         # Save insights to database
-        await db.users.update_one(
+        await get_db(user_id).users.update_one(
             {"_id": ObjectId(user_id)},
             {"$set": {"profile.insights": insights.dict()}}
         )
@@ -279,7 +321,7 @@ async def get_exercises(
     if search:
         query["name"] = {"$regex": search, "$options": "i"}
     
-    exercises = await db.exercises.find(query).to_list(1000)
+    exercises = await get_db(user_id).exercises.find(query).to_list(1000)
     
     # Convert _id to id for frontend
     result = []
@@ -302,7 +344,7 @@ async def create_exercise(
     
     exercise = Exercise(**exercise_dict)
     
-    result = await db.exercises.insert_one(exercise.dict(by_alias=True, exclude={"id"}))
+    result = await get_db(user_id).exercises.insert_one(exercise.dict(by_alias=True, exclude={"id"}))
     exercise.id = str(result.inserted_id)
     
     return exercise
@@ -313,7 +355,7 @@ async def get_exercise(
     exercise_id: str,
     user_id: str = Depends(get_current_user)
 ):
-    exercise = await db.exercises.find_one({"_id": ObjectId(exercise_id)})
+    exercise = await get_db(user_id).exercises.find_one({"_id": ObjectId(exercise_id)})
     if not exercise:
         raise HTTPException(status_code=404, detail="Exercise not found")
     
@@ -326,7 +368,7 @@ async def update_exercise(
     update_data: ExerciseUpdate,
     user_id: str = Depends(get_current_user)
 ):
-    exercise = await db.exercises.find_one({"_id": ObjectId(exercise_id)})
+    exercise = await get_db(user_id).exercises.find_one({"_id": ObjectId(exercise_id)})
     if not exercise:
         raise HTTPException(status_code=404, detail="Exercise not found")
     
@@ -338,19 +380,19 @@ async def update_exercise(
         update_dict["image"] = update_data.image
     
     if update_dict:
-        await db.exercises.update_one(
+        await get_db(user_id).exercises.update_one(
             {"_id": ObjectId(exercise_id)},
             {"$set": update_dict}
         )
     
-    updated_exercise = await db.exercises.find_one({"_id": ObjectId(exercise_id)})
+    updated_exercise = await get_db(user_id).exercises.find_one({"_id": ObjectId(exercise_id)})
     return Exercise(**{**updated_exercise, "id": str(updated_exercise["_id"])})
 
 
 # ============= TEMPLATE ROUTES =============
 @api_router.get("/templates", response_model=List[WorkoutTemplate])
 async def get_templates(user_id: str = Depends(get_current_user)):
-    templates = await db.templates.find({"user_id": user_id}).to_list(1000)
+    templates = await get_db(user_id).templates.find({"user_id": user_id}).to_list(1000)
     return [WorkoutTemplate(**{**t, "id": str(t["_id"])}) for t in templates]
 
 
@@ -364,7 +406,7 @@ async def create_template(
         user_id=user_id
     )
     
-    result = await db.templates.insert_one(template.dict(by_alias=True, exclude={"id"}))
+    result = await get_db(user_id).templates.insert_one(template.dict(by_alias=True, exclude={"id"}))
     template.id = str(result.inserted_id)
     
     return template
@@ -375,7 +417,7 @@ async def get_template(
     template_id: str,
     user_id: str = Depends(get_current_user)
 ):
-    template = await db.templates.find_one({"_id": ObjectId(template_id), "user_id": user_id})
+    template = await get_db(user_id).templates.find_one({"_id": ObjectId(template_id), "user_id": user_id})
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
     
@@ -388,7 +430,7 @@ async def update_template(
     template_data: WorkoutTemplateCreate,
     user_id: str = Depends(get_current_user)
 ):
-    result = await db.templates.update_one(
+    result = await get_db(user_id).templates.update_one(
         {"_id": ObjectId(template_id), "user_id": user_id},
         {"$set": {**template_data.dict(), "updated_at": datetime.utcnow()}}
     )
@@ -396,7 +438,7 @@ async def update_template(
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Template not found")
     
-    template = await db.templates.find_one({"_id": ObjectId(template_id)})
+    template = await get_db(user_id).templates.find_one({"_id": ObjectId(template_id)})
     return WorkoutTemplate(**{**template, "id": str(template["_id"])})
 
 
@@ -405,7 +447,7 @@ async def delete_template(
     template_id: str,
     user_id: str = Depends(get_current_user)
 ):
-    result = await db.templates.delete_one({"_id": ObjectId(template_id), "user_id": user_id})
+    result = await get_db(user_id).templates.delete_one({"_id": ObjectId(template_id), "user_id": user_id})
     
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Template not found")
@@ -425,7 +467,7 @@ async def start_workout(
     notes = workout_data.notes
     
     if workout_data.template_id:
-        template = await db.templates.find_one({
+        template = await get_db(user_id).templates.find_one({
             "_id": ObjectId(workout_data.template_id),
             "user_id": user_id
         })
@@ -500,13 +542,13 @@ async def start_workout(
         exercises=exercises
     )
     
-    result = await db.workouts.insert_one(workout.dict(by_alias=True, exclude={"id"}))
+    result = await get_db(user_id).workouts.insert_one(workout.dict(by_alias=True, exclude={"id"}))
     workout.id = str(result.inserted_id)
     
     # If this workout is linked to a planned workout, update its status
     if workout_data.planned_workout_id:
         if ObjectId.is_valid(workout_data.planned_workout_id):
-            await db.planned_workouts.update_one(
+            await get_db(user_id).planned_workouts.update_one(
                 {"_id": ObjectId(workout_data.planned_workout_id), "user_id": user_id},
                 {"$set": {"status": "in_progress", "workout_session_id": str(result.inserted_id)}}
             )
@@ -519,7 +561,7 @@ async def get_workouts(
     user_id: str = Depends(get_current_user),
     limit: int = 50
 ):
-    workouts = await db.workouts.find({"user_id": user_id}).sort("started_at", -1).limit(limit).to_list(limit)
+    workouts = await get_db(user_id).workouts.find({"user_id": user_id}).sort("started_at", -1).limit(limit).to_list(limit)
     return [WorkoutSession(**{**w, "id": str(w["_id"])}) for w in workouts]
 
 
@@ -529,7 +571,7 @@ async def get_workout_count(
     user_id: str = Depends(get_current_user)
 ):
     """Get the total number of completed workouts for the user"""
-    count = await db.workouts.count_documents({"user_id": user_id, "ended_at": {"$ne": None}})
+    count = await get_db(user_id).workouts.count_documents({"user_id": user_id, "ended_at": {"$ne": None}})
     return {"count": count}
 
 
@@ -540,7 +582,7 @@ async def get_workout_history(
     limit: int = 50
 ):
     """Get workout history with computed summary statistics"""
-    workouts = await db.workouts.find({"user_id": user_id, "ended_at": {"$ne": None}}).sort("started_at", -1).limit(limit).to_list(limit)
+    workouts = await get_db(user_id).workouts.find({"user_id": user_id, "ended_at": {"$ne": None}}).sort("started_at", -1).limit(limit).to_list(limit)
     
     # Get all exercise IDs we need
     exercise_ids = set()
@@ -551,7 +593,7 @@ async def get_workout_history(
     # Fetch all exercises in one query
     exercises_map = {}
     if exercise_ids:
-        exercises = await db.exercises.find({"_id": {"$in": [ObjectId(eid) for eid in exercise_ids if ObjectId.is_valid(eid)]}}).to_list(len(exercise_ids))
+        exercises = await get_db(user_id).exercises.find({"_id": {"$in": [ObjectId(eid) for eid in exercise_ids if ObjectId.is_valid(eid)]}}).to_list(len(exercise_ids))
         for ex in exercises:
             exercises_map[str(ex["_id"])] = ex
     
@@ -559,7 +601,7 @@ async def get_workout_history(
     workout_ids = [str(w["_id"]) for w in workouts]
     pr_counts = {}
     if workout_ids:
-        prs = await db.prs.find({"workout_id": {"$in": workout_ids}}).to_list(1000)
+        prs = await get_db(user_id).prs.find({"workout_id": {"$in": workout_ids}}).to_list(1000)
         for pr in prs:
             wid = pr.get("workout_id")
             if wid:
@@ -570,6 +612,7 @@ async def get_workout_history(
         workout_id = str(workout["_id"])
         started_at = workout.get("started_at", datetime.utcnow())
         ended_at = workout.get("ended_at")
+        template_id = workout.get("template_id")
         
         duration_seconds = 0
         if ended_at and started_at:
@@ -668,7 +711,8 @@ async def get_workout_history(
             set_count=set_count,
             total_volume_kg=total_volume_kg,
             pr_count=pr_counts.get(workout_id, 0),
-            exercises=exercise_summaries
+            exercises=exercise_summaries,
+            template_id=template_id
         ))
     
     return summaries
@@ -708,7 +752,7 @@ async def get_workout_history_by_exercise(
     # Determine kind for record logic
     ex_kind = DEFAULT_EXERCISE_KIND
     if ObjectId.is_valid(exercise_id):
-        ex_doc = await db.exercises.find_one({"_id": ObjectId(exercise_id)})
+        ex_doc = await get_db(user_id).exercises.find_one({"_id": ObjectId(exercise_id)})
         if ex_doc and ex_doc.get("exercise_kind"):
             ex_kind = ex_doc["exercise_kind"]
     if ex_kind not in EXERCISE_KIND_RULES:
@@ -719,7 +763,7 @@ async def get_workout_history_by_exercise(
     # Pull relevant workouts
    
     workouts = (
-        await db.workouts.find(
+        await get_db(user_id).workouts.find(
             {
                 "user_id": user_id,
                 "ended_at": {"$ne": None},
@@ -802,11 +846,34 @@ async def get_workout(
     workout_id: str,
     user_id: str = Depends(get_current_user)
 ):
-    workout = await db.workouts.find_one({"_id": ObjectId(workout_id), "user_id": user_id})
+    workout = await get_db(user_id).workouts.find_one({"_id": ObjectId(workout_id), "user_id": user_id})
     if not workout:
         raise HTTPException(status_code=404, detail="Workout not found")
     
     return WorkoutSession(**{**workout, "id": str(workout["_id"])})
+
+
+@api_router.get("/workouts/batch/{workout_ids}", response_model=List[WorkoutSession])
+async def get_workout(
+    workout_ids: str,
+    user_id: str = Depends(get_current_user)
+):
+    workout_id_list = workout_ids.split(",")
+    # type cast to workoutsession list
+    
+    
+    workouts = [] 
+        # Modify this to not use findone in a loop, but rather a single query
+    if workout_id_list:
+        workouts = await get_db(user_id).workouts.find(
+            {"_id": {"$in": [ObjectId(wid) for wid in workout_id_list if ObjectId.is_valid(wid)]}, "user_id": user_id}
+        ).to_list(len(workout_id_list))
+        workouts = [WorkoutSession(**{**w, "id": str(w["_id"])}) for w in workouts]
+    else:
+        workouts = []
+        
+        
+    return workouts
 
 
 @api_router.put("/workouts/{workout_id}", response_model=WorkoutSession)
@@ -817,7 +884,7 @@ async def update_workout(
 ):
     update_dict = workout_data.dict(exclude_unset=True)
     
-    result = await db.workouts.update_one(
+    result = await get_db(user_id).workouts.update_one(
         {"_id": ObjectId(workout_id), "user_id": user_id},
         {"$set": update_dict}
     )
@@ -829,13 +896,22 @@ async def update_workout(
     if workout_data.ended_at:
         await check_and_create_prs(user_id, workout_id)
     
-    workout = await db.workouts.find_one({"_id": ObjectId(workout_id)})
+    workout = await get_db(user_id).workouts.find_one({"_id": ObjectId(workout_id)})
+    
+    # If workout is marked as skipped, and linked to a planned workout, update its status
+    if workout_data.skipped and workout.get("planned_workout_id"):
+        planned_id = workout["planned_workout_id"]
+        if ObjectId.is_valid(planned_id):
+            await get_db(user_id).planned_workouts.update_one(
+                {"_id": ObjectId(planned_id), "user_id": user_id},
+                {"$set": {"status": "skipped"}}
+            )
     
     # If workout is completed and linked to a planned workout, update its status
     if workout_data.ended_at and workout.get("planned_workout_id"):
         planned_id = workout["planned_workout_id"]
         if ObjectId.is_valid(planned_id):
-            await db.planned_workouts.update_one(
+            await get_db(user_id).planned_workouts.update_one(
                 {"_id": ObjectId(planned_id), "user_id": user_id},
                 {"$set": {"status": "completed"}}
             )
@@ -852,7 +928,7 @@ async def delete_workout(
     if not ObjectId.is_valid(workout_id):
         raise HTTPException(status_code=400, detail="Invalid workout ID")
     
-    result = await db.workouts.delete_one({
+    result = await get_db(user_id).workouts.delete_one({
         "_id": ObjectId(workout_id),
         "user_id": user_id
     })
@@ -863,14 +939,13 @@ async def delete_workout(
     return {"message": "Workout deleted successfully"}
 
 
-
 @api_router.get("/workouts/{workout_id}/detail", response_model=WorkoutSummary)
 async def get_workout_detail(
     workout_id: str,
     user_id: str = Depends(get_current_user)
 ):
     """Get detailed workout summary with exercise breakdown"""
-    workout = await db.workouts.find_one({"_id": ObjectId(workout_id), "user_id": user_id})
+    workout = await get_db(user_id).workouts.find_one({"_id": ObjectId(workout_id), "user_id": user_id})
     if not workout:
         raise HTTPException(status_code=404, detail="Workout not found")
     
@@ -878,12 +953,12 @@ async def get_workout_detail(
     exercise_ids = [ex["exercise_id"] for ex in workout.get("exercises", [])]
     exercises_map = {}
     if exercise_ids:
-        exercises = await db.exercises.find({"_id": {"$in": [ObjectId(eid) for eid in exercise_ids if ObjectId.is_valid(eid)]}}).to_list(len(exercise_ids))
+        exercises = await get_db(user_id).exercises.find({"_id": {"$in": [ObjectId(eid) for eid in exercise_ids if ObjectId.is_valid(eid)]}}).to_list(len(exercise_ids))
         for ex in exercises:
             exercises_map[str(ex["_id"])] = ex
     
     # Count PRs for this workout
-    prs = await db.prs.find({"workout_id": workout_id}).to_list(100)
+    prs = await get_db(user_id).prs.find({"workout_id": workout_id}).to_list(100)
     pr_count = len(prs)
     
     started_at = workout.get("started_at", datetime.utcnow())
@@ -990,13 +1065,13 @@ async def get_prs(
     if exercise_id:
         query["exercise_id"] = exercise_id
     
-    prs = await db.prs.find(query).sort("date", -1).to_list(100)
+    prs = await get_db(user_id).prs.find(query).sort("date", -1).to_list(100)
     return [PRRecord(**{**pr, "id": str(pr["_id"])}) for pr in prs]
 
 
 async def check_and_create_prs(user_id: str, workout_id: str):
     """Check workout for PRs and create PR records with detailed PR types"""
-    workout = await db.workouts.find_one({"_id": ObjectId(workout_id)})
+    workout = await get_db(user_id).workouts.find_one({"_id": ObjectId(workout_id)})
     if not workout:
         return
     
@@ -1006,12 +1081,12 @@ async def check_and_create_prs(user_id: str, workout_id: str):
         exercise_id = exercise["exercise_id"]
         
         # Get exercise details to determine type
-        ex_data = await db.exercises.find_one({"_id": ObjectId(exercise_id)}) if ObjectId.is_valid(exercise_id) else None
+        ex_data = await get_db(user_id).exercises.find_one({"_id": ObjectId(exercise_id)}) if ObjectId.is_valid(exercise_id) else None
         ex_kind = ex_data.get("exercise_kind", "Barbell") if ex_data else "Barbell"
         is_duration_based = ex_kind in ['Cardio', 'Duration']
         
         # Get all previous PRs for this exercise
-        existing_prs = await db.prs.find({
+        existing_prs = await get_db(user_id).prs.find({
             "user_id": user_id,
             "exercise_id": exercise_id
         }).to_list(100)
@@ -1076,7 +1151,7 @@ async def check_and_create_prs(user_id: str, workout_id: str):
                     weight=weight,
                     reps=reps
                 )
-                await db.prs.insert_one(pr.dict(by_alias=True, exclude={"id"}))
+                await get_db(user_id).prs.insert_one(pr.dict(by_alias=True, exclude={"id"}))
             
             if is_reps_pr:
                 pr = PRRecord(
@@ -1087,7 +1162,7 @@ async def check_and_create_prs(user_id: str, workout_id: str):
                     weight=weight,
                     reps=reps
                 )
-                await db.prs.insert_one(pr.dict(by_alias=True, exclude={"id"}))
+                await get_db(user_id).prs.insert_one(pr.dict(by_alias=True, exclude={"id"}))
             
             if is_volume_pr:
                 pr = PRRecord(
@@ -1099,7 +1174,7 @@ async def check_and_create_prs(user_id: str, workout_id: str):
                     reps=reps,
                     volume=volume
                 )
-                await db.prs.insert_one(pr.dict(by_alias=True, exclude={"id"}))
+                await get_db(user_id).prs.insert_one(pr.dict(by_alias=True, exclude={"id"}))
             
             if is_1rm_pr:
                 pr = PRRecord(
@@ -1111,7 +1186,7 @@ async def check_and_create_prs(user_id: str, workout_id: str):
                     reps=reps,
                     estimated_1rm=estimated_1rm
                 )
-                await db.prs.insert_one(pr.dict(by_alias=True, exclude={"id"}))
+                await get_db(user_id).prs.insert_one(pr.dict(by_alias=True, exclude={"id"}))
             
             if is_duration_pr:
                 pr = PRRecord(
@@ -1121,7 +1196,7 @@ async def check_and_create_prs(user_id: str, workout_id: str):
                     pr_type="duration",
                     duration=duration
                 )
-                await db.prs.insert_one(pr.dict(by_alias=True, exclude={"id"}))
+                await get_db(user_id).prs.insert_one(pr.dict(by_alias=True, exclude={"id"}))
             
             # Update set with PR flags in the workout document
             if is_weight_pr or is_reps_pr or is_volume_pr or is_duration_pr:
@@ -1137,7 +1212,7 @@ async def check_and_create_prs(user_id: str, workout_id: str):
     # Update workout with PR flags
     if pr_flags_updates:
         for update in pr_flags_updates:
-            await db.workouts.update_one(
+            await get_db(user_id).workouts.update_one(
                 {"_id": ObjectId(workout_id)},
                 {"$set": {
                     f"exercises.{update['ex_idx']}.sets.{update['set_idx']}.is_weight_pr": update['is_weight_pr'],
@@ -1274,7 +1349,7 @@ async def enrich_planned_workouts_with_sessions(planned_workouts: List[dict], us
         return planned_workouts
 
     # 2) Single DB fetch: all sessions tied to these IDs
-    sessions_cursor = db.workouts.find({
+    sessions_cursor = get_db(user_id).workouts.find({
         "user_id": user_id,
         "planned_workout_id": {"$in": id_candidates}
     })
@@ -1341,7 +1416,7 @@ async def get_unscheduled_workouts_for_date(user_id: str, date_str: str) -> List
     end_of_day = datetime.fromisoformat(date_str + "T23:59:59")
     
     # Find workout sessions without planned_workout_id
-    sessions = await db.workouts.find({
+    sessions = await get_db(user_id).workouts.find({
         "user_id": user_id,
         "started_at": {"$gte": start_of_day, "$lte": end_of_day},
         "$or": [
@@ -1388,7 +1463,7 @@ async def get_unscheduled_workouts_for_range(user_id: str, start_date: str, end_
     end = datetime.fromisoformat(end_date + "T23:59:59")
     
     # Find workout sessions without planned_workout_id in the range
-    sessions = await db.workouts.find({
+    sessions = await get_db(user_id).workouts.find({
         "user_id": user_id,
         "started_at": {"$gte": start, "$lte": end},
         "$or": [
@@ -1440,11 +1515,11 @@ async def create_planned_workout(
         **workout_data.dict()
     )
     
-    result = await db.planned_workouts.insert_one(
+    result = await get_db(user_id).planned_workouts.insert_one(
         planned_workout.dict(by_alias=True, exclude={"id"})
     )
     
-    planned_workout_dict = await db.planned_workouts.find_one({"_id": result.inserted_id})
+    planned_workout_dict = await get_db(user_id).planned_workouts.find_one({"_id": result.inserted_id})
     return PlannedWorkout(**{**planned_workout_dict, "id": str(planned_workout_dict["_id"])})
 
 
@@ -1464,7 +1539,7 @@ async def get_planned_workouts(
     query = {"user_id": user_id}
     
     # Fetch base planned workouts
-    workouts = await db.planned_workouts.find(query).to_list(1000)
+    workouts = await get_db(user_id).planned_workouts.find(query).to_list(1000)
     
     # Convert ObjectId to string
     for w in workouts:
@@ -1505,7 +1580,7 @@ async def get_planned_workout(
     if not ObjectId.is_valid(workout_id):
         raise HTTPException(status_code=400, detail="Invalid workout ID")
     
-    workout = await db.planned_workouts.find_one({
+    workout = await get_db(user_id).planned_workouts.find_one({
         "_id": ObjectId(workout_id),
         "user_id": user_id
     })
@@ -1527,7 +1602,7 @@ async def update_planned_workout(
         raise HTTPException(status_code=400, detail="Invalid workout ID")
     
     # Check if workout exists and belongs to user
-    existing = await db.planned_workouts.find_one({
+    existing = await get_db(user_id).planned_workouts.find_one({
         "_id": ObjectId(workout_id),
         "user_id": user_id
     })
@@ -1539,12 +1614,12 @@ async def update_planned_workout(
     update_data = {k: v for k, v in workout_data.dict(exclude_unset=True).items() if v is not None}
     
     if update_data:
-        await db.planned_workouts.update_one(
+        await get_db(user_id).planned_workouts.update_one(
             {"_id": ObjectId(workout_id)},
             {"$set": update_data}
         )
     
-    updated = await db.planned_workouts.find_one({"_id": ObjectId(workout_id)})
+    updated = await get_db(user_id).planned_workouts.find_one({"_id": ObjectId(workout_id)})
     return PlannedWorkout(**{**updated, "id": str(updated["_id"])})
 
 
@@ -1557,7 +1632,7 @@ async def delete_planned_workout(
     if not ObjectId.is_valid(workout_id):
         raise HTTPException(status_code=400, detail="Invalid workout ID")
     
-    result = await db.planned_workouts.delete_one({
+    result = await get_db(user_id).planned_workouts.delete_one({
         "_id": ObjectId(workout_id),
         "user_id": user_id
     })
@@ -1597,7 +1672,7 @@ async def chat_with_ai(
             updated_messages = await generate_ai_chat_response(
                 user_id=user_id,
                 messages=request.messages,
-                db=db
+                db=get_db(db)
             )
             
             return ChatResponse(messages=updated_messages)
@@ -1612,32 +1687,6 @@ async def chat_with_ai(
 
 
 # ============= SEED DATA =============
-@api_router.post("/seed")
-async def seed_exercises(force: bool = False):
-    """Seed the database with default exercises"""
-    count = await db.exercises.count_documents({"is_custom": False})
-    
-    if count > 0 and not force:
-        return {"message": f"Database already has {count} exercises. Use force=true to reseed"}
-    
-    # Delete existing non-custom exercises if force
-    if force:
-        await db.exercises.delete_many({"is_custom": False})
-    
-    exercises = []
-    for ex_data in EXERCISES:
-        exercise = Exercise(
-            **ex_data,
-            is_custom=False,
-            user_id=None
-        )
-        exercises.append(exercise.dict(by_alias=True, exclude={"id"}))
-    
-    result = await db.exercises.insert_many(exercises)
-    
-    return {"message": f"Seeded {len(result.inserted_ids)} exercises"}
-
-
 @api_router.get("/")
 async def root():
     return {"message": "Strong Workout Tracker API", "version": "1.0.0"}

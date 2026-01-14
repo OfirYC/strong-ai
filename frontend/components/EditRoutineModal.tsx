@@ -6,6 +6,7 @@ import { WorkoutTemplate } from "../types";
 import api from "../utils/api";
 import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTemplates } from "../store/templatesStore";
 
 export interface EditRoutineModalProps {
   visible: boolean;
@@ -20,6 +21,7 @@ export function EditRoutineModal({
   onRoutineEdited,
 }: EditRoutineModalProps) {
   const insets = useSafeAreaInsets();
+  const { upsert: upsertTemplate } = useTemplates();
 
   return (
     <Modal
@@ -41,6 +43,16 @@ export function EditRoutineModal({
             name: name.trim(),
             notes: notes.trim(),
             exercises: exercises,
+          });
+          // update global cache immediately
+          upsertTemplate({
+            id: routine.id,
+            name: name.trim(),
+            notes: notes.trim(),
+            exercises: exercises,
+            user_id: routine.user_id,
+            created_at: routine.created_at,
+            updated_at: new Date().toISOString(),
           });
           onRoutineEdited({
             ...routine,

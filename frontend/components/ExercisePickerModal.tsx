@@ -40,7 +40,7 @@ export default function ExercisePickerModal({
   onSelectExercise,
   onCreateNew,
 }: ExercisePickerModalProps) {
-  const { byId, getAll, loading, list } = useExercises();
+  const { loading, list, refetchAll } = useExercises();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedMuscleGroup, setSelectedMuscleGroup] = useState("All");
 
@@ -130,6 +130,8 @@ export default function ExercisePickerModal({
         </View>
 
         <FlatList
+          refreshing={loading}
+          onRefresh={() => refetchAll()}
           data={filteredExercises}
           keyExtractor={item => item.id}
           renderItem={({ item }) => (

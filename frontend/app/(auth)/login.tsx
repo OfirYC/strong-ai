@@ -31,10 +31,8 @@ export default function LoginScreen() {
 
     try {
       setLoading(true);
-      console.log("GONNA POST");
       const response = await api.post("/auth/login", { email, password });
-      console.log("POSTED", response.data);
-      await setUser(response.data);
+      setUser(response.data);
       router.replace("/(tabs)/workout");
     } catch (error: any) {
       Alert.alert("Error", error.response?.data?.detail || "Login failed");

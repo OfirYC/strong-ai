@@ -1,84 +1,35 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import React, { useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
   Alert,
-  ActivityIndicator,
+  FlatList,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter, useFocusEffect } from "expo-router";
 import Button from "../../components/Button";
-import api from "../../utils/api";
-import { WorkoutTemplate } from "../../types";
-import RoutineDetailModal from "../../components/RoutineDetailModal";
-import { useWorkoutStore } from "../../store/workoutStore";
-import ScheduleWorkoutModal from "../../components/ScheduleWorkoutModal";
 import { LoadingData } from "../../components/LoadingData";
-
-interface PlannedWorkout {
-  id: string;
-  user_id: string;
-  date: string;
-  name: string;
-  template_id?: string;
-  type?: string;
-  notes?: string;
-  status: "planned" | "in_progress" | "completed" | "skipped";
-  workout_session_id?: string;
-  order: number;
-  is_recurring: boolean;
-  recurrence_type?: string;
-  recurrence_days?: number[];
-  recurrence_end_date?: string;
-  recurrence_parent_id?: string;
-}
-
-interface EnrichedPlannedWorkout extends PlannedWorkout {
-  actualName?: string;
-  actualNotes?: string;
-}
+import RoutineDetailModal from "../../components/RoutineDetailModal";
+import ScheduleWorkoutModal from "../../components/ScheduleWorkoutModal";
+import { useTemplates } from "../../store/templatesStore";
+import { workoutsStore } from "../../store/workoutsStore";
+import { useWorkoutStore } from "../../store/workoutStore";
+import { WorkoutTemplate } from "../../types";
+import api from "../../utils/api";
 
 export default function RoutinesScreen() {
   const router = useRouter();
   const { activeWorkout, startWorkout, endWorkout } = useWorkoutStore();
-  const [templates, setTemplates] = useState<WorkoutTemplate[]>([]);
+
   const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const { list: templates, loading, refetchAll, remove } = useTemplates();
   const [selectedRoutine, setSelectedRoutine] =
     useState<WorkoutTemplate | null>(null);
 
   const [showRoutineModal, setShowRoutineModal] = useState(false);
-  const [todaysWorkouts, setTodaysWorkouts] = useState<
-    EnrichedPlannedWorkout[]
-  >([]);
-
-  // Load templates on mount
-  useEffect(() => {
-    loadTemplates();
-  }, []);
-
-  // Reload templates whenever the screen comes into focus
-  useFocusEffect(
-    useCallback(() => {
-      loadTemplates();
-    }, [])
-  );
-
-  const loadTemplates = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get("/templates");
-      setTemplates(response.data);
-    } catch (error) {
-      console.error("Failed to load templates:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleRoutinePress = (routine: WorkoutTemplate) => {
     setSelectedRoutine(routine);
@@ -104,14 +55,21 @@ export default function RoutinesScreen() {
       );
       return;
     }
+
     await createTemplateWorkout(routine.id);
   };
 
   const createTemplateWorkout = async (templateId: string) => {
     try {
       const response = await api.post("/workouts", { template_id: templateId });
+
       startWorkout(response.data);
+
+      // Keep workoutsStore hot so other screens can enrich immediately
+      workoutsStore.getState().upsert(response.data);
+
       setShowRoutineModal(false);
+
       // Navigate to workout tab
       router.push("/(tabs)/workout");
     } catch (error: any) {
@@ -131,7 +89,7 @@ export default function RoutinesScreen() {
           onPress: async () => {
             try {
               await api.delete(`/templates/${templateId}`);
-              setTemplates(prev => prev.filter(t => t.id !== templateId));
+              remove(templateId);
             } catch (error) {
               Alert.alert("Error", "Failed to delete routine");
             }
@@ -157,6 +115,7 @@ export default function RoutinesScreen() {
           </Text>
         )}
       </TouchableOpacity>
+
       <TouchableOpacity
         style={styles.deleteButton}
         onPress={() => handleDeleteTemplate(item.id, item.name)}
@@ -165,44 +124,6 @@ export default function RoutinesScreen() {
       </TouchableOpacity>
     </View>
   );
-
-  const loadTodaysWorkouts = async () => {
-    try {
-      const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
-      const response = await api.get(`/planned-workouts?date=${today}`);
-      const plannedWorkouts: PlannedWorkout[] = response.data;
-
-      // Enrich with actual workout session data if exists
-      const enriched: EnrichedPlannedWorkout[] = await Promise.all(
-        plannedWorkouts.map(async pw => {
-          if (pw.workout_session_id) {
-            try {
-              const workoutResponse = await api.get(
-                `/workouts/${pw.workout_session_id}`
-              );
-              const workout = workoutResponse.data;
-              return {
-                ...pw,
-                actualName: workout.name,
-                actualNotes: workout.notes,
-              };
-            } catch (error) {
-              console.error(
-                `Failed to load workout session ${pw.workout_session_id}:`,
-                error
-              );
-              return pw;
-            }
-          }
-          return pw;
-        })
-      );
-
-      setTodaysWorkouts(enriched);
-    } catch (error) {
-      console.error("Failed to load today's workouts:", error);
-    }
-  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -214,19 +135,18 @@ export default function RoutinesScreen() {
           style={styles.createButton}
         />
       </View>
+
       <FlatList
         data={templates}
         keyExtractor={item => item.id}
         renderItem={renderTemplate}
         contentContainerStyle={styles.listContent}
         refreshing={loading}
-        onRefresh={loadTemplates}
+        onRefresh={refetchAll}
         ListEmptyComponent={
           loading ? (
-            // Initial (or refresh) load with no data yet
             <LoadingData loadingTitle="Loading Routines..." />
           ) : (
-            // Loaded and actually empty
             <View style={styles.emptyState}>
               <Ionicons name="list-outline" size={64} color="#3A3A3C" />
               <Text style={styles.emptyText}>No routines yet</Text>
@@ -254,10 +174,7 @@ export default function RoutinesScreen() {
         visible={showScheduleModal}
         routine={selectedRoutine}
         onClose={() => setShowScheduleModal(false)}
-        onScheduled={() => {
-          loadTodaysWorkouts();
-          setShowScheduleModal(false);
-        }}
+        onScheduled={() => {}}
       />
     </SafeAreaView>
   );

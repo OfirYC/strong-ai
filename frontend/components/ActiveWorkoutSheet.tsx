@@ -1,7 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useExercises } from "../store/exercisesStore";
 import * as Haptics from "expo-haptics";
-import { useDebounce } from "use-debounce";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -17,12 +15,16 @@ import {
 } from "react-native";
 import DraggableFlatList from "react-native-draggable-flatlist";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useDebounce } from "use-debounce";
 import { useMultipleExercisesPreviousSets } from "../hooks/usePreviousSetValues";
+import { useExercises } from "../store/exercisesStore";
 import { useWorkoutStore } from "../store/workoutStore";
+import { useWorkouts } from "../store/workoutsStore";
 import {
   Exercise,
   SetType,
   WorkoutExercise,
+  WorkoutSession,
   WorkoutSet,
   getExerciseFields,
 } from "../types";
@@ -55,7 +57,6 @@ const COLLAPSED_HEIGHT = 80;
 
 interface ActiveWorkoutSheetProps {
   onFinishWorkout: () => void;
-  onMetaCommitted?: () => void; // NEW: “name/notes saved to backend”
 
   initialExpanded?: boolean;
 }
@@ -63,7 +64,6 @@ interface ActiveWorkoutSheetProps {
 export default function ActiveWorkoutSheet({
   onFinishWorkout,
   initialExpanded = true,
-  onMetaCommitted,
 }: ActiveWorkoutSheetProps) {
   const insets = useSafeAreaInsets();
 
@@ -75,6 +75,49 @@ export default function ActiveWorkoutSheet({
     endWorkout,
     workoutStartTime,
   } = useWorkoutStore();
+
+  const {
+    patch: patchWorkout,
+    upsert: upsertWorkout,
+    remove: removeWorkout,
+    list: workoutsList,
+  } = useWorkouts();
+  const activeWorkoutId = activeWorkout?.id;
+
+  const syncWorkoutPatch = (partial: Partial<WorkoutSession>) => {
+    if (!activeWorkoutId) return;
+
+    // 1) Update local active workout store (persisted UI draft)
+    // Reuse your existing methods depending on what's being patched.
+    // For general partials, we’ll route through updateWorkout with current exercises.
+    const nextName = partial.name ?? undefined;
+    const nextNotes = partial.notes ?? undefined;
+    const nextExercises = partial.exercises ?? exercises;
+
+    updateWorkout(nextExercises, nextNotes, nextName);
+
+    // 2) Update canonical workouts store (optimistic)
+    patchWorkout(activeWorkoutId, partial);
+  };
+
+  const syncExercises = (nextExercises: WorkoutExercise[]) => {
+    if (!activeWorkoutId) return;
+    updateWorkout(nextExercises);
+    patchWorkout(activeWorkoutId, { exercises: nextExercises });
+  };
+
+  const syncName = (name: string) => {
+    if (!activeWorkoutId) return;
+    updateWorkoutName(name);
+    patchWorkout(activeWorkoutId, { name });
+  };
+
+  const syncNotes = (notes: string | undefined) => {
+    if (!activeWorkoutId) return;
+    updateWorkoutNotes(notes);
+    patchWorkout(activeWorkoutId, { notes });
+  };
+
   const workoutName = activeWorkout?.name ?? "";
   const workoutNotes = activeWorkout?.notes ?? "";
   const [debouncedName] = useDebounce(workoutName, 800);
@@ -134,9 +177,8 @@ export default function ActiveWorkoutSheet({
   // Extra 40px at top to avoid system gesture conflicts
   const maxExpandedHeight = SCREEN_HEIGHT - insets.top - 85 - insets.bottom;
 
-  const animatedHeight = useRef(
-    new Animated.Value(initialExpanded ? maxExpandedHeight : COLLAPSED_HEIGHT)
-  ).current;
+  const animatedHeight = useRef(new Animated.Value(COLLAPSED_HEIGHT)).current;
+  const didInitRef = useRef(false);
 
   const exercises = activeWorkout?.exercises || [];
 
@@ -193,10 +235,43 @@ export default function ActiveWorkoutSheet({
 
   // Update height when initialExpanded changes
   useEffect(() => {
-    if (initialExpanded) {
-      expand();
+    // Don’t animate before we have the correct maxExpandedHeight
+    // (insets are ready by first render, but this keeps it stable)
+    const run = () => {
+      if (initialExpanded) {
+        // Render expanded content immediately, then animate height up
+        setIsExpanded(true);
+        isExpandedRef.current = true;
+
+        Animated.spring(animatedHeight, {
+          toValue: maxExpandedHeight,
+          useNativeDriver: false,
+          friction: 10,
+        }).start();
+      } else {
+        // Collapse (animate down)
+        setIsExpanded(false);
+        isExpandedRef.current = false;
+
+        Animated.spring(animatedHeight, {
+          toValue: COLLAPSED_HEIGHT,
+          useNativeDriver: false,
+          friction: 10,
+        }).start();
+      }
+    };
+
+    // On first mount, ensure we animate from collapsed → expanded if needed.
+    if (!didInitRef.current) {
+      didInitRef.current = true;
+      requestAnimationFrame(run);
+      return;
     }
-  }, [initialExpanded]);
+
+    // On subsequent changes (e.g., initialExpanded prop changes, safe-area changes)
+    run();
+  }, [initialExpanded, maxExpandedHeight, animatedHeight]);
+
   useEffect(() => {
     if (!workoutStartTime) return;
 
@@ -248,8 +323,6 @@ export default function ActiveWorkoutSheet({
           name: debouncedName,
           notes: debouncedNotes,
         };
-
-        onMetaCommitted?.(); // refresh today's workouts once
       } catch (e) {
         console.error("Failed to save workout meta:", e);
       }
@@ -300,7 +373,7 @@ export default function ActiveWorkoutSheet({
     };
 
     const newExercises = [...exercises, newExercise];
-    updateWorkout(newExercises);
+    syncExercises(newExercises);
 
     upsert(exercise);
 
@@ -327,7 +400,7 @@ export default function ActiveWorkoutSheet({
       ...exercise,
       sets: [...exercise.sets, newSet],
     };
-    updateWorkout(newExercises);
+    syncExercises(newExercises);
   };
 
   const updateSet = (
@@ -347,7 +420,7 @@ export default function ActiveWorkoutSheet({
       ),
     };
 
-    updateWorkout(newExercises);
+    syncExercises(newExercises);
   };
 
   const removeSet = (exerciseIndex: number, setIndex: number) => {
@@ -356,7 +429,7 @@ export default function ActiveWorkoutSheet({
       ...newExercises[exerciseIndex],
       sets: newExercises[exerciseIndex].sets.filter((_, i) => i !== setIndex),
     };
-    updateWorkout(newExercises);
+    syncExercises(newExercises);
   };
 
   const removeExercise = (exerciseIndex: number) => {
@@ -376,7 +449,7 @@ export default function ActiveWorkoutSheet({
             const newExercises = exercises.filter(
               (_, i) => i !== exerciseIndex
             );
-            updateWorkout(newExercises);
+            syncExercises(newExercises);
           },
         },
       ]
@@ -432,24 +505,26 @@ export default function ActiveWorkoutSheet({
 
     try {
       setSaving(true);
-      // Use PUT instead of PATCH - backend requires PUT
-      await api.put(`/workouts/${activeWorkout.id}`, {
+      // optimistic store updates
+      syncWorkoutPatch({
         exercises: exercisesToSave,
         name: activeWorkout.name,
         notes: activeWorkout.notes,
-        status: "completed",
         ended_at: new Date().toISOString(),
-        duration: timer,
+      });
+      // Use PUT instead of PATCH - backend requires PUT
+      const response = await api.put(`/workouts/${activeWorkout.id}`, {
+        exercises: exercisesToSave,
+        name: activeWorkout.name,
+        notes: activeWorkout.notes,
+        ended_at: new Date().toISOString(),
       });
 
+      endWorkout();
+      upsertWorkout(response.data as WorkoutSession);
+
       // Get workout count for summary
-      let workoutNumber = 1;
-      try {
-        const countRes = await api.get("/workouts/count");
-        workoutNumber = countRes.data.count;
-      } catch (e) {
-        console.log("Could not fetch workout count");
-      }
+      const workoutNumber = workoutsList.length;
 
       // Build exercise summaries (use saved exercises, not original)
       const exerciseSummaries = exercisesToSave.map(ex => {
@@ -544,14 +619,13 @@ export default function ActiveWorkoutSheet({
   const handleCloseWorkoutComplete = () => {
     setShowWorkoutComplete(false);
     setWorkoutSummary(null);
-    endWorkout();
     onFinishWorkout();
   };
 
   const handleToggleDescription = () => {
     if (showDescription) {
       // Remove description
-      updateWorkoutNotes(undefined);
+      syncNotes(undefined);
       setShowDescription(false);
     } else {
       // Add description
@@ -581,10 +655,13 @@ export default function ActiveWorkoutSheet({
             onPress: async () => {
               // Mark the planned workout as skipped
               try {
-                await api.put(`/workouts/${activeWorkout.id}`, {
+                syncWorkoutPatch({ skipped: true, exercises: [] });
+
+                const res = await api.put(`/workouts/${activeWorkout.id}`, {
                   skipped: true,
                   exercises: [],
                 });
+                upsertWorkout(res.data);
               } catch (error) {
                 console.error(
                   "Failed to update planned workout status:",
@@ -610,6 +687,8 @@ export default function ActiveWorkoutSheet({
             onPress: async () => {
               // Delete the workout session from database
               try {
+                if (activeWorkoutId) removeWorkout(activeWorkoutId);
+
                 await api.delete(`/workouts/${activeWorkout?.id}`);
               } catch (error) {
                 console.error("Failed to delete workout:", error);
@@ -641,7 +720,7 @@ export default function ActiveWorkoutSheet({
       ...ex,
       order: index, // keep consistent with backend ordering
     }));
-    updateWorkout(reordered);
+    syncExercises(reordered);
   };
 
   return (
@@ -746,7 +825,7 @@ export default function ActiveWorkoutSheet({
                     <TextInput
                       style={styles.workoutNameInput}
                       value={activeWorkout?.name || ""}
-                      onChangeText={updateWorkoutName}
+                      onChangeText={syncName}
                       placeholder="Workout Name"
                       placeholderTextColor="#8E8E93"
                     />
@@ -821,7 +900,7 @@ export default function ActiveWorkoutSheet({
                       <TextInput
                         style={styles.descriptionInput}
                         value={activeWorkout?.notes || ""}
-                        onChangeText={updateWorkoutNotes}
+                        onChangeText={syncNotes}
                         placeholder="Add workout description..."
                         placeholderTextColor="#8E8E93"
                         multiline
