@@ -233,11 +233,11 @@ class WorkoutSessionCreate(BaseModel):
 
 
 class WorkoutSessionUpdate(BaseModel):
-    exercises: List[WorkoutExerciseItem]
+    exercises: Optional[List[WorkoutExerciseItem]] = None
     notes: Optional[str] = None
     ended_at: Optional[datetime] = None
     name: Optional[str] = None
-    skipped: bool = False
+    skipped: Optional[bool] = False
 
 class WorkoutSession(BaseModel):
     id: Optional[str] = Field(default=None)

@@ -4,99 +4,439 @@ import { create } from "zustand";
 import type { WorkoutSession } from "../types";
 import api from "../utils/api";
 
+/**
+ * Canonical cache: byId (WorkoutSession)
+ * Paging cache (contiguous prefix only):
+ *  - orderedIds[i] is the workout id at index i of the global sort (started_at desc, _id desc)
+ *  - prefixCount means indices [0..prefixCount) are fully fetched + orderedIds filled
+ *
+ * Important rules:
+ *  - Only /workouts?start&limit advances prefixCount/orderedIds.
+ *  - /workouts/batch/{ids} hydrates byId only (does NOT grant prefix coverage).
+ */
+
 type WorkoutsStore = {
   byId: Record<string, WorkoutSession>;
   loading: boolean;
 
+  // Paging state (offset-based)
+  orderedIds: string[];
+  prefixCount: number; // contiguous coverage from 0..prefixCount
+  totalCount: number | null; // from /workouts/count
+  exhausted: boolean; // true if prefixCount reached totalCount or server returned 0
   refetchById: (id: string) => Promise<void>;
+  prependToPrefix: (session: WorkoutSession) => void;
 
+  // Count
+  ensureCount: (opts?: { force?: boolean }) => Promise<number>;
+
+  // Paging / coverage
+  ensurePrefix: (
+    targetCount: number,
+    opts?: { pageSize?: number }
+  ) => Promise<void>;
+  ensurePrefixThroughDate: (
+    minDateISO: string,
+    opts?: { pageSize?: number; maxPages?: number }
+  ) => Promise<void>;
+  ensureNextPage: (opts?: { pageSize?: number }) => Promise<void>;
+
+  // Fetch a slice by offset/limit (ensures prefix then returns)
+  getPage: (opts: {
+    start: number;
+    limit: number;
+    pageSize?: number;
+  }) => Promise<WorkoutSession[]>;
+
+  // Hydration
   getById: (id: string) => Promise<WorkoutSession | undefined>;
-  getManyByIds: (
-    ids: string[],
-    opts?: { force?: boolean }
-  ) => Promise<Record<string, WorkoutSession>>;
+  getManyByIds: (ids: string[]) => Promise<Record<string, WorkoutSession>>;
 
-  upsert: (w: WorkoutSession) => void;
-  upsertMany: (ws: WorkoutSession[]) => void;
+  // Local mutations
+  upsertMany: (sessions: WorkoutSession[]) => void;
+  upsert: (session: WorkoutSession) => void;
   patch: (id: string, partial: Partial<WorkoutSession>) => void;
   remove: (id: string) => void;
+  clear: () => void;
 };
 
-const inFlightById = new Map<string, Promise<WorkoutSession | undefined>>();
-const inFlightMany = new Map<string, Promise<Record<string, WorkoutSession>>>();
+const DEFAULT_PAGE_SIZE = 50;
+
+let inflightCount: Promise<number> | null = null;
+let inflightPrefix: Promise<void> | null = null;
+const inflightById = new Map<string, Promise<WorkoutSession | undefined>>();
+const inflightBatch = new Map<
+  string,
+  Promise<Record<string, WorkoutSession>>
+>();
+
+const stableKey = (ids: string[]) => Array.from(new Set(ids)).sort().join(",");
+
+const parseDateSafe = (s?: string) => {
+  if (!s) return null;
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
 
 export const useWorkoutsStoreInternal = create<WorkoutsStore>((set, get) => ({
   byId: {},
   loading: false,
 
-  refetchById: async id => {
-    const res = await api.get(`/workouts/${id}`);
-    const w = res.data as WorkoutSession;
-    set(s => ({ byId: { ...s.byId, [id]: w } }));
+  orderedIds: [],
+  prefixCount: 0,
+  totalCount: null,
+  exhausted: false,
+
+  ensureCount: async opts => {
+    const force = !!opts?.force;
+
+    const cached = get().totalCount;
+    if (!force && typeof cached === "number") return cached;
+
+    if (inflightCount) return inflightCount;
+
+    inflightCount = (async () => {
+      set({ loading: true });
+      try {
+        const res = await api.get("/workouts/count");
+        const count = (res.data?.count ?? 0) as number;
+        set({ totalCount: count });
+
+        // If we already have prefixCount >= count, mark exhausted.
+        const st = get();
+        if (st.prefixCount >= count) set({ exhausted: true });
+
+        return count;
+      } finally {
+        set({ loading: false });
+        inflightCount = null;
+      }
+    })();
+
+    return inflightCount;
+  },
+
+  ensurePrefix: async (targetCount, opts) => {
+    const pageSize = opts?.pageSize ?? DEFAULT_PAGE_SIZE;
+
+    // Normalize
+    targetCount = Math.max(0, Math.floor(targetCount));
+
+    // Fast-path
+    {
+      const st = get();
+      if (st.exhausted) return;
+      if (st.prefixCount >= targetCount) return;
+    }
+
+    // Dedupe: only one prefix-expansion at a time (append-only)
+    if (inflightPrefix) {
+      await inflightPrefix;
+      return;
+    }
+
+    inflightPrefix = (async () => {
+      // Try to know totalCount early (optional, but helps stop conditions)
+      try {
+        await get().ensureCount();
+      } catch {
+        // ok if count fails; we'll still stop when server returns 0
+      }
+
+      while (true) {
+        const st = get();
+
+        if (st.exhausted) return;
+        if (st.prefixCount >= targetCount) return;
+
+        // Stop if totalCount known and already reached
+        if (
+          typeof st.totalCount === "number" &&
+          st.prefixCount >= st.totalCount
+        ) {
+          set({ exhausted: true });
+          return;
+        }
+
+        const remaining = targetCount - st.prefixCount;
+        const fetchLimit = Math.max(1, Math.min(pageSize, remaining));
+
+        set({ loading: true });
+        try {
+          const res = await api.get(
+            `/workouts?start=${st.prefixCount}&limit=${fetchLimit}`
+          );
+          const sessions = (res.data ?? []) as WorkoutSession[];
+
+          if (!sessions.length) {
+            set({ exhausted: true });
+            return;
+          }
+
+          set(s => {
+            const nextById = { ...s.byId };
+            const nextOrdered = s.orderedIds.slice();
+            let nextPrefix = s.prefixCount;
+
+            for (let i = 0; i < sessions.length; i++) {
+              const w = sessions[i];
+              nextById[w.id] = w;
+              nextOrdered[nextPrefix + i] = w.id;
+            }
+
+            nextPrefix += sessions.length;
+
+            const exhaustedNow =
+              (typeof s.totalCount === "number" &&
+                nextPrefix >= s.totalCount) ||
+              false;
+
+            return {
+              byId: nextById,
+              orderedIds: nextOrdered,
+              prefixCount: nextPrefix,
+              exhausted: exhaustedNow,
+            };
+          });
+
+          // If server returned fewer than requested, assume exhausted
+          if (sessions.length < fetchLimit) {
+            set({ exhausted: true });
+            return;
+          }
+        } finally {
+          set({ loading: false });
+        }
+      }
+    })();
+
+    try {
+      await inflightPrefix;
+    } finally {
+      inflightPrefix = null;
+    }
+  },
+
+  ensurePrefixThroughDate: async (minDateISO, opts) => {
+    const pageSize = opts?.pageSize ?? DEFAULT_PAGE_SIZE;
+    const maxPages = opts?.maxPages ?? 50; // hard safety cap
+
+    const minDate = parseDateSafe(minDateISO);
+    if (!minDate) return;
+
+    // Expand until oldest in prefix is <= minDate, or exhausted
+    for (let i = 0; i < maxPages; i++) {
+      const st = get();
+      if (st.exhausted) return;
+
+      if (st.prefixCount > 0) {
+        const lastId = st.orderedIds[st.prefixCount - 1];
+        const last = lastId ? st.byId[lastId] : undefined;
+        const lastDate = parseDateSafe(last?.started_at);
+
+        if (lastDate && lastDate <= minDate) return;
+      }
+
+      // Need more
+      await get().ensurePrefix(st.prefixCount + pageSize, { pageSize });
+    }
+  },
+
+  ensureNextPage: async opts => {
+    const pageSize = opts?.pageSize ?? DEFAULT_PAGE_SIZE;
+    const st = get();
+    if (st.exhausted) return;
+    await get().ensurePrefix(st.prefixCount + pageSize, { pageSize });
+  },
+
+  prependToPrefix: session =>
+    set(s => {
+      const nextById = { ...s.byId, [session.id]: session };
+
+      // If we haven't loaded any prefix yet, just seed it.
+      if (s.prefixCount === 0) {
+        return {
+          byId: nextById,
+          orderedIds: [session.id],
+          prefixCount: 1,
+        };
+      }
+
+      // If it's already in the prefix, keep ordering stable (optional: move to front).
+      const existingIdx = s.orderedIds
+        .slice(0, s.prefixCount)
+        .indexOf(session.id);
+      if (existingIdx !== -1) {
+        // move-to-front behavior
+        const prefix = s.orderedIds.slice(0, s.prefixCount);
+        prefix.splice(existingIdx, 1);
+        prefix.unshift(session.id);
+
+        return {
+          byId: nextById,
+          orderedIds: [...prefix, ...s.orderedIds.slice(s.prefixCount)],
+        };
+      }
+
+      // Insert at the front of the prefix
+      const prefix = s.orderedIds.slice(0, s.prefixCount);
+      prefix.unshift(session.id);
+
+      // Keep prefixCount consistent: we added one known item to the prefix.
+      // NOTE: this assumes your list endpoint sorts newest-first, which it does.
+      return {
+        byId: nextById,
+        orderedIds: [...prefix, ...s.orderedIds.slice(s.prefixCount)],
+        prefixCount: s.prefixCount + 1,
+        // totalCount should also increase if you're using count-all
+        totalCount:
+          typeof s.totalCount === "number" ? s.totalCount + 1 : s.totalCount,
+      };
+    }),
+
+  getPage: async ({ start, limit, pageSize }) => {
+    start = Math.max(0, Math.floor(start));
+    limit = Math.max(1, Math.floor(limit));
+    const ps = pageSize ?? DEFAULT_PAGE_SIZE;
+
+    // Ensure prefix through endIndex
+    const end = start + limit;
+    await get().ensurePrefix(end, { pageSize: ps });
+
+    const st = get();
+
+    const ids = st.orderedIds.slice(start, Math.min(end, st.prefixCount));
+    return ids.map(id => st.byId[id]).filter(Boolean);
   },
 
   getById: async id => {
     const cached = get().byId[id];
     if (cached) return cached;
 
-    const existing = inFlightById.get(id);
+    const existing = inflightById.get(id);
     if (existing) return existing;
 
     const p = (async () => {
-      set({ loading: true });
       try {
         const res = await api.get(`/workouts/${id}`);
         const w = res.data as WorkoutSession;
         set(s => ({ byId: { ...s.byId, [id]: w } }));
         return w;
       } finally {
-        set({ loading: false });
-        inFlightById.delete(id);
+        inflightById.delete(id);
       }
     })();
 
-    inFlightById.set(id, p);
+    inflightById.set(id, p);
     return p;
   },
-  getManyByIds: async (ids: string[]) => {
-    const unique = [...new Set(ids)].filter(Boolean);
+  refetchById: async id => {
+    try {
+      const res = await api.get(`/workouts/${id}`);
+      const w = res.data as WorkoutSession;
+      set(s => ({ byId: { ...s.byId, [id]: w } }));
+    } catch {
+      // ignore
+    }
+  },
+
+  getManyByIds: async ids => {
+    const unique = Array.from(new Set(ids)).filter(Boolean);
     if (!unique.length) return {};
 
     const cached = get().byId;
     const missing = unique.filter(id => !cached[id]);
 
+    // if all cached, return subset
     if (!missing.length) {
       const out: Record<string, WorkoutSession> = {};
-      unique.forEach(id => cached[id] && (out[id] = cached[id]));
+      for (const id of unique) if (cached[id]) out[id] = cached[id];
       return out;
     }
 
-    const res = await api.get(`/workouts/batch/${missing.join(",")}`);
-    const arr = res.data as WorkoutSession[];
+    const key = stableKey(missing);
+    const existing = inflightBatch.get(key);
+    if (existing) return existing;
 
-    const map: Record<string, WorkoutSession> = {};
-    arr.forEach(w => (map[w.id] = w));
+    const p = (async () => {
+      set({ loading: true });
+      try {
+        const res = await api.get(`/workouts/batch/${missing.join(",")}`);
+        const arr = (res.data ?? []) as WorkoutSession[];
+        console.log("Fetched batch workouts:", arr.length);
+        const map: Record<string, WorkoutSession> = {};
+        for (const w of arr) map[w.id] = w;
+        set(s => ({ byId: { ...s.byId, ...map } }));
 
-    set(s => ({ byId: { ...s.byId, ...map } }));
+        const merged = { ...get().byId, ...map };
+        const out: Record<string, WorkoutSession> = {};
+        for (const id of unique) if (merged[id]) out[id] = merged[id];
+        return out;
+      } finally {
+        set({ loading: false });
+        inflightBatch.delete(key);
+      }
+    })();
 
-    return { ...cached, ...map };
+    inflightBatch.set(key, p);
+    return p;
   },
 
-  upsert: w =>
-    set(s => ({
-      byId: {
-        ...s.byId,
-        [w.id]: { ...(s.byId[w.id] ?? {}), ...w },
-      },
-    })),
-
-  upsertMany: ws =>
+  upsertMany: sessions => {
     set(s => {
-      if (!ws?.length) return s;
       const next = { ...s.byId };
-      for (const w of ws) next[w.id] = { ...(next[w.id] ?? {}), ...w };
+      for (const w of sessions) next[w.id] = w;
       return { byId: next };
-    }),
+    });
+  },
+
+  // upsert into byId, and modify orderedIds for history
+ // inside create<WorkoutsStore>((set, get) => ({ ... }))
+
+upsert: session =>
+  set(s => {
+    const nextById = { ...s.byId, [session.id]: session };
+
+    // Dedup ids (ensure session.id is included exactly once)
+    const seen = new Set<string>();
+    const ids = [session.id, ...s.orderedIds].filter(id => {
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+
+    // Robust date compare (do NOT rely on string ordering)
+    const toMs = (iso?: string) => {
+      if (!iso) return 0;
+      const t = new Date(iso).getTime();
+      return Number.isNaN(t) ? 0 : t;
+    };
+
+    // Sort by started_at DESC, then id DESC (ObjectId lexicographic works)
+    ids.sort((aId, bId) => {
+      const a = nextById[aId];
+      const b = nextById[bId];
+
+      const aMs = toMs(a?.started_at);
+      const bMs = toMs(b?.started_at);
+
+      if (aMs !== bMs) return bMs - aMs;
+
+      // tie-breaker: _id desc (ObjectId string compare is fine)
+      if (aId === bId) return 0;
+      return aId > bId ? -1 : 1;
+    });
+
+    // IMPORTANT:
+    // - We do NOT touch prefixCount here.
+    //   prefixCount should only represent "server pages fetched".
+    //   This makes upsert safe from breaking pagination.
+    return {
+      byId: nextById,
+      orderedIds: ids,
+    };
+  }),
+
 
   patch: (id, partial) =>
     set(s => {
@@ -109,85 +449,108 @@ export const useWorkoutsStoreInternal = create<WorkoutsStore>((set, get) => ({
     set(s => {
       const next = { ...s.byId };
       delete next[id];
+
+      // If it was in the ordered prefix, we keep orderedIds as-is (holes are ok),
+      // because prefix coverage represents “requested indices fetched” not “still exists”.
+      // If you want to compact after deletions, do it explicitly in one place.
       return { byId: next };
+    }),
+
+  clear: () =>
+    set({
+      byId: {},
+      orderedIds: [],
+      prefixCount: 0,
+      totalCount: null,
+      exhausted: false,
     }),
 }));
 
-type Options = {
-  // Optional: list-level utilities for screens (similar spirit to templatesStore)
-  search?: string;
-  sort?: (a: WorkoutSession, b: WorkoutSession) => number;
-
-  // Common filters
-  hasEnded?: boolean; // true = completed (ended_at set), false = in-progress
-  plannedWorkoutId?: string; // filter by planned_workout_id
-  templateId?: string; // filter by template_id
-};
-
-export function useWorkouts(opts?: Options) {
+// Hook
+export function useWorkouts() {
   const byId = useWorkoutsStoreInternal(s => s.byId);
   const loading = useWorkoutsStoreInternal(s => s.loading);
 
-  const refetchById = useWorkoutsStoreInternal(s => s.refetchById);
+  const orderedIds = useWorkoutsStoreInternal(s => s.orderedIds);
+  const prefixCount = useWorkoutsStoreInternal(s => s.prefixCount);
+  const totalCount = useWorkoutsStoreInternal(s => s.totalCount);
+  const exhausted = useWorkoutsStoreInternal(s => s.exhausted);
+
+  const ensureCount = useWorkoutsStoreInternal(s => s.ensureCount);
+  const ensurePrefix = useWorkoutsStoreInternal(s => s.ensurePrefix);
+  const ensurePrefixThroughDate = useWorkoutsStoreInternal(
+    s => s.ensurePrefixThroughDate
+  );
+  const getPage = useWorkoutsStoreInternal(s => s.getPage);
+
   const getById = useWorkoutsStoreInternal(s => s.getById);
   const getManyByIds = useWorkoutsStoreInternal(s => s.getManyByIds);
 
-  const upsert = useWorkoutsStoreInternal(s => s.upsert);
   const upsertMany = useWorkoutsStoreInternal(s => s.upsertMany);
+  const upsert = useWorkoutsStoreInternal(s => s.upsert);
   const patch = useWorkoutsStoreInternal(s => s.patch);
   const remove = useWorkoutsStoreInternal(s => s.remove);
+  const clear = useWorkoutsStoreInternal(s => s.clear);
+  const ensureNextPage = useWorkoutsStoreInternal(s => s.ensureNextPage);
+  const prependToPrefix = useWorkoutsStoreInternal(s => s.prependToPrefix);
 
-  const list = useMemo(() => {
-    let arr = Object.values(byId);
+  const hasMore = useMemo(() => {
+    if (exhausted) return false;
+    if (typeof totalCount === "number") return prefixCount < totalCount;
+    return true;
+  }, [exhausted, prefixCount, totalCount]);
 
-    if (typeof opts?.hasEnded === "boolean") {
-      arr = arr.filter(w => (opts.hasEnded ? !!w.ended_at : !w.ended_at));
-    }
+  const sessionsPrefix = useMemo(() => {
+    const ids = orderedIds.slice(0, prefixCount);
+    return ids.map(id => byId[id]).filter(Boolean);
+  }, [orderedIds, prefixCount, byId]);
 
-    if (opts?.plannedWorkoutId) {
-      arr = arr.filter(w => w.planned_workout_id === opts.plannedWorkoutId);
-    }
+  const historySessions = useMemo(() => {
+    return sessionsPrefix.filter(w => !!w.ended_at);
+  }, [sessionsPrefix]);
 
-    if (opts?.templateId) {
-      arr = arr.filter(w => w.template_id === opts.templateId);
-    }
-
-    const search = opts?.search?.trim();
-    if (search) {
-      const q = search.toLowerCase();
-      arr = arr.filter(w => {
-        const name = (w.name ?? "").toLowerCase();
-        const notes = (w.notes ?? "").toLowerCase();
-        return name.includes(q) || notes.includes(q);
-      });
-    }
-
-    if (opts?.sort) arr = [...arr].sort(opts.sort);
-
-    return arr;
-  }, [
-    byId,
-    opts?.hasEnded,
-    opts?.plannedWorkoutId,
-    opts?.templateId,
-    opts?.search,
-    opts?.sort,
-  ]);
+  // Effects
+  useEffect(() => {
+    // On mount, ensure we know totalCount
+    ensureCount().catch(() => {});
+  }, [ensureCount]);
 
   return {
     byId,
     loading,
-    refetchById,
+    prependToPrefix,
+    // paging state
+    orderedIds,
+    prefixCount,
+    totalCount,
+    exhausted,
+
+    // derived lists
+    sessionsPrefix,
+    historySessions,
+
+    // methods
+    ensureCount,
+    ensurePrefix,
+    ensurePrefixThroughDate,
+    ensureNextPage,
+    hasMore,
+    getPage,
+
     getById,
     getManyByIds,
-    upsert,
+
     upsertMany,
+    upsert,
     patch,
     remove,
-    list,
+    clear,
   };
 }
 
+/**
+ * Convenience hook: stateful single-workout fetch pattern.
+ */
 export function useWorkout(workoutId: string | null | undefined) {
   const byId = useWorkoutsStoreInternal(s => s.byId);
   const getById = useWorkoutsStoreInternal(s => s.getById);

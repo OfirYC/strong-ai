@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -11,9 +11,17 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { format, parseISO, isToday, isYesterday } from "date-fns";
 import { useRouter } from "expo-router";
-import api from "../../utils/api";
-import { WorkoutSummary } from "../../types";
 import { LoadingData } from "../../components/LoadingData";
+import type {
+  WorkoutSession,
+  WorkoutSummary,
+  ExerciseKind,
+  WorkoutExerciseSummary,
+} from "../../types";
+import { formatDuration } from "../../types";
+import { useWorkouts } from "../../store/workoutsStore";
+import { useExercises } from "../../store/exercisesStore";
+import { usePRs } from "../../store/prsStore";
 
 interface GroupedWorkouts {
   title: string;
@@ -21,43 +29,197 @@ interface GroupedWorkouts {
   data: WorkoutSummary[];
 }
 
+// ------------------ local summary compute ------------------
+const estimate1RM_Brzycki = (weight: number, reps: number) => {
+  if (weight <= 0 || reps <= 0) return 0;
+  if (reps >= 37) return weight;
+  return weight * (36 / (37 - reps));
+};
+
+const bestSetDisplay = (
+  kind: ExerciseKind,
+  best: { w: number; r: number; d: number }
+) => {
+  if (kind === "Cardio" || kind === "Duration") {
+    return best.d > 0 ? formatDuration(best.d) : "0:00";
+  }
+  if (kind === "Reps Only") {
+    return best.r > 0 ? `${best.r} reps` : "-";
+  }
+  if (best.w > 0 && best.r > 0) return `${best.w}kg × ${best.r}`;
+  if (best.r > 0) return `${best.r} reps`;
+  return "-";
+};
+
+function computeWorkoutSummaryFromSession(args: {
+  session: WorkoutSession;
+  exercisesById: Record<string, any>;
+}): WorkoutSummary {
+  const { session, exercisesById } = args;
+
+  const started = new Date(session.started_at);
+  const ended = session.ended_at ? new Date(session.ended_at) : null;
+
+  const duration_seconds =
+    ended && !Number.isNaN(+ended) && !Number.isNaN(+started)
+      ? Math.max(0, Math.floor((+ended - +started) / 1000))
+      : 0;
+
+  let set_count = 0;
+  let total_volume_kg = 0;
+
+  const exercises: WorkoutExerciseSummary[] = (session.exercises ?? []).map(
+    ex => {
+      const meta = exercisesById[ex.exercise_id];
+      const name = meta?.name ?? "Unknown Exercise";
+      const kind = (meta?.exercise_kind ?? "Barbell") as ExerciseKind;
+
+      set_count += (ex.sets ?? []).length;
+
+      let best = { w: 0, r: 0, d: 0 };
+      let bestE1RM = 0;
+
+      for (const s of ex.sets ?? []) {
+        const setType = s.set_type ?? "normal";
+        if (setType === "warmup" || setType === "cooldown") continue;
+
+        const w = s.weight ?? 0;
+        const r = s.reps ?? 0;
+        const d = s.duration ?? 0;
+
+        if (w > 0 && r > 0) total_volume_kg += w * r;
+
+        const e1rm = estimate1RM_Brzycki(w, r);
+        if (e1rm > bestE1RM) {
+          bestE1RM = e1rm;
+          best.w = w;
+          best.r = r;
+        }
+
+        if (d > best.d) best.d = d;
+        if (kind === "Reps Only" && r > best.r) best.r = r;
+      }
+
+      return {
+        exercise_id: ex.exercise_id,
+        name,
+        exercise_kind: kind,
+        set_count: (ex.sets ?? []).length,
+        best_set_display: bestSetDisplay(kind, best),
+        estimated_1rm: bestE1RM > 0 ? bestE1RM : undefined,
+      };
+    }
+  );
+
+  return {
+    id: session.id,
+    name: session.name,
+    started_at: session.started_at,
+    ended_at: session.ended_at,
+    duration_seconds,
+    exercise_count: (session.exercises ?? []).length,
+    set_count,
+    total_volume_kg,
+    pr_count: 0,
+    exercises,
+  };
+}
+// ----------------------------------------------------------
+
 export default function HistoryScreen() {
   const router = useRouter();
-  const [workouts, setWorkouts] = useState<WorkoutSummary[]>([]);
-  const [loading, setLoading] = useState(false);
+
+  const PAGE_SIZE = 50;
+
+  // Workouts store (canonical sessions cache + paging)
+  const {
+    historySessions,
+    ensureNextPage, // assumes you added this to the hook as discussed
+    ensureCount,
+    hasMore, // optional but recommended
+    loading: workoutsLoading,
+    clear, // optional, only if you want full reset on refresh
+  } = useWorkouts();
+
+  // Needed to compute summaries locally (names/kinds + PR counts)
+  const { byId: exercisesById, getAll: getAllExercises } = useExercises();
+
   const [refreshing, setRefreshing] = useState(false);
+  const [bootLoading, setBootLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
+  // initial boot: load supporting caches + first page
   useEffect(() => {
-    loadWorkouts();
-  }, []);
+    let cancelled = false;
 
-  const loadWorkouts = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get("/workouts/history");
-      setWorkouts(response.data);
-    } catch (error) {
-      console.error("Failed to load workouts:", error);
-    } finally {
-      setLoading(false);
+    if (historySessions.length > 0) {
+      setBootLoading(false);
+      return;
     }
-  };
+
+    (async () => {
+      try {
+        setBootLoading(true);
+
+        // load first page
+        await ensureNextPage({ pageSize: PAGE_SIZE });
+      } finally {
+        if (!cancelled) setBootLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ensureCount, getAllExercises, ensureNextPage]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await loadWorkouts();
-    setRefreshing(false);
-  }, []);
+    try {
+      // Optional: full reset then reload page 1
+      // If you don't want to clear cache globally, remove these two lines
+      clear?.();
+
+      await Promise.all([
+        ensureCount({ force: true }).catch(() => {}),
+        getAllExercises().catch(() => {}),
+      ]);
+
+      await ensureNextPage({ pageSize: PAGE_SIZE });
+    } finally {
+      setRefreshing(false);
+    }
+  }, [clear, ensureCount, getAllExercises, ensureNextPage]);
+
+  const onEndReached = useCallback(async () => {
+    if (loadingMore) return;
+    if (hasMore === false) return;
+
+    setLoadingMore(true);
+    try {
+      await ensureNextPage({ pageSize: PAGE_SIZE });
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [ensureNextPage, loadingMore, hasMore]);
+
+  // Convert cached sessions -> WorkoutSummary[] for UI
+  const workouts = useMemo(() => {
+    return historySessions.map(session =>
+      computeWorkoutSummaryFromSession({
+        session,
+        exercisesById,
+      })
+    );
+  }, [historySessions, exercisesById]);
 
   // Group workouts by date
-  const groupedWorkouts = React.useMemo((): GroupedWorkouts[] => {
+  const groupedWorkouts = useMemo((): GroupedWorkouts[] => {
     const groups: { [key: string]: WorkoutSummary[] } = {};
 
     workouts.forEach(workout => {
       const date = format(parseISO(workout.started_at), "yyyy-MM-dd");
-      if (!groups[date]) {
-        groups[date] = [];
-      }
+      if (!groups[date]) groups[date] = [];
       groups[date].push(workout);
     });
 
@@ -65,38 +227,24 @@ export default function HistoryScreen() {
       const parsedDate = parseISO(date);
       let title: string;
 
-      if (isToday(parsedDate)) {
-        title = "Today";
-      } else if (isYesterday(parsedDate)) {
-        title = "Yesterday";
-      } else {
-        title = format(parsedDate, "EEEE, MMM d, yyyy");
-      }
+      if (isToday(parsedDate)) title = "Today";
+      else if (isYesterday(parsedDate)) title = "Yesterday";
+      else title = format(parsedDate, "EEEE, MMM d, yyyy");
 
       return { title, date, data };
     });
   }, [workouts]);
 
-  const formatDuration = (seconds: number): string => {
+  const formatDurationMinutes = (seconds: number): string => {
     const totalMins = Math.round(seconds / 60);
-
-    if (totalMins < 60) {
-      return `${totalMins}m`;
-    }
-
+    if (totalMins < 60) return `${totalMins}m`;
     const hours = Math.floor(totalMins / 60);
     const mins = totalMins % 60;
-
-    // pad minutes to always 2 digits (e.g., 1:05)
-    const paddedMins = mins.toString().padStart(2, "0");
-
-    return `${hours}h ${paddedMins}m`;
+    return `${hours}h ${mins.toString().padStart(2, "0")}m`;
   };
 
   const formatVolume = (kg: number): string => {
-    if (kg >= 1000) {
-      return `${(kg / 1000).toFixed(1)}k`;
-    }
+    if (kg >= 1000) return `${(kg / 1000).toFixed(1)}k`;
     return `${Math.round(kg)}`;
   };
 
@@ -146,7 +294,7 @@ export default function HistoryScreen() {
           <View style={styles.statItem}>
             <Ionicons name="time-outline" size={16} color="#007AFF" />
             <Text style={styles.statText}>
-              {formatDuration(item.duration_seconds)}
+              {formatDurationMinutes(item.duration_seconds)}
             </Text>
           </View>
         </View>
@@ -159,6 +307,8 @@ export default function HistoryScreen() {
       <Text style={styles.sectionTitle}>{section.title}</Text>
     </View>
   );
+
+  const showEmptyLoading = bootLoading || workoutsLoading;
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -175,8 +325,17 @@ export default function HistoryScreen() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+        onEndReached={onEndReached}
+        onEndReachedThreshold={0.6}
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={styles.footerLoading}>
+              <LoadingData loadingTitle="Loading more..." />
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
-          loading ? (
+          showEmptyLoading ? (
             <LoadingData loadingTitle="Loading Workouts..." />
           ) : (
             <View style={styles.emptyState}>
@@ -195,28 +354,13 @@ export default function HistoryScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F5F5F7",
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 16,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#1C1C1E",
-  },
-  listContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 100,
-  },
-  sectionHeader: {
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
+  container: { flex: 1, backgroundColor: "#F5F5F7" },
+  header: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16 },
+  title: { fontSize: 32, fontWeight: "bold", color: "#1C1C1E" },
+
+  listContent: { paddingHorizontal: 20, paddingBottom: 100 },
+
+  sectionHeader: { paddingTop: 16, paddingBottom: 8 },
   sectionTitle: {
     fontSize: 15,
     fontWeight: "600",
@@ -224,6 +368,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
+
   workoutCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
@@ -238,36 +383,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 12,
   },
-  cardTitleContainer: {
-    flex: 1,
-    marginRight: 12,
-  },
-  workoutName: {
-    fontSize: 17,
-    fontWeight: "600",
-    color: "#1C1C1E",
-  },
-  workoutTime: {
-    fontSize: 15,
-    color: "#8E8E93",
-  },
-  statsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  statItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  statText: {
-    fontSize: 13,
-    color: "#6E6E73",
-  },
-  emptyState: {
-    alignItems: "center",
-    paddingVertical: 64,
-  },
+  cardTitleContainer: { flex: 1, marginRight: 12 },
+  workoutName: { fontSize: 17, fontWeight: "600", color: "#1C1C1E" },
+  workoutTime: { fontSize: 15, color: "#8E8E93" },
+
+  statsRow: { flexDirection: "row", justifyContent: "space-between" },
+  statItem: { flexDirection: "row", alignItems: "center", gap: 4 },
+  statText: { fontSize: 13, color: "#6E6E73" },
+
+  emptyState: { alignItems: "center", paddingVertical: 64 },
   emptyText: {
     fontSize: 18,
     fontWeight: "600",
@@ -280,4 +404,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: "center",
   },
+
+  footerLoading: { paddingVertical: 12 },
 });

@@ -36,6 +36,7 @@ import ExercisePickerModal from "./ExercisePickerModal";
 import SetRowInput, { SetHeader } from "./SetRowInput";
 import SwipeToDeleteRow from "./SwipeToDeleteRow";
 import WorkoutCompleteModal from "./WorkoutCompleteModal";
+import { useWorkoutCompleteUIStore } from "../store/workoutCompleteUIStore";
 
 interface WorkoutSummaryData {
   name: string;
@@ -80,7 +81,7 @@ export default function ActiveWorkoutSheet({
     patch: patchWorkout,
     upsert: upsertWorkout,
     remove: removeWorkout,
-    list: workoutsList,
+    totalCount,
   } = useWorkouts();
   const activeWorkoutId = activeWorkout?.id;
 
@@ -97,29 +98,33 @@ export default function ActiveWorkoutSheet({
     updateWorkout(nextExercises, nextNotes, nextName);
 
     // 2) Update canonical workouts store (optimistic)
+    console.log("Syncing workout patch:");
     patchWorkout(activeWorkoutId, partial);
   };
 
   const syncExercises = (nextExercises: WorkoutExercise[]) => {
     if (!activeWorkoutId) return;
     updateWorkout(nextExercises);
+    console.log("Patching workout");
     patchWorkout(activeWorkoutId, { exercises: nextExercises });
   };
 
   const syncName = (name: string) => {
     if (!activeWorkoutId) return;
     updateWorkoutName(name);
+    console.log("Patching workout name");
     patchWorkout(activeWorkoutId, { name });
   };
 
   const syncNotes = (notes: string | undefined) => {
     if (!activeWorkoutId) return;
     updateWorkoutNotes(notes);
+    console.log("Patching workout notes");
     patchWorkout(activeWorkoutId, { notes });
   };
 
-  const workoutName = activeWorkout?.name ?? "";
-  const workoutNotes = activeWorkout?.notes ?? "";
+  const workoutName = activeWorkout?.name;
+  const workoutNotes = activeWorkout?.notes;
   const [debouncedName] = useDebounce(workoutName, 800);
   const [debouncedNotes] = useDebounce(workoutNotes, 800);
   const [isExpanded, setIsExpanded] = useState(initialExpanded);
@@ -137,9 +142,7 @@ export default function ActiveWorkoutSheet({
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(
     null
   );
-  const [showWorkoutComplete, setShowWorkoutComplete] = useState(false);
-  const [workoutSummary, setWorkoutSummary] =
-    useState<WorkoutSummaryData | null>(null);
+
   const [isDraggingList, setIsDraggingList] = useState(false);
   const [extraTopPadding, setExtraTopPadding] = useState(0);
   const {
@@ -148,6 +151,7 @@ export default function ActiveWorkoutSheet({
     upsert,
     loading: exercisesLoading,
   } = useExercises();
+  const { openWorkoutComplete } = useWorkoutCompleteUIStore();
 
   // NEW: track scroll position for timer fade
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -297,7 +301,10 @@ export default function ActiveWorkoutSheet({
     }
   }, [activeWorkout?.exercises, exercisesById, refetchById]);
 
-  const lastCommittedRef = useRef<{ name: string; notes: string }>({
+  const lastCommittedRef = useRef<{
+    name: string | undefined;
+    notes: string | undefined;
+  }>({
     name: workoutName,
     notes: workoutNotes,
   });
@@ -314,6 +321,20 @@ export default function ActiveWorkoutSheet({
 
     const commit = async () => {
       try {
+        console.log(
+          "Sending Debounced Meta",
+          JSON.stringify(
+            {
+              debouncedName,
+              debouncedNotes,
+              workoutName,
+              workoutNotes,
+              activeWorkout,
+            },
+            null,
+            2
+          )
+        );
         await api.put(`/workouts/${activeWorkout.id}`, {
           name: debouncedName,
           notes: debouncedNotes,
@@ -520,11 +541,10 @@ export default function ActiveWorkoutSheet({
         ended_at: new Date().toISOString(),
       });
 
-      endWorkout();
       upsertWorkout(response.data as WorkoutSession);
-
+      endWorkout();
       // Get workout count for summary
-      const workoutNumber = workoutsList.length;
+      const workoutNumber = (totalCount || 0) + 1;
 
       // Build exercise summaries (use saved exercises, not original)
       const exerciseSummaries = exercisesToSave.map(ex => {
@@ -602,9 +622,8 @@ export default function ActiveWorkoutSheet({
         workoutNumber: workoutNumber,
       };
 
-      setWorkoutSummary(summary);
+      openWorkoutComplete(summary);
       collapse();
-      setShowWorkoutComplete(true);
     } catch (error: any) {
       console.error("Save error:", error.response?.data || error);
       Alert.alert(
@@ -614,12 +633,6 @@ export default function ActiveWorkoutSheet({
     } finally {
       setSaving(false);
     }
-  };
-
-  const handleCloseWorkoutComplete = () => {
-    setShowWorkoutComplete(false);
-    setWorkoutSummary(null);
-    onFinishWorkout();
   };
 
   const handleToggleDescription = () => {
@@ -714,7 +727,6 @@ export default function ActiveWorkoutSheet({
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  if (!activeWorkout) return null;
   const handleReorderExercises = (data: WorkoutExercise[]) => {
     const reordered = data.map((ex, index) => ({
       ...ex,
@@ -722,6 +734,10 @@ export default function ActiveWorkoutSheet({
     }));
     syncExercises(reordered);
   };
+
+  if (!activeWorkout) {
+    return null;
+  }
 
   return (
     <>
@@ -1142,12 +1158,6 @@ export default function ActiveWorkoutSheet({
           upsert(ex);
           setSelectedExercise(ex);
         }}
-      />
-
-      <WorkoutCompleteModal
-        visible={showWorkoutComplete}
-        onClose={handleCloseWorkoutComplete}
-        summaryData={workoutSummary}
       />
     </>
   );

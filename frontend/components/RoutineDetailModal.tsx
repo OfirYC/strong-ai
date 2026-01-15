@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -12,8 +12,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useExercises } from "../store/exercisesStore";
+import { useWorkouts } from "../store/workoutsStore";
 import { Exercise, WorkoutTemplate } from "../types";
-import api from "../utils/api";
 import { EditRoutineModal, EditRoutineModalProps } from "./EditRoutineModal";
 import ExerciseDetailModal from "./ExerciseDetailModal";
 
@@ -26,12 +26,6 @@ interface RoutineDetailModalProps {
   onRoutineEdited: EditRoutineModalProps["onRoutineEdited"];
 }
 
-interface ExerciseWithDetails {
-  exercise_id: string;
-  sets: number;
-  exercise?: Exercise;
-}
-
 export default function RoutineDetailModal({
   visible,
   routine,
@@ -42,6 +36,9 @@ export default function RoutineDetailModal({
 }: RoutineDetailModalProps) {
   const { byId, loading: exercisesLoading, getById } = useExercises();
 
+  // Workouts store (canonical session cache)
+  const { historySessions, ensurePrefix, exhausted } = useWorkouts();
+
   const [loading, setLoading] = useState(false);
   const [lastPerformed, setLastPerformed] = useState<string | null>(null);
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(
@@ -50,47 +47,93 @@ export default function RoutineDetailModal({
   const [showExerciseDetail, setShowExerciseDetail] = useState(false);
   const [showEditRoutineModal, setShowEditRoutineModal] = useState(false);
 
+  // Prefetch exercises used in routine
   useEffect(() => {
-    if (visible && routine) {
-      loadLastPerformed();
+    if (!routine || routine.exercises.length === 0) return;
+
+    const nonAvailableExercises = routine.exercises.filter(
+      ex => !byId[ex.exercise_id]
+    );
+    if (nonAvailableExercises.length === 0) {
+      setLoading(false);
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, routine]);
 
-  const loadLastPerformed = async () => {
-    if (!routine) return;
+    setLoading(true);
+    Promise.all(nonAvailableExercises.map(ex => getById(ex.exercise_id)))
+      .catch(err => {
+        console.error("Failed to load routine exercises:", err);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [routine, routine?.exercises, byId, getById]);
 
-    try {
-      // Get workouts that used this template
-      const response = await api.get("/workouts/history");
-      const workouts = response.data;
+  // Compute last performed using store-backed historySessions (ended_at != null)
+  useEffect(() => {
+    if (!visible || !routine) return;
 
-      // Find the most recent workout using this template
-      const templateWorkout = workouts.find(
-        (w: any) => w.template_id === routine.id
-      );
+    let cancelled = false;
 
-      if (templateWorkout) {
-        const date = new Date(templateWorkout.started_at);
-        const now = new Date();
-        const diffTime = Math.abs(now.getTime() - date.getTime());
-        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    const computeLabel = (startedAtISO: string) => {
+      const date = new Date(startedAtISO);
+      const now = new Date();
+      const diffTime = Math.abs(now.getTime() - date.getTime());
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
-        if (diffDays === 0) {
-          setLastPerformed("Today");
-        } else if (diffDays === 1) {
-          setLastPerformed("Yesterday");
-        } else {
-          setLastPerformed(`${diffDays} days ago`);
+      if (diffDays === 0) return "Today";
+      if (diffDays === 1) return "Yesterday";
+      return `${diffDays} days ago`;
+    };
+
+    const findMostRecentTemplateSession = () => {
+      // historySessions are derived from prefix cache and should already be sorted newest->older
+      // because paging returns newest->older and we compute from prefix.
+      return historySessions.find(s => s.template_id === routine.id);
+    };
+
+    const loadLastPerformed = async () => {
+      try {
+        // First attempt: use whatever is already cached
+        let match = findMostRecentTemplateSession();
+        if (match?.started_at) {
+          if (!cancelled) setLastPerformed(computeLabel(match.started_at));
+          return;
         }
-      } else {
-        setLastPerformed(null);
+
+        // If not found, progressively fetch a few more pages and retry.
+        // We cap attempts so this modal doesn't become a “fetch the whole DB” spinner.
+        const PAGE_SIZE = 50;
+        const MAX_PAGES_TO_TRY = 6; // 300 sessions max attempt
+
+        for (let i = 0; i < MAX_PAGES_TO_TRY; i++) {
+          if (cancelled) return;
+          if (exhausted) break;
+          console.log("Ensuring Prefix RoutineDetailModal lastPerformed");
+          // Ask store to extend the prefix by one page each time
+          await ensurePrefix((i + 1) * PAGE_SIZE, { pageSize: PAGE_SIZE });
+
+          match = findMostRecentTemplateSession();
+          if (match?.started_at) {
+            if (!cancelled) setLastPerformed(computeLabel(match.started_at));
+            return;
+          }
+        }
+
+        // Still not found
+        if (!cancelled) setLastPerformed(null);
+      } catch (e) {
+        console.error("Failed to compute last performed:", e);
+        if (!cancelled) setLastPerformed(null);
       }
-    } catch (error) {
-      console.error("Failed to load last performed:", error);
-      setLastPerformed(null);
-    }
-  };
+    };
+
+    loadLastPerformed();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, routine?.id, historySessions, ensurePrefix, exhausted]);
 
   const handleStartWorkout = () => {
     if (routine) {
@@ -104,25 +147,6 @@ export default function RoutineDetailModal({
   };
 
   const showLoading = loading || exercisesLoading;
-
-  useEffect(() => {
-    if (!routine || routine.exercises.length === 0) return;
-    const nonAvailableExercises = routine.exercises.filter(
-      ex => !byId[ex.exercise_id]
-    );
-    if (nonAvailableExercises.length === 0) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    Promise.all(nonAvailableExercises.map(ex => getById(ex.exercise_id)))
-      .catch(err => {
-        console.error("Failed to load routine exercises:", err);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, [routine, routine?.exercises, routine?.exercises.length, byId]);
 
   if (!routine) return null;
 
@@ -149,19 +173,17 @@ export default function RoutineDetailModal({
               <TouchableOpacity onPress={onClose} style={styles.headerButton}>
                 <Ionicons name="close" size={28} color="#1C1C1E" />
               </TouchableOpacity>
+
               <Text style={styles.headerTitle} numberOfLines={1}>
                 {routine.name}
               </Text>
-              {handleEditRoutine ? (
-                <TouchableOpacity
-                  onPress={handleEditRoutine}
-                  style={{ width: 60, alignItems: "flex-end" }}
-                >
-                  <Text style={styles.editText}>Edit</Text>
-                </TouchableOpacity>
-              ) : (
-                <View style={styles.headerButton} />
-              )}
+
+              <TouchableOpacity
+                onPress={handleEditRoutine}
+                style={{ width: 60, alignItems: "flex-end" }}
+              >
+                <Text style={styles.editText}>Edit</Text>
+              </TouchableOpacity>
             </View>
 
             {/* Last Performed */}
@@ -261,6 +283,7 @@ export default function RoutineDetailModal({
                   <Text style={styles.scheduleButtonText}>Schedule</Text>
                 </TouchableOpacity>
               )}
+
               <TouchableOpacity
                 style={[
                   styles.startButton,
@@ -284,8 +307,6 @@ export default function RoutineDetailModal({
           setSelectedExercise(null);
         }}
         onExerciseUpdated={(newExercise: Exercise) => {
-          // store already updated by ExerciseDetailModal (upsert there),
-          // but keep local selectedExercise in sync so modal reflects changes immediately
           setSelectedExercise(newExercise);
         }}
       />

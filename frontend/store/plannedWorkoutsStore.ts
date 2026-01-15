@@ -1,5 +1,5 @@
 // store/plannedWorkoutsStore.ts
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { create } from "zustand";
 import api from "../utils/api";
 
@@ -313,6 +313,14 @@ export function usePlannedWorkouts(opts?: Options) {
   const patch = usePlannedWorkoutsStoreInternal(s => s.patch);
   const remove = usePlannedWorkoutsStoreInternal(s => s.remove);
 
+  const instanceId = useRef(Math.random().toString(36).substring(2, 8));
+  useEffect(() => {
+    console.log(
+      "Planned ByID CHanged",
+      instanceId.current,
+      Object.entries(byId).length
+    );
+  }, [byId]);
   useEffect(() => {
     // Mirrors templatesStore: do an initial load if caller provided date/range.
     if (opts?.date) {

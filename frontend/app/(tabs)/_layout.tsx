@@ -1,38 +1,51 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import { Tabs } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { useWorkoutStore } from '../../store/workoutStore';
-import { useAuthStore } from '../../store/authStore';
-import ActiveWorkoutSheet from '../../components/ActiveWorkoutSheet';
-import AIChatModal from '../../components/AIChatModal';
+import { Ionicons } from "@expo/vector-icons";
+import { Tabs } from "expo-router";
+import React, { useState } from "react";
+import { StyleSheet, TouchableOpacity, View } from "react-native";
+import ActiveWorkoutSheet from "../../components/ActiveWorkoutSheet";
+import AIChatModal from "../../components/AIChatModal";
+import WorkoutCompleteModal from "../../components/WorkoutCompleteModal";
+import { useAuthStore } from "../../store/authStore";
+import { useWorkoutCompleteUIStore } from "../../store/workoutCompleteUIStore";
+import { useWorkoutStore } from "../../store/workoutStore";
 
 export default function TabLayout() {
   const { activeWorkout } = useWorkoutStore();
   const { user } = useAuthStore();
-  const [sheetExpanded, setSheetExpanded] = useState(false);
+
   const [showAIChat, setShowAIChat] = useState(false);
+
+  const workoutCompleteVisible = useWorkoutCompleteUIStore(
+    s => s.workoutCompleteVisible
+  );
+  const workoutCompleteSummary = useWorkoutCompleteUIStore(
+    s => s.workoutCompleteSummary
+  );
+  const closeWorkoutComplete = useWorkoutCompleteUIStore(
+    s => s.closeWorkoutComplete
+  );
 
   return (
     <View style={styles.container}>
       <Tabs
         screenOptions={{
           headerShown: false,
-          tabBarActiveTintColor: '#007AFF',
-          tabBarInactiveTintColor: '#8E8E93',
+          tabBarActiveTintColor: "#007AFF",
+          tabBarInactiveTintColor: "#8E8E93",
           tabBarStyle: {
-            backgroundColor: '#FFFFFF',
-            borderTopColor: '#D1D1D6',
+            backgroundColor: "#FFFFFF",
+            borderTopColor: "#D1D1D6",
             paddingTop: 8,
             paddingBottom: 8,
             height: 60,
           },
         }}
       >
+        {/* screens unchanged */}
         <Tabs.Screen
           name="workout"
           options={{
-            title: 'Workout',
+            title: "Workout",
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="barbell" size={size} color={color} />
             ),
@@ -41,7 +54,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="history"
           options={{
-            title: 'History',
+            title: "History",
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="time" size={size} color={color} />
             ),
@@ -50,7 +63,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="routines"
           options={{
-            title: 'Routines',
+            title: "Routines",
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="list" size={size} color={color} />
             ),
@@ -59,7 +72,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="exercises"
           options={{
-            title: 'Exercises',
+            title: "Exercises",
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="fitness" size={size} color={color} />
             ),
@@ -68,19 +81,25 @@ export default function TabLayout() {
         <Tabs.Screen
           name="profile"
           options={{
-            title: 'Profile',
+            title: "Profile",
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="person" size={size} color={color} />
             ),
           }}
         />
       </Tabs>
-      
-      {activeWorkout && (
-        <ActiveWorkoutSheet 
-          onFinishWorkout={() => {}}
-        />
-      )}
+
+      {activeWorkout && <ActiveWorkoutSheet onFinishWorkout={() => {}} />}
+
+      {/* Completion modal lives OUTSIDE the activeWorkout conditional */}
+      <WorkoutCompleteModal
+        visible={workoutCompleteVisible}
+        summaryData={workoutCompleteSummary}
+        onClose={() => {
+          closeWorkoutComplete();
+          // optional: navigate or do other post-finish behavior here
+        }}
+      />
 
       {/* Floating AI Chat Button */}
       {user && (
@@ -95,27 +114,21 @@ export default function TabLayout() {
         </TouchableOpacity>
       )}
 
-      {/* AI Chat Modal */}
-      <AIChatModal
-        visible={showAIChat}
-        onClose={() => setShowAIChat(false)}
-      />
+      <AIChatModal visible={showAIChat} onClose={() => setShowAIChat(false)} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   aiButton: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 80,
     right: 20,
     width: 60,
     height: 60,
     borderRadius: 30,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -125,8 +138,8 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#007AFF',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "#007AFF",
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

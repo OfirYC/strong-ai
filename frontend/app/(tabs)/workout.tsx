@@ -78,6 +78,22 @@ export default function WorkoutScreen() {
     for (const pw of todaysPlannedBase) {
       if (pw.workout_session_id) ids.add(pw.workout_session_id);
     }
+
+    // console.log(
+    //   "POO ID",
+    //   // Object.entries(workoutsById).find(([k, v]) => v.name === "POOO"),
+    //   todaysPlannedBase.find(
+    //     p =>
+    //       p.workout_session_id ==
+    //       Object.entries(workoutsById).find(([k, v]) => v.name === "POOO")![1]
+    //         .id
+    //   ),
+
+    //   ids.has(
+    //     Object.entries(workoutsById).find(([k, v]) => v.name === "POOO")![1].id
+    //   )
+    // );
+
     return Array.from(ids);
   }, [todaysPlannedBase]);
 
@@ -171,7 +187,7 @@ export default function WorkoutScreen() {
       setLoading(true);
       const response = await api.post("/workouts", { notes: "" });
       startWorkout(response.data);
-      workoutsStore.getState().upsert(response.data);
+      // workoutsStore.getState().upsert(response.data);
     } catch (error: any) {
       console.error(error);
       Alert.alert("Error", "Failed to start workout");
@@ -405,7 +421,9 @@ export default function WorkoutScreen() {
 
   // Enrich planned workouts using workoutsStore (single source of truth for workout session fields)
   const todaysWorkouts: EnrichedPlannedWorkout[] = useMemo(() => {
-    return (todaysPlannedBase ?? []).map(pw => {
+    // todaysPlannedBase and also the ongoing workouts
+
+    const plannedTodaysWorkouts = (todaysPlannedBase ?? []).map(pw => {
       const sid = pw.workout_session_id;
       if (!sid) return pw as EnrichedPlannedWorkout;
 
@@ -418,6 +436,8 @@ export default function WorkoutScreen() {
         actualNotes: session.notes ?? pw.notes,
       };
     });
+
+    return plannedTodaysWorkouts;
   }, [todaysPlannedBase, workoutsById]);
 
   return (

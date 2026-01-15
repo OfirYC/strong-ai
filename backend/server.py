@@ -100,7 +100,7 @@ async def get_current_user_ws(ws: WebSocket) -> str:
 @api_router.post("/auth/register", response_model=UserResponse)
 async def register(user_data: UserCreate):
     # Check if user exists
-    existing_user = await get_db(user_id).users.find_one({"email": user_data.email})
+    existing_user = await db.users.find_one({"email": user_data.email})
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     
@@ -111,7 +111,7 @@ async def register(user_data: UserCreate):
         password_hash=password_hash
     )
     
-    result = await get_db(user_id).users.insert_one(user.dict(by_alias=True, exclude={"id"}))
+    result = await db.users.insert_one(user.dict(by_alias=True, exclude={"id"}))
     user_id = str(result.inserted_id)
     
     # Create token
@@ -123,7 +123,7 @@ async def register(user_data: UserCreate):
 @api_router.post("/auth/login", response_model=UserResponse)
 async def login(credentials: UserLogin):
     # Find user
-    user_doc = await get_db(user_id).users.find_one({"email": credentials.email})
+    user_doc = await db.users.find_one({"email": credentials.email})
     if not user_doc:
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
@@ -556,166 +556,93 @@ async def start_workout(
     return workout
 
 
-@api_router.get("/workouts", response_model=List[WorkoutSession])
-async def get_workouts(
-    user_id: str = Depends(get_current_user),
-    limit: int = 50
-):
-    workouts = await get_db(user_id).workouts.find({"user_id": user_id}).sort("started_at", -1).limit(limit).to_list(limit)
-    return [WorkoutSession(**{**w, "id": str(w["_id"])}) for w in workouts]
+@api_router.put("/workouts/{workout_id}", response_model=WorkoutSession)
+async def update_workout(
+    workout_id: str,
+    workout_data: WorkoutSessionUpdate,
+    user_id: str = Depends(get_current_user)
+):  
+    update_dict = workout_data.dict(exclude_unset=True)
+    result = await get_db(user_id).workouts.update_one(
+        {"_id": ObjectId(workout_id), "user_id": user_id},
+        {"$set": update_dict}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Workout not found")
+    
+    # Check for PRs if workout is completed
+    if workout_data.ended_at:
+        await check_and_create_prs(user_id, workout_id)
+    
+    workout = await get_db(user_id).workouts.find_one({"_id": ObjectId(workout_id)})
+    
+    # If workout is marked as skipped, and linked to a planned workout, update its status
+    if workout_data.skipped and workout.get("planned_workout_id"):
+        planned_id = workout["planned_workout_id"]
+        if ObjectId.is_valid(planned_id):
+            await get_db(user_id).planned_workouts.update_one(
+                {"_id": ObjectId(planned_id), "user_id": user_id},
+                {"$set": {"status": "skipped"}}
+            )
+    
+    # If workout is completed and linked to a planned workout, update its status
+    if workout_data.ended_at and workout.get("planned_workout_id"):
+        planned_id = workout["planned_workout_id"]
+        if ObjectId.is_valid(planned_id):
+            await get_db(user_id).planned_workouts.update_one(
+                {"_id": ObjectId(planned_id), "user_id": user_id},
+                {"$set": {"status": "completed"}}
+            )
+    
+    return WorkoutSession(**{**workout, "id": str(workout["_id"])})
 
 
-# Get completed workout count for user
-@api_router.get("/workouts/count")
-async def get_workout_count(
+@api_router.delete("/workouts/{workout_id}")
+async def delete_workout(
+    workout_id: str,
     user_id: str = Depends(get_current_user)
 ):
-    """Get the total number of completed workouts for the user"""
-    count = await get_db(user_id).workouts.count_documents({"user_id": user_id, "ended_at": {"$ne": None}})
+    """Delete a workout session"""
+    if not ObjectId.is_valid(workout_id):
+        raise HTTPException(status_code=400, detail="Invalid workout ID")
+    
+    result = await get_db(user_id).workouts.delete_one({
+        "_id": ObjectId(workout_id),
+        "user_id": user_id
+    })
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Workout not found")
+    
+    return {"message": "Workout deleted successfully"}
+
+@api_router.get("/workouts/count")
+async def get_workout_count_all(user_id: str = Depends(get_current_user)):
+    count = await db.workouts.count_documents({"user_id": user_id})
     return {"count": count}
 
 
-# IMPORTANT: This route MUST come before /workouts/{workout_id} to avoid "history" being treated as a workout_id
-@api_router.get("/workouts/history", response_model=List[WorkoutSummary])
-async def get_workout_history(
+@api_router.get("/workouts", response_model=List[WorkoutSession])
+async def get_workouts(
     user_id: str = Depends(get_current_user),
-    limit: int = 50
+    limit: int = 50,
+    start: int = 0,
 ):
-    """Get workout history with computed summary statistics"""
-    workouts = await get_db(user_id).workouts.find({"user_id": user_id, "ended_at": {"$ne": None}}).sort("started_at", -1).limit(limit).to_list(limit)
-    
-    # Get all exercise IDs we need
-    exercise_ids = set()
-    for workout in workouts:
-        for ex in workout.get("exercises", []):
-            exercise_ids.add(ex["exercise_id"])
-    
-    # Fetch all exercises in one query
-    exercises_map = {}
-    if exercise_ids:
-        exercises = await get_db(user_id).exercises.find({"_id": {"$in": [ObjectId(eid) for eid in exercise_ids if ObjectId.is_valid(eid)]}}).to_list(len(exercise_ids))
-        for ex in exercises:
-            exercises_map[str(ex["_id"])] = ex
-    
-    # Count PRs per workout
-    workout_ids = [str(w["_id"]) for w in workouts]
-    pr_counts = {}
-    if workout_ids:
-        prs = await get_db(user_id).prs.find({"workout_id": {"$in": workout_ids}}).to_list(1000)
-        for pr in prs:
-            wid = pr.get("workout_id")
-            if wid:
-                pr_counts[wid] = pr_counts.get(wid, 0) + 1
-    
-    summaries = []
-    for workout in workouts:
-        workout_id = str(workout["_id"])
-        started_at = workout.get("started_at", datetime.utcnow())
-        ended_at = workout.get("ended_at")
-        template_id = workout.get("template_id")
-        
-        duration_seconds = 0
-        if ended_at and started_at:
-            duration_seconds = int((ended_at - started_at).total_seconds())
-        
-        exercise_count = len(workout.get("exercises", []))
-        set_count = 0
-        total_volume_kg = 0.0
-        exercise_summaries = []
-        
-        for ex_item in workout.get("exercises", []):
-            exercise_id = ex_item["exercise_id"]
-            sets = ex_item.get("sets", [])
-            set_count += len(sets)
-            
-            ex_data = exercises_map.get(exercise_id, {})
-            ex_name = ex_data.get("name", "Unknown Exercise")
-            ex_kind = ex_data.get("exercise_kind", "Barbell")
-            
-            # Calculate best set and volume
-            best_weight = 0
-            best_reps = 0
-            best_duration = 0
-            best_set_display = ""
-            estimated_1rm = None
-            
-            for s in sets:
-                # Skip warmup and cooldown sets for PR/volume calculations
-                set_type = s.get("set_type", "normal")
-                if set_type in ["warmup", "cooldown"]:
-                    continue
-                    
-                weight = s.get("weight") or 0
-                reps = s.get("reps") or 0
-                duration = s.get("duration") or 0
-                
-                # Calculate volume for weight-based exercises
-                if weight > 0 and reps > 0:
-                    total_volume_kg += weight * reps
-                    
-                    # Calculate 1RM for comparison
-                    set_1rm = weight * (36 / (37 - reps)) if reps < 37 else weight
-                    
-                    if set_1rm > (estimated_1rm or 0):
-                        estimated_1rm = set_1rm
-                        best_weight = weight
-                        best_reps = reps
-                
-                # Track best duration for duration-based exercises
-                if duration > best_duration:
-                    best_duration = duration
-                
-                # Track best reps
-                if reps > best_reps:
-                    best_reps = reps
-            
-            # Format best set display based on exercise kind
-            if ex_kind in ['Cardio', 'Duration']:
-                if best_duration > 0:
-                    total_centis = int(round(best_duration * 100))
-                    mins = total_centis // 6000
-                    secs = (total_centis % 6000) // 100
-                    centis = total_centis % 100
-                    if centis > 0:
-                        best_set_display = f"{mins}:{secs:02d}.{centis:02d}"
-                    else:
-                        best_set_display = f"{mins}:{secs:02d}"
-                else:
-                    best_set_display = "0:00"
-            elif ex_kind == 'Reps Only':
-                best_set_display = f"{best_reps} reps" if best_reps > 0 else "-"
-            else:
-                if best_weight > 0 and best_reps > 0:
-                    best_set_display = f"{best_weight}kg × {best_reps}"
-                elif best_reps > 0:
-                    best_set_display = f"{best_reps} reps"
-                else:
-                    best_set_display = "-"
-            
-            exercise_summaries.append(WorkoutExerciseSummary(
-                exercise_id=exercise_id,
-                name=ex_name,
-                exercise_kind=ex_kind,
-                set_count=len(sets),
-                best_set_display=best_set_display,
-                estimated_1rm=estimated_1rm
-            ))
-        
-        summaries.append(WorkoutSummary(
-            id=workout_id,
-            name=workout.get("name"),
-            started_at=started_at,
-            ended_at=ended_at,
-            duration_seconds=duration_seconds,
-            exercise_count=exercise_count,
-            set_count=set_count,
-            total_volume_kg=total_volume_kg,
-            pr_count=pr_counts.get(workout_id, 0),
-            exercises=exercise_summaries,
-            template_id=template_id
-        ))
-    
-    return summaries
+    start = max(0, int(start))
+    limit = max(1, min(int(limit), 200))
+
+    workouts = (
+        await get_db(user_id).workouts
+        .find({"user_id": user_id})
+        .sort([("started_at", -1), ("_id", -1)])
+        .skip(start)
+        .limit(limit)
+        .to_list(limit)
+    )
+
+    return [WorkoutSession(**{**w, "id": str(w["_id"])}) for w in workouts]
+
 
 @api_router.get("/workouts/history/by-exercise")
 async def get_workout_history_by_exercise(
@@ -874,70 +801,6 @@ async def get_workout(
         
         
     return workouts
-
-
-@api_router.put("/workouts/{workout_id}", response_model=WorkoutSession)
-async def update_workout(
-    workout_id: str,
-    workout_data: WorkoutSessionUpdate,
-    user_id: str = Depends(get_current_user)
-):
-    update_dict = workout_data.dict(exclude_unset=True)
-    
-    result = await get_db(user_id).workouts.update_one(
-        {"_id": ObjectId(workout_id), "user_id": user_id},
-        {"$set": update_dict}
-    )
-    
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Workout not found")
-    
-    # Check for PRs if workout is completed
-    if workout_data.ended_at:
-        await check_and_create_prs(user_id, workout_id)
-    
-    workout = await get_db(user_id).workouts.find_one({"_id": ObjectId(workout_id)})
-    
-    # If workout is marked as skipped, and linked to a planned workout, update its status
-    if workout_data.skipped and workout.get("planned_workout_id"):
-        planned_id = workout["planned_workout_id"]
-        if ObjectId.is_valid(planned_id):
-            await get_db(user_id).planned_workouts.update_one(
-                {"_id": ObjectId(planned_id), "user_id": user_id},
-                {"$set": {"status": "skipped"}}
-            )
-    
-    # If workout is completed and linked to a planned workout, update its status
-    if workout_data.ended_at and workout.get("planned_workout_id"):
-        planned_id = workout["planned_workout_id"]
-        if ObjectId.is_valid(planned_id):
-            await get_db(user_id).planned_workouts.update_one(
-                {"_id": ObjectId(planned_id), "user_id": user_id},
-                {"$set": {"status": "completed"}}
-            )
-    
-    return WorkoutSession(**{**workout, "id": str(workout["_id"])})
-
-
-@api_router.delete("/workouts/{workout_id}")
-async def delete_workout(
-    workout_id: str,
-    user_id: str = Depends(get_current_user)
-):
-    """Delete a workout session"""
-    if not ObjectId.is_valid(workout_id):
-        raise HTTPException(status_code=400, detail="Invalid workout ID")
-    
-    result = await get_db(user_id).workouts.delete_one({
-        "_id": ObjectId(workout_id),
-        "user_id": user_id
-    })
-    
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Workout not found")
-    
-    return {"message": "Workout deleted successfully"}
-
 
 @api_router.get("/workouts/{workout_id}/detail", response_model=WorkoutSummary)
 async def get_workout_detail(
