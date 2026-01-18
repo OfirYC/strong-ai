@@ -1,13 +1,19 @@
-import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { WorkoutSession, WorkoutExercise } from '../types';
+// src/store/workoutStore.ts
+import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { WorkoutSession, WorkoutExercise } from "../types";
+import { storageKey } from "../env";
 
 interface WorkoutState {
   activeWorkout: WorkoutSession | null;
   workoutStartTime: number | null;
   startWorkout: (workout: WorkoutSession) => void;
-  updateWorkout: (exercises: WorkoutExercise[], notes?: string, name?: string) => void;
+  updateWorkout: (
+    exercises: WorkoutExercise[],
+    notes?: string,
+    name?: string
+  ) => void;
   updateWorkoutName: (name: string) => void;
   updateWorkoutNotes: (notes: string | undefined) => void;
   endWorkout: () => void;
@@ -15,35 +21,37 @@ interface WorkoutState {
 
 export const useWorkoutStore = create<WorkoutState>()(
   persist(
-    (set) => ({
+    set => ({
       activeWorkout: null,
       workoutStartTime: null,
-      startWorkout: (workout) => set({ 
-        activeWorkout: {
-          ...workout,
-          name: workout.name || 'Workout',
-        },
-        workoutStartTime: Date.now(),
-      }),
-      updateWorkout: (exercises, notes, name) => 
-        set((state) => ({
+      startWorkout: workout =>
+        set({
+          activeWorkout: {
+            ...workout,
+            name: workout.name || "Workout",
+          },
+          workoutStartTime: Date.now(),
+        }),
+
+      updateWorkout: (exercises, notes, name) =>
+        set(state => ({
           activeWorkout: state.activeWorkout
-            ? { 
-                ...state.activeWorkout, 
-                exercises, 
+            ? {
+                ...state.activeWorkout,
+                exercises,
                 ...(notes !== undefined && { notes }),
                 ...(name !== undefined && { name }),
               }
             : null,
         })),
-      updateWorkoutName: (name) =>
-        set((state) => ({
+      updateWorkoutName: name =>
+        set(state => ({
           activeWorkout: state.activeWorkout
             ? { ...state.activeWorkout, name }
             : null,
         })),
-      updateWorkoutNotes: (notes) =>
-        set((state) => ({
+      updateWorkoutNotes: notes =>
+        set(state => ({
           activeWorkout: state.activeWorkout
             ? { ...state.activeWorkout, notes }
             : null,
@@ -51,7 +59,8 @@ export const useWorkoutStore = create<WorkoutState>()(
       endWorkout: () => set({ activeWorkout: null, workoutStartTime: null }),
     }),
     {
-      name: 'workout-storage',
+      // IMPORTANT: env-namespaced key so Expo Go local/prod don't collide
+      name: storageKey("workout-storage"),
       storage: createJSONStorage(() => AsyncStorage),
     }
   )
