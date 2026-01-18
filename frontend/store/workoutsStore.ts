@@ -19,6 +19,27 @@ type WorkoutsStore = {
   byId: Record<string, WorkoutSession>;
   loading: boolean;
 
+  // Query caches (do NOT affect orderedIds/prefixCount)
+  byDateIds: Record<string, string[]>; // key -> workout ids
+  byDateRangeIds: Record<string, string[]>; // key -> workout ids
+
+  getByDate: (opts: {
+    date: string; // YYYY-MM-DD
+    tzOffsetMinutes?: number;
+    includeIncomplete?: boolean;
+    start?: number;
+    limit?: number;
+  }) => Promise<WorkoutSession[]>;
+
+  getByDateRange: (opts: {
+    startDate: string; // YYYY-MM-DD
+    endDate: string; // YYYY-MM-DD
+    tzOffsetMinutes?: number;
+    includeIncomplete?: boolean;
+    start?: number;
+    limit?: number;
+  }) => Promise<WorkoutSession[]>;
+
   // Paging state (offset-based)
   orderedIds: string[];
   prefixCount: number; // contiguous coverage from 0..prefixCount
@@ -34,10 +55,6 @@ type WorkoutsStore = {
   ensurePrefix: (
     targetCount: number,
     opts?: { pageSize?: number }
-  ) => Promise<void>;
-  ensurePrefixThroughDate: (
-    minDateISO: string,
-    opts?: { pageSize?: number; maxPages?: number }
   ) => Promise<void>;
   ensureNextPage: (opts?: { pageSize?: number }) => Promise<void>;
 
@@ -69,17 +86,39 @@ const inflightBatch = new Map<
   string,
   Promise<Record<string, WorkoutSession>>
 >();
+const inflightByDate = new Map<string, Promise<WorkoutSession[]>>();
+const inflightByDateRange = new Map<string, Promise<WorkoutSession[]>>();
+
+const keyByDate = (o: {
+  date: string;
+  tzOffsetMinutes: number;
+  includeIncomplete: boolean;
+  start: number;
+  limit: number;
+}) =>
+  `d:${o.date}|tz:${o.tzOffsetMinutes}|inc:${o.includeIncomplete ? 1 : 0}|s:${
+    o.start
+  }|l:${o.limit}`;
+
+const keyByRange = (o: {
+  startDate: string;
+  endDate: string;
+  tzOffsetMinutes: number;
+  includeIncomplete: boolean;
+  start: number;
+  limit: number;
+}) =>
+  `r:${o.startDate}->${o.endDate}|tz:${o.tzOffsetMinutes}|inc:${
+    o.includeIncomplete ? 1 : 0
+  }|s:${o.start}|l:${o.limit}`;
 
 const stableKey = (ids: string[]) => Array.from(new Set(ids)).sort().join(",");
 
-const parseDateSafe = (s?: string) => {
-  if (!s) return null;
-  const d = new Date(s);
-  return Number.isNaN(d.getTime()) ? null : d;
-};
-
 export const useWorkoutsStoreInternal = create<WorkoutsStore>((set, get) => ({
   byId: {},
+  byDateIds: {},
+  byDateRangeIds: {},
+
   loading: false,
 
   orderedIds: [],
@@ -217,31 +256,6 @@ export const useWorkoutsStoreInternal = create<WorkoutsStore>((set, get) => ({
     }
   },
 
-  ensurePrefixThroughDate: async (minDateISO, opts) => {
-    const pageSize = opts?.pageSize ?? DEFAULT_PAGE_SIZE;
-    const maxPages = opts?.maxPages ?? 50; // hard safety cap
-
-    const minDate = parseDateSafe(minDateISO);
-    if (!minDate) return;
-
-    // Expand until oldest in prefix is <= minDate, or exhausted
-    for (let i = 0; i < maxPages; i++) {
-      const st = get();
-      if (st.exhausted) return;
-
-      if (st.prefixCount > 0) {
-        const lastId = st.orderedIds[st.prefixCount - 1];
-        const last = lastId ? st.byId[lastId] : undefined;
-        const lastDate = parseDateSafe(last?.started_at);
-
-        if (lastDate && lastDate <= minDate) return;
-      }
-
-      // Need more
-      await get().ensurePrefix(st.prefixCount + pageSize, { pageSize });
-    }
-  },
-
   ensureNextPage: async opts => {
     const pageSize = opts?.pageSize ?? DEFAULT_PAGE_SIZE;
     const st = get();
@@ -364,14 +378,18 @@ export const useWorkoutsStoreInternal = create<WorkoutsStore>((set, get) => ({
         const res = await api.get(`/workouts/batch/${missing.join(",")}`);
         const arr = (res.data ?? []) as WorkoutSession[];
         console.log("Fetched batch workouts:", arr.length);
-        const map: Record<string, WorkoutSession> = {};
-        for (const w of arr) map[w.id] = w;
-        set(s => ({ byId: { ...s.byId, ...map } }));
+        if (arr.length) {
+          const map: Record<string, WorkoutSession> = {};
+          for (const w of arr) map[w.id] = w;
+          set(s => ({ byId: { ...s.byId, ...map } }));
 
-        const merged = { ...get().byId, ...map };
-        const out: Record<string, WorkoutSession> = {};
-        for (const id of unique) if (merged[id]) out[id] = merged[id];
-        return out;
+          const merged = { ...get().byId, ...map };
+          const out: Record<string, WorkoutSession> = {};
+          for (const id of unique) if (merged[id]) out[id] = merged[id];
+          return out;
+        } else {
+          return get().byId;
+        }
       } finally {
         set({ loading: false });
         inflightBatch.delete(key);
@@ -379,6 +397,162 @@ export const useWorkoutsStoreInternal = create<WorkoutsStore>((set, get) => ({
     })();
 
     inflightBatch.set(key, p);
+    return p;
+  },
+
+  // Date
+  getByDate: async opts => {
+    const date = opts.date;
+    if (!date) throw new Error("date is required (YYYY-MM-DD)");
+
+    const tzOffsetMinutes = Number.isFinite(opts.tzOffsetMinutes as number)
+      ? (opts.tzOffsetMinutes as number)
+      : 0;
+
+    const includeIncomplete = opts.includeIncomplete ?? true;
+    const start = Math.max(0, Math.floor(opts.start ?? 0));
+    const limit = Math.max(
+      1,
+      Math.min(Math.floor(opts.limit ?? DEFAULT_PAGE_SIZE), 200)
+    );
+
+    const k = keyByDate({
+      date,
+      tzOffsetMinutes,
+      includeIncomplete,
+      start,
+      limit,
+    });
+
+    // If we already have ids cached for this exact request, serve from byId
+    const cachedIds = get().byDateIds[k];
+    if (cachedIds?.length) {
+      const st = get();
+      return cachedIds.map(id => st.byId[id]).filter(Boolean);
+    }
+
+    const existing = inflightByDate.get(k);
+
+    if (existing) return existing;
+
+    const p = (async () => {
+      set({ loading: true });
+      try {
+        const qs = new URLSearchParams();
+        qs.set("date", date);
+        qs.set("tz_offset_minutes", String(tzOffsetMinutes));
+        qs.set("include_incomplete", includeIncomplete ? "true" : "false");
+        qs.set("start", String(start));
+        qs.set("limit", String(limit));
+
+        const res = await api.get(`/workouts/by-date?${qs.toString()}`);
+        const arr = (res.data ?? []) as WorkoutSession[];
+        if (arr.length) {
+          // hydrate byId
+          const map: Record<string, WorkoutSession> = {};
+          const ids: string[] = [];
+          for (const w of arr) {
+            map[w.id] = w;
+            ids.push(w.id);
+          }
+
+          set(s => ({
+            byId: { ...s.byId, ...map },
+            byDateIds: { ...s.byDateIds, [k]: ids },
+          }));
+        } else {
+          // cache empty too (prevents refetch storms)
+          set(s => ({
+            byDateIds: { ...s.byDateIds, [k]: [] },
+          }));
+        }
+
+        return arr;
+      } finally {
+        set({ loading: false });
+        inflightByDate.delete(k);
+      }
+    })();
+
+    inflightByDate.set(k, p);
+    return p;
+  },
+
+  getByDateRange: async opts => {
+    const startDate = opts.startDate;
+    const endDate = opts.endDate;
+    if (!startDate) throw new Error("startDate is required (YYYY-MM-DD)");
+    if (!endDate) throw new Error("endDate is required (YYYY-MM-DD)");
+
+    const tzOffsetMinutes = Number.isFinite(opts.tzOffsetMinutes as number)
+      ? (opts.tzOffsetMinutes as number)
+      : 0;
+
+    const includeIncomplete = opts.includeIncomplete ?? true;
+    const start = Math.max(0, Math.floor(opts.start ?? 0));
+    const limit = Math.max(
+      1,
+      Math.min(Math.floor(opts.limit ?? DEFAULT_PAGE_SIZE), 200)
+    );
+
+    const k = keyByRange({
+      startDate,
+      endDate,
+      tzOffsetMinutes,
+      includeIncomplete,
+      start,
+      limit,
+    });
+
+    const cachedIds = get().byDateRangeIds[k];
+    if (cachedIds?.length) {
+      const st = get();
+      return cachedIds.map(id => st.byId[id]).filter(Boolean);
+    }
+
+    const existing = inflightByDateRange.get(k);
+    if (existing) return existing;
+
+    const p = (async () => {
+      set({ loading: true });
+      try {
+        const qs = new URLSearchParams();
+        qs.set("start_date", startDate);
+        qs.set("end_date", endDate);
+        qs.set("tz_offset_minutes", String(tzOffsetMinutes));
+        qs.set("include_incomplete", includeIncomplete ? "true" : "false");
+        qs.set("start", String(start));
+        qs.set("limit", String(limit));
+
+        const res = await api.get(`/workouts/by-date-range?${qs.toString()}`);
+        const arr = (res.data ?? []) as WorkoutSession[];
+
+        if (arr.length) {
+          const map: Record<string, WorkoutSession> = {};
+          const ids: string[] = [];
+          for (const w of arr) {
+            map[w.id] = w;
+            ids.push(w.id);
+          }
+
+          set(s => ({
+            byId: { ...s.byId, ...map },
+            byDateRangeIds: { ...s.byDateRangeIds, [k]: ids },
+          }));
+        } else {
+          set(s => ({
+            byDateRangeIds: { ...s.byDateRangeIds, [k]: [] },
+          }));
+        }
+
+        return arr;
+      } finally {
+        set({ loading: false });
+        inflightByDateRange.delete(k);
+      }
+    })();
+
+    inflightByDateRange.set(k, p);
     return p;
   },
 
@@ -391,52 +565,51 @@ export const useWorkoutsStoreInternal = create<WorkoutsStore>((set, get) => ({
   },
 
   // upsert into byId, and modify orderedIds for history
- // inside create<WorkoutsStore>((set, get) => ({ ... }))
+  // inside create<WorkoutsStore>((set, get) => ({ ... }))
 
-upsert: session =>
-  set(s => {
-    const nextById = { ...s.byId, [session.id]: session };
+  upsert: session =>
+    set(s => {
+      const nextById = { ...s.byId, [session.id]: session };
 
-    // Dedup ids (ensure session.id is included exactly once)
-    const seen = new Set<string>();
-    const ids = [session.id, ...s.orderedIds].filter(id => {
-      if (seen.has(id)) return false;
-      seen.add(id);
-      return true;
-    });
+      // Dedup ids (ensure session.id is included exactly once)
+      const seen = new Set<string>();
+      const ids = [session.id, ...s.orderedIds].filter(id => {
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      });
 
-    // Robust date compare (do NOT rely on string ordering)
-    const toMs = (iso?: string) => {
-      if (!iso) return 0;
-      const t = new Date(iso).getTime();
-      return Number.isNaN(t) ? 0 : t;
-    };
+      // Robust date compare (do NOT rely on string ordering)
+      const toMs = (iso?: string) => {
+        if (!iso) return 0;
+        const t = new Date(iso).getTime();
+        return Number.isNaN(t) ? 0 : t;
+      };
 
-    // Sort by started_at DESC, then id DESC (ObjectId lexicographic works)
-    ids.sort((aId, bId) => {
-      const a = nextById[aId];
-      const b = nextById[bId];
+      // Sort by started_at DESC, then id DESC (ObjectId lexicographic works)
+      ids.sort((aId, bId) => {
+        const a = nextById[aId];
+        const b = nextById[bId];
 
-      const aMs = toMs(a?.started_at);
-      const bMs = toMs(b?.started_at);
+        const aMs = toMs(a?.started_at);
+        const bMs = toMs(b?.started_at);
 
-      if (aMs !== bMs) return bMs - aMs;
+        if (aMs !== bMs) return bMs - aMs;
 
-      // tie-breaker: _id desc (ObjectId string compare is fine)
-      if (aId === bId) return 0;
-      return aId > bId ? -1 : 1;
-    });
+        // tie-breaker: _id desc (ObjectId string compare is fine)
+        if (aId === bId) return 0;
+        return aId > bId ? -1 : 1;
+      });
 
-    // IMPORTANT:
-    // - We do NOT touch prefixCount here.
-    //   prefixCount should only represent "server pages fetched".
-    //   This makes upsert safe from breaking pagination.
-    return {
-      byId: nextById,
-      orderedIds: ids,
-    };
-  }),
-
+      // IMPORTANT:
+      // - We do NOT touch prefixCount here.
+      //   prefixCount should only represent "server pages fetched".
+      //   This makes upsert safe from breaking pagination.
+      return {
+        byId: nextById,
+        orderedIds: ids,
+      };
+    }),
 
   patch: (id, partial) =>
     set(s => {
@@ -478,14 +651,14 @@ export function useWorkouts() {
 
   const ensureCount = useWorkoutsStoreInternal(s => s.ensureCount);
   const ensurePrefix = useWorkoutsStoreInternal(s => s.ensurePrefix);
-  const ensurePrefixThroughDate = useWorkoutsStoreInternal(
-    s => s.ensurePrefixThroughDate
-  );
+
   const getPage = useWorkoutsStoreInternal(s => s.getPage);
 
   const getById = useWorkoutsStoreInternal(s => s.getById);
   const getManyByIds = useWorkoutsStoreInternal(s => s.getManyByIds);
 
+  const getByDate = useWorkoutsStoreInternal(s => s.getByDate);
+  const getByDateRange = useWorkoutsStoreInternal(s => s.getByDateRange);
   const upsertMany = useWorkoutsStoreInternal(s => s.upsertMany);
   const upsert = useWorkoutsStoreInternal(s => s.upsert);
   const patch = useWorkoutsStoreInternal(s => s.patch);
@@ -532,10 +705,12 @@ export function useWorkouts() {
     // methods
     ensureCount,
     ensurePrefix,
-    ensurePrefixThroughDate,
     ensureNextPage,
     hasMore,
     getPage,
+
+    getByDate,
+    getByDateRange,
 
     getById,
     getManyByIds,

@@ -717,10 +717,7 @@ async def get_workout_history_by_exercise(
         entry_sets = []
         for ex in (w.get("exercises") or []):
             if str(ex.get("exercise_id")) != exercise_id:
-                print("skipppp",str(ex.get("exercise_id")), exercise_id)
                 continue
-            else:
-                print("no ski")
             for s in (ex.get("sets") or []):
                 reps = s.get("reps") or 0
                 weight = s.get("weight") or 0
@@ -766,6 +763,106 @@ async def get_workout_history_by_exercise(
         "max_reps": max_reps or None,
         "best_e1rm": round(best_e1rm, 2) if best_e1rm > 0 else None,
     }
+
+from datetime import datetime, timedelta, timezone
+from typing import List, Optional
+from fastapi import HTTPException, Depends, Query
+
+def _parse_yyyy_mm_dd(s: str, field: str) -> datetime:
+    try:
+        # returns naive datetime at 00:00:00 for that date
+        return datetime.strptime(s, "%Y-%m-%d")
+    except Exception:
+        raise HTTPException(status_code=400, detail=f"{field} must be YYYY-MM-DD")
+
+def _day_bounds_utc(date_yyyy_mm_dd: str, tz_offset_minutes: int) -> tuple[datetime, datetime]:
+    """
+    Compute [start_utc, end_utc) bounds for the given local date, using tz_offset_minutes.
+    Example: tz_offset_minutes=120 means local time = UTC+2.
+    """
+    local_start = _parse_yyyy_mm_dd(date_yyyy_mm_dd, "date")
+    offset = timedelta(minutes=int(tz_offset_minutes))
+    # local -> utc: utc = local - offset
+    start_utc = (local_start - offset).replace(tzinfo=timezone.utc)
+    end_utc = (local_start + timedelta(days=1) - offset).replace(tzinfo=timezone.utc)
+    return start_utc, end_utc
+
+
+@api_router.get("/workouts/by-date", response_model=List[WorkoutSession])
+async def get_workouts_by_date(
+    date: str = Query(..., description="YYYY-MM-DD in user's local date"),
+    tz_offset_minutes: int = Query(0, description="User timezone offset in minutes, e.g. Israel winter=120, summer=180"),
+    include_incomplete: bool = Query(True, description="If false, only workouts with ended_at != None"),
+    user_id: str = Depends(get_current_user),
+    limit: int = 200,
+    start: int = 0,
+):
+    start = max(0, int(start))
+    limit = max(1, min(int(limit), 200))
+
+    start_utc, end_utc = _day_bounds_utc(date, tz_offset_minutes)
+
+    q = {
+        "user_id": user_id,
+        "started_at": {"$gte": start_utc, "$lt": end_utc},
+    }
+    if not include_incomplete:
+        q["ended_at"] = {"$ne": None}
+
+    workouts = (
+        await get_db(user_id).workouts
+        .find(q)
+        .sort([("started_at", -1), ("_id", -1)])
+        .skip(start)
+        .limit(limit)
+        .to_list(limit)
+    )
+
+    return [WorkoutSession(**{**w, "id": str(w["_id"])}) for w in workouts]
+
+
+@api_router.get("/workouts/by-date-range", response_model=List[WorkoutSession])
+async def get_workouts_by_date_range(
+    start_date: str = Query(..., description="YYYY-MM-DD (local)"),
+    end_date: str = Query(..., description="YYYY-MM-DD (local), inclusive"),
+    tz_offset_minutes: int = Query(0, description="User timezone offset in minutes"),
+    include_incomplete: bool = Query(True, description="If false, only workouts with ended_at != None"),
+    user_id: str = Depends(get_current_user),
+    limit: int = 200,
+    start: int = 0,
+):
+    start = max(0, int(start))
+    limit = max(1, min(int(limit), 200))
+
+    start_local = _parse_yyyy_mm_dd(start_date, "start_date")
+    end_local = _parse_yyyy_mm_dd(end_date, "end_date")
+
+    if end_local < start_local:
+        raise HTTPException(status_code=400, detail="end_date must be >= start_date")
+
+    offset = timedelta(minutes=int(tz_offset_minutes))
+
+    # inclusive end_date => upper bound is next day at 00:00 local
+    start_utc = (start_local - offset).replace(tzinfo=timezone.utc)
+    end_utc = (end_local + timedelta(days=1) - offset).replace(tzinfo=timezone.utc)
+
+    q = {
+        "user_id": user_id,
+        "started_at": {"$gte": start_utc, "$lt": end_utc},
+    }
+    if not include_incomplete:
+        q["ended_at"] = {"$ne": None}
+
+    workouts = (
+        await get_db(user_id).workouts
+        .find(q)
+        .sort([("started_at", -1), ("_id", -1)])
+        .skip(start)
+        .limit(limit)
+        .to_list(limit)
+    )
+
+    return [WorkoutSession(**{**w, "id": str(w["_id"])}) for w in workouts]
 
 
 @api_router.get("/workouts/{workout_id}", response_model=WorkoutSession)
@@ -1269,102 +1366,6 @@ async def enrich_planned_workouts_with_sessions(planned_workouts: List[dict], us
 
     return enriched
 
-async def get_unscheduled_workouts_for_date(user_id: str, date_str: str) -> List[dict]:
-    """
-    Get workout sessions for a specific date that weren't scheduled (no planned_workout_id).
-    Returns them in PlannedWorkout format for consistency.
-    """
-    from datetime import datetime
-    start_of_day = datetime.fromisoformat(date_str + "T00:00:00")
-    end_of_day = datetime.fromisoformat(date_str + "T23:59:59")
-    
-    # Find workout sessions without planned_workout_id
-    sessions = await get_db(user_id).workouts.find({
-        "user_id": user_id,
-        "started_at": {"$gte": start_of_day, "$lte": end_of_day},
-        "$or": [
-            {"planned_workout_id": None},
-            {"planned_workout_id": {"$exists": False}}
-        ]
-    }).to_list(100)
-    
-    # Convert to PlannedWorkout format
-    unscheduled = []
-    for session in sessions:
-        # Ensure name is never None
-        workout_name = session.get("name") or "Quick Start Workout"
-        
-        unscheduled.append({
-            "id": str(session["_id"]),
-            "user_id": user_id,
-            "date": date_str,
-            "name": workout_name,
-            "template_id": session.get("template_id"),
-            "type": None,
-            "notes": session.get("notes"),
-            "status": "completed" if session.get("ended_at") else "in_progress",
-            "workout_session_id": str(session["_id"]),
-            "order": 999,  # Put unscheduled at the end
-            "is_recurring": False,
-            "recurrence_type": None,
-            "recurrence_days": None,
-            "recurrence_end_date": None,
-            "recurrence_parent_id": None,
-            "created_at": session.get("created_at", datetime.utcnow())
-        })
-    
-    return unscheduled
-
-
-async def get_unscheduled_workouts_for_range(user_id: str, start_date: str, end_date: str) -> List[dict]:
-    """
-    Get workout sessions for a date range that weren't scheduled.
-    Returns them in PlannedWorkout format grouped by date.
-    """
-    from datetime import datetime
-    start = datetime.fromisoformat(start_date + "T00:00:00")
-    end = datetime.fromisoformat(end_date + "T23:59:59")
-    
-    # Find workout sessions without planned_workout_id in the range
-    sessions = await get_db(user_id).workouts.find({
-        "user_id": user_id,
-        "started_at": {"$gte": start, "$lte": end},
-        "$or": [
-            {"planned_workout_id": None},
-            {"planned_workout_id": {"$exists": False}}
-        ]
-    }).to_list(1000)
-    
-    # Convert to PlannedWorkout format
-    unscheduled = []
-    for session in sessions:
-        # Extract date from started_at
-        workout_date = session["started_at"].date().isoformat()
-        
-        # Ensure name is never None
-        workout_name = session.get("name") or "Quick Start Workout"
-        
-        unscheduled.append({
-            "id": str(session["_id"]),
-            "user_id": user_id,
-            "date": workout_date,
-            "name": workout_name,
-            "template_id": session.get("template_id"),
-            "type": None,
-            "notes": session.get("notes"),
-            "status": "completed" if session.get("ended_at") else "in_progress",
-            "workout_session_id": str(session["_id"]),
-            "order": 999,  # Put unscheduled at the end
-            "is_recurring": False,
-            "recurrence_type": None,
-            "recurrence_days": None,
-            "recurrence_end_date": None,
-            "recurrence_parent_id": None,
-            "created_at": session.get("created_at", datetime.utcnow())
-        })
-    
-    return unscheduled
-
 
 # ============= PLANNED WORKOUT ROUTES =============
 @api_router.post("/planned-workouts", response_model=PlannedWorkout)
@@ -1386,6 +1387,14 @@ async def create_planned_workout(
     return PlannedWorkout(**{**planned_workout_dict, "id": str(planned_workout_dict["_id"])})
 
 
+
+def _is_yyyy_mm_dd(s: str) -> bool:
+    try:
+        datetime.strptime(s, "%Y-%m-%d")
+        return True
+    except Exception:
+        return False
+ 
 @api_router.get("/planned-workouts", response_model=List[PlannedWorkout])
 async def get_planned_workouts(
     user_id: str = Depends(get_current_user),
@@ -1399,39 +1408,71 @@ async def get_planned_workouts(
     - If 'start_date' and 'end_date' are provided, returns workouts in that range (expanded + actual sessions)
     - Otherwise, returns all planned workouts (not expanded)
     """
-    query = {"user_id": user_id}
     
-    # Fetch base planned workouts
-    workouts = await get_db(user_id).planned_workouts.find(query).to_list(1000)
+    # Normalize inputs
+    if date and (start_date or end_date):
+        raise HTTPException(
+            status_code=400,
+            detail="Provide either 'date' or ('start_date' and 'end_date'), not both.",
+        )
+
+    if date:
+        if not _is_yyyy_mm_dd(date):
+            raise HTTPException(status_code=400, detail="Invalid 'date' format (YYYY-MM-DD).")
+        start_date = date
+        end_date = date
+
+    if (start_date and not end_date) or (end_date and not start_date):
+        raise HTTPException(status_code=400, detail="Provide both 'start_date' and 'end_date'.")
+
+    if start_date and end_date:
+        if not _is_yyyy_mm_dd(start_date) or not _is_yyyy_mm_dd(end_date):
+            raise HTTPException(status_code=400, detail="Invalid date format (YYYY-MM-DD).")
+        if start_date > end_date:
+            raise HTTPException(status_code=400, detail="'start_date' must be <= 'end_date'.")
+
+
+    base_query = {"user_id": user_id}
+
+    # If no range/date: return all parents and one-offs (unexpanded), as before
+    if not start_date and not end_date:
+        workouts = await get_db(user_id).planned_workouts.find(base_query).to_list(1000)
+        for w in workouts:
+            w["id"] = str(w["_id"])
+        return [PlannedWorkout(**w) for w in workouts]
+    
+    range_query = {
+        **base_query,
+        "$or": [
+            # Non-recurring scheduled within range
+            {
+                "is_recurring": {"$ne": True},
+                "date": {"$gte": start_date, "$lte": end_date},
+            },
+            # Recurring parent overlaps range window (possible to generate at least one occurrence)
+            {
+                "is_recurring": True,
+                "date": {"$lte": end_date},
+                "$or": [
+                   {"recurrence_end_date": {"$exists": False}},
+                   {"recurrence_end_date": None},
+                   {"recurrence_end_date": ""},
+                   {"recurrence_end_date": {"$gte": start_date}},
+                ],
+            },
+        ],
+    }
+
+    workouts = await get_db(user_id).planned_workouts.find(range_query).to_list(2000)
+
     
     # Convert ObjectId to string
     for w in workouts:
         w["id"] = str(w["_id"])
     
-    # If specific date or date range requested, expand recurring workouts and add unscheduled sessions
-    if date:
-        expanded = expand_recurring_workouts(workouts, date, date)
-        enriched = await enrich_planned_workouts_with_sessions(expanded, user_id)
+    enriched = await enrich_planned_workouts_with_sessions(workouts, user_id)    
         
-        # Also fetch actual workout sessions for this date that weren't scheduled
-        unscheduled = await get_unscheduled_workouts_for_date(user_id, date)
-        
-        # Merge both lists
-        all_workouts = enriched + unscheduled
-        return [PlannedWorkout(**w) for w in all_workouts]
-    elif start_date and end_date:
-        expanded = expand_recurring_workouts(workouts, start_date, end_date)
-        enriched = await enrich_planned_workouts_with_sessions(expanded, user_id)
-        
-        # Also fetch unscheduled workout sessions in this range
-        unscheduled = await get_unscheduled_workouts_for_range(user_id, start_date, end_date)
-        
-        # Merge both lists
-        all_workouts = enriched + unscheduled
-        return [PlannedWorkout(**w) for w in all_workouts]
-    else:
-        # Return base workouts without expansion
-        return [PlannedWorkout(**w) for w in workouts]
+    return [PlannedWorkout(**w) for w in enriched]
 
 
 @api_router.get("/planned-workouts/{workout_id}", response_model=PlannedWorkout)

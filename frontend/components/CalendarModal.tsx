@@ -46,7 +46,9 @@ export default function CalendarModal({
 }: CalendarModalProps) {
   const router = useRouter();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(
+    new Date().toISOString().split("T")[0]
+  );
 
   const [selectedRoutine, setSelectedRoutine] =
     useState<WorkoutTemplate | null>(null);
@@ -90,7 +92,7 @@ export default function CalendarModal({
     list: monthPlannedWorkouts,
     loading: plannedLoading,
     getRange,
-  } = usePlannedWorkouts({ startDate, endDate });
+  } = usePlannedWorkouts({ startDate, endDate, expandRecurring: true });
 
   // Workouts store: session enrichment
   const { byId: workoutsById, getManyByIds } = useWorkouts();
@@ -143,7 +145,14 @@ export default function CalendarModal({
           ...pw,
           name: session.name ?? pw.name,
           notes: session.notes ?? pw.notes,
-        };
+          status: session.ended_at
+            ? "completed"
+            : session.skipped
+            ? "skipped"
+            : session.started_at
+            ? "in_progress"
+            : "planned",
+        } as const;
       });
     },
     [workoutsByDate, workoutsById]

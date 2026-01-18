@@ -90,6 +90,113 @@ function groupByDate(items: PlannedWorkout[]) {
   return grouped;
 }
 
+function expandPlannedWorkoutsById(
+  byId: Record<string, PlannedWorkout>,
+  startDate: string,
+  endDate: string
+): PlannedWorkout[] {
+  const out: PlannedWorkout[] = [];
+  const parents = Object.values(byId);
+
+  // ---------- date helpers (UTC, no DST bugs) ----------
+  const addDays = (d: string, days: number) => {
+    const [y, m, dd] = d.split("-").map(Number);
+    const t = Date.UTC(y, m - 1, dd);
+    const next = new Date(t + days * 86400000);
+    const yy = next.getUTCFullYear();
+    const mm = String(next.getUTCMonth() + 1).padStart(2, "0");
+    const ddd = String(next.getUTCDate()).padStart(2, "0");
+    return `${yy}-${mm}-${ddd}`;
+  };
+
+  // Python-style weekday: 0=Mon .. 6=Sun
+  const weekdayPy = (d: string) => {
+    const [y, m, dd] = d.split("-").map(Number);
+    const js = new Date(Date.UTC(y, m - 1, dd)).getUTCDay(); // 0=Sun..6=Sat
+    return (js + 6) % 7;
+  };
+  // ----------------------------------------------------
+
+  for (const pw of parents) {
+    // ---- NON-RECURRING ----
+    if (!pw.is_recurring) {
+      if (pw.date >= startDate && pw.date <= endDate) {
+        out.push(pw);
+      }
+      continue;
+    }
+
+    const parentId = pw.id;
+    const recurrenceType = pw.recurrence_type;
+    const recurrenceDays = pw.recurrence_days ?? [];
+
+    const until =
+      pw.recurrence_end_date && pw.recurrence_end_date < endDate
+        ? pw.recurrence_end_date
+        : endDate;
+
+    // generation cursor starts at max(rangeStart, pw.date)
+    let cur = startDate;
+
+    // ---- DAILY ----
+    if (recurrenceType === "daily") {
+      while (cur <= until) {
+        out.push({
+          ...pw,
+          id: `${parentId}:${cur}`,
+          date: cur,
+          recurrence_parent_id: parentId,
+          status: "planned",
+          workout_session_id: undefined,
+        });
+        cur = addDays(cur, 1);
+      }
+      continue;
+    }
+
+    // ---- WEEKLY ----
+    if (recurrenceType === "weekly") {
+      if (!recurrenceDays.length) continue;
+
+      while (cur <= until) {
+        if (cur >= pw.date && recurrenceDays.includes(weekdayPy(cur))) {
+          out.push({
+            ...pw,
+            id: `${parentId}:${cur}`,
+            date: cur,
+            recurrence_parent_id: parentId,
+            status: "planned",
+          });
+        }
+        cur = addDays(cur, 1);
+      }
+      continue;
+    }
+
+    // ---- MONTHLY (same day-of-month) ----
+    if (recurrenceType === "monthly") {
+      const originalDay = Number(pw.date.split("-")[2]);
+
+      while (cur <= until) {
+        if (cur >= pw.date && Number(cur.split("-")[2]) === originalDay) {
+          out.push({
+            ...pw,
+            id: `${parentId}:${cur}`,
+            date: cur,
+            recurrence_parent_id: parentId,
+            status: "planned",
+            workout_session_id: undefined,
+          });
+        }
+        cur = addDays(cur, 1);
+      }
+      continue;
+    }
+  }
+
+  return out;
+}
+
 function sortForDate(items: PlannedWorkout[]) {
   // stable: order asc, then id
   return [...items].sort((a, b) => {
@@ -101,185 +208,222 @@ function sortForDate(items: PlannedWorkout[]) {
 }
 
 export const usePlannedWorkoutsStoreInternal = create<PlannedWorkoutsStore>(
-  (set, get) => ({
-    byId: {},
-    loading: false,
-    loadedDates: {},
-    loadedRanges: {},
+  (set, get) => {
+    const debugSet: typeof set = (partial: any, replace?: any) => {
+      // 1) Try to extract a useful “action name”
+      // If partial is a function, we can’t easily name it; still log stack.
+      const action =
+        typeof partial === "function"
+          ? "debugSet(fn)"
+          : "debugSet(object keys: " +
+            Object.keys(partial ?? {}).join(",") +
+            ")";
 
-    refetchByDate: async date => {
-      set({ loading: true });
-      try {
-        const res = await api.get(`/planned-workouts?date=${date}`);
-        const items = (res.data ?? []) as PlannedWorkout[];
+      // 2) Optional: detect if byId size changes
+      const prevCount = Object.keys(get().byId).length;
 
-        // Upsert + mark loaded
-        get().upsertMany(items);
-        set(s => ({
-          loadedDates: { ...s.loadedDates, [date]: true },
-        }));
-      } finally {
-        set({ loading: false });
-      }
-    },
+      // 3) Log stack so you see exactly who called it
+      console.groupCollapsed(`[plannedWorkoutsStore] ${action}`);
+      console.log("prevCount:", prevCount);
+      console.log(partial);
+      console.log(replace);
+      console.trace();
+      console.groupEnd();
 
-    refetchRange: async (startDate, endDate) => {
-      set({ loading: true });
-      try {
-        const res = await api.get(
-          `/planned-workouts?start_date=${startDate}&end_date=${endDate}`
+      // 4) Call real set
+      set(partial, replace);
+
+      // 5) After-state (optional)
+      const nextCount = Object.keys(get().byId).length;
+      if (nextCount !== prevCount) {
+        console.log(
+          `[plannedWorkoutsStore] byId count changed: ${prevCount} -> ${nextCount}`
         );
-        const items = (res.data ?? []) as PlannedWorkout[];
-
-        get().upsertMany(items);
-        set(s => ({
-          loadedRanges: {
-            ...s.loadedRanges,
-            [rangeKey(startDate, endDate)]: true,
-          },
-        }));
-      } finally {
-        set({ loading: false });
       }
-    },
+    };
+    return {
+      byId: {},
+      loading: false,
+      loadedDates: {},
+      loadedRanges: {},
 
-    refetchById: async id => {
-      const res = await api.get(`/planned-workouts/${id}`);
-      get().upsert(res.data as PlannedWorkout);
-    },
-
-    getByDate: async (date, opts) => {
-      const force = !!opts?.force;
-
-      const state = get();
-      if (!force && state.loadedDates[date]) {
-        return state.selectByDate(date);
-      }
-
-      const existing = inFlightDate.get(date);
-      if (existing) return existing;
-
-      const p = (async () => {
-        set({ loading: true });
+      refetchByDate: async date => {
+        debugSet({ loading: true });
         try {
           const res = await api.get(`/planned-workouts?date=${date}`);
           const items = (res.data ?? []) as PlannedWorkout[];
+
+          // Upsert + mark loaded
           get().upsertMany(items);
-          set(s => ({ loadedDates: { ...s.loadedDates, [date]: true } }));
-          return get().selectByDate(date);
+          debugSet(s => ({
+            loadedDates: { ...s.loadedDates, [date]: true },
+          }));
         } finally {
-          set({ loading: false });
-          inFlightDate.delete(date);
+          debugSet({ loading: false });
         }
-      })();
+      },
 
-      inFlightDate.set(date, p);
-      return p;
-    },
-
-    getRange: async (startDate, endDate, opts) => {
-      const force = !!opts?.force;
-      const key = rangeKey(startDate, endDate);
-
-      const state = get();
-      if (!force && state.loadedRanges[key]) {
-        return state.selectGroupedByDateInRange(startDate, endDate);
-      }
-
-      const existing = inFlightRange.get(key);
-      if (existing) return existing;
-
-      const p = (async () => {
-        set({ loading: true });
+      refetchRange: async (startDate, endDate) => {
+        debugSet({ loading: true });
         try {
           const res = await api.get(
             `/planned-workouts?start_date=${startDate}&end_date=${endDate}`
           );
           const items = (res.data ?? []) as PlannedWorkout[];
           get().upsertMany(items);
-          set(s => ({ loadedRanges: { ...s.loadedRanges, [key]: true } }));
-          return get().selectGroupedByDateInRange(startDate, endDate);
+          debugSet(s => ({
+            loadedRanges: {
+              ...s.loadedRanges,
+              [rangeKey(startDate, endDate)]: true,
+            },
+          }));
         } finally {
-          set({ loading: false });
-          inFlightRange.delete(key);
+          debugSet({ loading: false });
         }
-      })();
+      },
 
-      inFlightRange.set(key, p);
-      return p;
-    },
+      refetchById: async id => {
+        const res = await api.get(`/planned-workouts/${id}`);
+        get().upsert(res.data as PlannedWorkout);
+      },
 
-    getById: async (id: string) => {
-      const cached = get().byId[id];
-      if (cached) return cached;
+      getByDate: async (date, opts) => {
+        const force = !!opts?.force;
 
-      const existing = inFlightById.get(id);
-      if (existing) return existing;
-
-      const p = (async () => {
-        try {
-          const res = await api.get(`/planned-workouts/${id}`);
-          const pw = res.data as PlannedWorkout;
-          get().upsert(pw);
-          return pw;
-        } finally {
-          inFlightById.delete(id);
+        const state = get();
+        if (!force && state.loadedDates[date]) {
+          return state.selectByDate(date);
         }
-      })();
 
-      inFlightById.set(id, p);
-      return p;
-    },
+        const existing = inFlightDate.get(date);
+        if (existing) return existing;
 
-    upsert: pw =>
-      set(s => ({
-        byId: { ...s.byId, [pw.id]: pw },
-      })),
+        const p = (async () => {
+          debugSet({ loading: true });
+          try {
+            const res = await api.get(`/planned-workouts?date=${date}`);
+            console.log("Res length", res.data.length);
+            const items = (res.data ?? []) as PlannedWorkout[];
+            get().upsertMany(items);
+            debugSet(s => ({
+              loadedDates: { ...s.loadedDates, [date]: true },
+            }));
+            return get().selectByDate(date);
+          } finally {
+            debugSet({ loading: false });
+            inFlightDate.delete(date);
+          }
+        })();
 
-    upsertMany: pws =>
-      set(s => {
-        if (!pws?.length) return s;
+        inFlightDate.set(date, p);
+        return p;
+      },
 
-        // Merge byId
-        const nextById = { ...s.byId };
-        for (const pw of pws) nextById[pw.id] = pw;
+      getRange: async (startDate, endDate, opts) => {
+        const force = !!opts?.force;
+        const key = rangeKey(startDate, endDate);
+        const state = get();
+        if (!force && state.loadedRanges[key]) {
+          return state.selectGroupedByDateInRange(startDate, endDate);
+        }
 
-        return { ...s, byId: nextById };
-      }),
+        const existing = inFlightRange.get(key);
+        if (existing) return existing;
 
-    patch: (id, partial) =>
-      set(s => {
-        const prev = s.byId[id];
-        if (!prev) return s;
-        return { byId: { ...s.byId, [id]: { ...prev, ...partial } } };
-      }),
+        const p = (async () => {
+          debugSet({ loading: true });
+          try {
+            const res = await api.get(
+              `/planned-workouts?start_date=${startDate}&end_date=${endDate}`
+            );
+            const items = (res.data ?? []) as PlannedWorkout[];
+            get().upsertMany(items);
+            debugSet(s => ({
+              loadedRanges: { ...s.loadedRanges, [key]: true },
+            }));
+            return get().selectGroupedByDateInRange(startDate, endDate);
+          } finally {
+            debugSet({ loading: false });
+            inFlightRange.delete(key);
+          }
+        })();
 
-    remove: id =>
-      set(s => {
-        const next = { ...s.byId };
-        delete next[id];
-        return { byId: next };
-      }),
+        inFlightRange.set(key, p);
+        return p;
+      },
 
-    selectByDate: date => {
-      const byId = get().byId;
-      const items = Object.values(byId).filter(pw => pw.date === date);
-      return sortForDate(items);
-    },
+      getById: async (id: string) => {
+        const cached = get().byId[id];
+        if (cached) return cached;
 
-    selectGroupedByDateInRange: (startDate, endDate) => {
-      const byId = get().byId;
-      const items = Object.values(byId).filter(pw => {
-        // YYYY-MM-DD lexical comparison works
-        return pw.date >= startDate && pw.date <= endDate;
-      });
+        const existing = inFlightById.get(id);
+        if (existing) return existing;
 
-      const grouped = groupByDate(items);
-      for (const d of Object.keys(grouped))
-        grouped[d] = sortForDate(grouped[d]);
-      return grouped;
-    },
-  })
+        const p = (async () => {
+          try {
+            const res = await api.get(`/planned-workouts/${id}`);
+            const pw = res.data as PlannedWorkout;
+            get().upsert(pw);
+            return pw;
+          } finally {
+            inFlightById.delete(id);
+          }
+        })();
+
+        inFlightById.set(id, p);
+        return p;
+      },
+
+      upsert: pw =>
+        debugSet(s => ({
+          byId: { ...s.byId, [pw.id]: pw },
+        })),
+
+      upsertMany: pws =>
+        debugSet(s => {
+          if (!pws?.length) return s;
+
+          // Merge byId
+          const nextById = { ...s.byId };
+          for (const pw of pws) nextById[pw.id] = pw;
+
+          return { ...s, byId: nextById };
+        }),
+
+      patch: (id, partial) =>
+        debugSet(s => {
+          const prev = s.byId[id];
+          if (!prev) return s;
+          return { byId: { ...s.byId, [id]: { ...prev, ...partial } } };
+        }),
+
+      remove: id =>
+        debugSet(s => {
+          const next = { ...s.byId };
+          delete next[id];
+          return { byId: next };
+        }),
+
+      selectByDate: date => {
+        const byId = get().byId;
+        const items = Object.values(byId).filter(pw => pw.date === date);
+        return sortForDate(items);
+      },
+
+      selectGroupedByDateInRange: (startDate, endDate) => {
+        const byId = get().byId;
+        const items = Object.values(byId).filter(pw => {
+          // YYYY-MM-DD lexical comparison works
+          return pw.date >= startDate && pw.date <= endDate;
+        });
+
+        const grouped = groupByDate(items);
+        for (const d of Object.keys(grouped))
+          grouped[d] = sortForDate(grouped[d]);
+        return grouped;
+      },
+    };
+  }
 );
 
 type Options = {
@@ -294,10 +438,13 @@ type Options = {
   status?: PlannedWorkoutStatus | PlannedWorkoutStatus[];
   search?: string;
   sort?: (a: PlannedWorkout, b: PlannedWorkout) => number;
+
+  // Whether to expand recurrances
+  expandRecurring?: boolean;
 };
 
 export function usePlannedWorkouts(opts?: Options) {
-  const byId = usePlannedWorkoutsStoreInternal(s => s.byId);
+  const originalById = usePlannedWorkoutsStoreInternal(s => s.byId);
   const loading = usePlannedWorkoutsStoreInternal(s => s.loading);
 
   const refetchByDate = usePlannedWorkoutsStoreInternal(s => s.refetchByDate);
@@ -314,13 +461,19 @@ export function usePlannedWorkouts(opts?: Options) {
   const remove = usePlannedWorkoutsStoreInternal(s => s.remove);
 
   const instanceId = useRef(Math.random().toString(36).substring(2, 8));
-  useEffect(() => {
-    console.log(
-      "Planned ByID CHanged",
-      instanceId.current,
-      Object.entries(byId).length
-    );
-  }, [byId]);
+
+  const byId = useMemo(() => {
+    const startDate = opts?.startDate || opts?.date;
+    const endDate = opts?.endDate || opts?.date;
+
+    const shouldExpand = !!(opts?.expandRecurring && startDate && endDate);
+    const expanded = shouldExpand
+      ? expandPlannedWorkoutsById(originalById, startDate, endDate)
+      : originalById;
+
+    return expanded;
+  }, [originalById, opts?.startDate, opts?.endDate, opts?.date]);
+
   useEffect(() => {
     // Mirrors templatesStore: do an initial load if caller provided date/range.
     if (opts?.date) {
@@ -379,7 +532,7 @@ export function usePlannedWorkouts(opts?: Options) {
       });
     }
 
-    return arr;
+    return arr.map(item => ({ ...item, id: item.id.split(":")[0] }));
   }, [
     byId,
     opts?.date,

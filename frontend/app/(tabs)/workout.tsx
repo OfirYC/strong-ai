@@ -6,7 +6,7 @@
 
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -29,35 +29,64 @@ import {
 import { useTemplates } from "../../store/templatesStore";
 import { useWorkoutStore } from "../../store/workoutStore";
 import { useWorkouts, workoutsStore } from "../../store/workoutsStore";
-import { WorkoutExercise, WorkoutTemplate } from "../../types";
+import { WorkoutExercise, WorkoutSession, WorkoutTemplate } from "../../types";
 import api from "../../utils/api";
+import { useActiveWorkoutSheetUIStore } from "../../store/workoutCompleteUIStore";
 
 // Keep your enriched shape for UI only
 type EnrichedPlannedWorkout = StorePlannedWorkout & {
   actualName?: string;
   actualNotes?: string;
+  __sessionOnly?: boolean; // add this
+};
+
+const toLocalYMD = (d: Date) => d.toLocaleDateString("en-CA"); // YYYY-MM-DD
+
+const isSessionOnDate = (session: any, ymd: string) => {
+  const raw =
+    session?.started_at ??
+    session?.created_at ??
+    session?.ended_at ??
+    session?.date; // whichever exists in your model
+
+  if (!raw) return false;
+
+  const dt = new Date(raw);
+  if (Number.isNaN(dt.getTime())) return false;
+
+  return toLocalYMD(dt) === ymd;
 };
 
 export default function WorkoutScreen() {
   const router = useRouter();
-  const { activeWorkout, startWorkout, endWorkout } = useWorkoutStore();
+  const {
+    activeWorkout,
+    startWorkout: _startWorkout,
+    endWorkout,
+  } = useWorkoutStore();
+
+  const startWorkout = useCallback(
+    (workout: WorkoutSession) => {
+      _startWorkout(workout);
+      setIsActiveWorkoutSheetExpanded(true);
+    },
+    [_startWorkout]
+  );
 
   const { list: templatesList, loading: templatesLoading } = useTemplates();
 
-  const today = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const today = useMemo(() => new Date().toLocaleDateString("en-CA"), []); // YYYY-MM-DD, local
 
   // Planned workouts for today
-  const {
-    list: todaysPlannedBase,
-    loading: plannedLoading,
-    getByDate,
-  } = usePlannedWorkouts({ date: today });
+  const { list: todaysPlannedBase, loading: plannedLoading } =
+    usePlannedWorkouts({ date: today, expandRecurring: true });
 
   // Workouts sessions cache
   const {
     byId: workoutsById,
     getManyByIds,
     getById: getWorkoutById,
+    getByDate: getWorkoutSessionsByDate,
   } = useWorkouts();
 
   const [loading, setLoading] = useState(false);
@@ -66,11 +95,8 @@ export default function WorkoutScreen() {
   const [showRoutineModal, setShowRoutineModal] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
-
-  // Initial load (cache-aware)
-  useEffect(() => {
-    getByDate(today).catch(() => {});
-  }, [getByDate, today]);
+  const { setIsExpanded: setIsActiveWorkoutSheetExpanded } =
+    useActiveWorkoutSheetUIStore();
 
   // Derive the set of workout session ids that we need for enrichment
   const todaysWorkoutSessionIds = useMemo(() => {
@@ -79,28 +105,17 @@ export default function WorkoutScreen() {
       if (pw.workout_session_id) ids.add(pw.workout_session_id);
     }
 
-    // console.log(
-    //   "POO ID",
-    //   // Object.entries(workoutsById).find(([k, v]) => v.name === "POOO"),
-    //   todaysPlannedBase.find(
-    //     p =>
-    //       p.workout_session_id ==
-    //       Object.entries(workoutsById).find(([k, v]) => v.name === "POOO")![1]
-    //         .id
-    //   ),
-
-    //   ids.has(
-    //     Object.entries(workoutsById).find(([k, v]) => v.name === "POOO")![1].id
-    //   )
-    // );
-
     return Array.from(ids);
   }, [todaysPlannedBase]);
+
+  // Fetch workout sessions by current date
+  useEffect(() => {
+    getWorkoutSessionsByDate({ date: today }).catch();
+  }, [getWorkoutSessionsByDate]);
 
   // Fetch missing workout sessions (once), and rely on workoutsStore afterwards
   useEffect(() => {
     if (todaysWorkoutSessionIds.length === 0) return;
-
     const missing = todaysWorkoutSessionIds.filter(id => !workoutsById[id]);
     if (missing.length === 0) return;
 
@@ -264,6 +279,7 @@ export default function WorkoutScreen() {
       plannedWorkout.workout_session_id &&
       activeWorkout?.id === plannedWorkout.workout_session_id
     ) {
+      setIsActiveWorkoutSheetExpanded(true);
       return;
     }
 
@@ -421,9 +437,7 @@ export default function WorkoutScreen() {
 
   // Enrich planned workouts using workoutsStore (single source of truth for workout session fields)
   const todaysWorkouts: EnrichedPlannedWorkout[] = useMemo(() => {
-    // todaysPlannedBase and also the ongoing workouts
-
-    const plannedTodaysWorkouts = (todaysPlannedBase ?? []).map(pw => {
+    const planned = (todaysPlannedBase ?? []).map(pw => {
       const sid = pw.workout_session_id;
       if (!sid) return pw as EnrichedPlannedWorkout;
 
@@ -434,11 +448,49 @@ export default function WorkoutScreen() {
         ...(pw as EnrichedPlannedWorkout),
         actualName: session.name ?? pw.name,
         actualNotes: session.notes ?? pw.notes,
-      };
+        status: session.ended_at
+          ? "completed"
+          : session.skipped
+          ? "skipped"
+          : session.started_at
+          ? "in_progress"
+          : "planned",
+      } as const;
     });
 
-    return plannedTodaysWorkouts;
-  }, [todaysPlannedBase, workoutsById]);
+    const plannedSessionIds = new Set(
+      (todaysPlannedBase ?? [])
+        .map(pw => pw.workout_session_id)
+        .filter(Boolean) as string[]
+    );
+
+    // sessions that exist in cache and happened today, but are NOT linked to a planned workout
+    const sessionOnly = Object.values(workoutsById)
+      .filter(s => isSessionOnDate(s, today))
+      .filter(s => !plannedSessionIds.has((s as any).id))
+      .map(s => {
+        const sid = (s as any).id as string;
+
+        const status: StorePlannedWorkout["status"] = (s as any).ended_at
+          ? "completed"
+          : "in_progress";
+
+        // Pseudo planned workout card shape
+        return {
+          id: `session:${sid}`, // unique key for list rendering
+          date: today,
+          status,
+          name: (s as any).name ?? "Workout",
+          notes: (s as any).notes ?? "",
+          workout_session_id: sid,
+          actualName: (s as any).name ?? "Workout",
+          actualNotes: (s as any).notes ?? "",
+          __sessionOnly: true,
+        } as EnrichedPlannedWorkout;
+      });
+
+    return [...planned, ...sessionOnly];
+  }, [todaysPlannedBase, workoutsById, today]);
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>

@@ -1,6 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Alert,
   Animated,
@@ -35,8 +41,7 @@ import ExerciseDetailModal from "./ExerciseDetailModal";
 import ExercisePickerModal from "./ExercisePickerModal";
 import SetRowInput, { SetHeader } from "./SetRowInput";
 import SwipeToDeleteRow from "./SwipeToDeleteRow";
-import WorkoutCompleteModal from "./WorkoutCompleteModal";
-import { useWorkoutCompleteUIStore } from "../store/workoutCompleteUIStore";
+import { useActiveWorkoutSheetUIStore } from "../store/workoutCompleteUIStore";
 
 interface WorkoutSummaryData {
   name: string;
@@ -58,13 +63,10 @@ const COLLAPSED_HEIGHT = 80;
 
 interface ActiveWorkoutSheetProps {
   onFinishWorkout: () => void;
-
-  initialExpanded?: boolean;
 }
 
 export default function ActiveWorkoutSheet({
   onFinishWorkout,
-  initialExpanded = true,
 }: ActiveWorkoutSheetProps) {
   const insets = useSafeAreaInsets();
 
@@ -83,43 +85,37 @@ export default function ActiveWorkoutSheet({
     remove: removeWorkout,
     totalCount,
   } = useWorkouts();
+
   const activeWorkoutId = activeWorkout?.id;
+
+  const exercises = activeWorkout?.exercises || [];
 
   const syncWorkoutPatch = (partial: Partial<WorkoutSession>) => {
     if (!activeWorkoutId) return;
 
-    // 1) Update local active workout store (persisted UI draft)
-    // Reuse your existing methods depending on what's being patched.
-    // For general partials, we’ll route through updateWorkout with current exercises.
     const nextName = partial.name ?? undefined;
     const nextNotes = partial.notes ?? undefined;
     const nextExercises = partial.exercises ?? exercises;
 
     updateWorkout(nextExercises, nextNotes, nextName);
-
-    // 2) Update canonical workouts store (optimistic)
-    console.log("Syncing workout patch:");
     patchWorkout(activeWorkoutId, partial);
   };
 
   const syncExercises = (nextExercises: WorkoutExercise[]) => {
     if (!activeWorkoutId) return;
     updateWorkout(nextExercises);
-    console.log("Patching workout");
     patchWorkout(activeWorkoutId, { exercises: nextExercises });
   };
 
   const syncName = (name: string) => {
     if (!activeWorkoutId) return;
     updateWorkoutName(name);
-    console.log("Patching workout name");
     patchWorkout(activeWorkoutId, { name });
   };
 
   const syncNotes = (notes: string | undefined) => {
     if (!activeWorkoutId) return;
     updateWorkoutNotes(notes);
-    console.log("Patching workout notes");
     patchWorkout(activeWorkoutId, { notes });
   };
 
@@ -127,14 +123,19 @@ export default function ActiveWorkoutSheet({
   const workoutNotes = activeWorkout?.notes;
   const [debouncedName] = useDebounce(workoutName, 800);
   const [debouncedNotes] = useDebounce(workoutNotes, 800);
-  const [isExpanded, setIsExpanded] = useState(initialExpanded);
-  const isExpandedRef = useRef(initialExpanded); // Ref to track current expanded state
+
+  const { openWorkoutComplete, isExpanded, setIsExpanded } =
+    useActiveWorkoutSheetUIStore();
+
+  // Local imperative refs for gesture + animation; store is the source of truth
+  const isExpandedRef = useRef<boolean>(false);
+
   const [showMenu, setShowMenu] = useState(false);
   const [showDescription, setShowDescription] = useState(
     !!activeWorkout?.notes
   );
 
-  const [timer, setTimer] = useState(0);
+  const { timer, setTimer } = useTimer();
   const [saving, setSaving] = useState(false);
   const [showExercisePicker, setShowExercisePicker] = useState(false);
   const [showCreateExercise, setShowCreateExercise] = useState(false);
@@ -145,21 +146,16 @@ export default function ActiveWorkoutSheet({
 
   const [isDraggingList, setIsDraggingList] = useState(false);
   const [extraTopPadding, setExtraTopPadding] = useState(0);
-  const {
-    byId: exercisesById,
-    refetchById,
-    upsert,
-    loading: exercisesLoading,
-  } = useExercises();
-  const { openWorkoutComplete } = useWorkoutCompleteUIStore();
 
-  // NEW: track scroll position for timer fade
+  const { byId: exercisesById, refetchById, upsert } = useExercises();
+
+  // Scroll position for timer fade
   const scrollY = useRef(new Animated.Value(0)).current;
 
   const timerTopOpacity = useMemo(
     () =>
       scrollY.interpolate({
-        inputRange: [0, 40], // tweak as needed
+        inputRange: [0, 40],
         outputRange: [0, 1],
         extrapolate: "clamp",
       }),
@@ -169,112 +165,84 @@ export default function ActiveWorkoutSheet({
   const mainTimerOpacity = useMemo(
     () =>
       scrollY.interpolate({
-        inputRange: [0, 40], // same threshold so they crossfade
+        inputRange: [0, 40],
         outputRange: [1, 0],
         extrapolate: "clamp",
       }),
     [scrollY]
   );
 
-  // Calculate the maximum height for expanded state
-  // Screen height minus top safe area minus tab bar (60px) minus bottom safe area
-  // Extra 40px at top to avoid system gesture conflicts
   const maxExpandedHeight = SCREEN_HEIGHT - insets.top - 85 - insets.bottom;
 
   const animatedHeight = useRef(new Animated.Value(COLLAPSED_HEIGHT)).current;
-  const didInitRef = useRef(false);
 
-  const exercises = activeWorkout?.exercises || [];
+  const animateTo = useCallback(
+    (nextExpanded: boolean) => {
+      Animated.spring(animatedHeight, {
+        toValue: nextExpanded ? maxExpandedHeight : COLLAPSED_HEIGHT,
+        useNativeDriver: false,
+        friction: 10,
+      }).start();
 
-  // Pan responder for drag gesture - use ref for isExpanded to avoid stale closure
+      isExpandedRef.current = nextExpanded;
+
+      // Reset scroll-driven fades when collapsing
+      if (!nextExpanded) scrollY.setValue(0);
+    },
+    [animatedHeight, maxExpandedHeight, scrollY]
+  );
+
+  // Mount behavior: always paint collapsed first, then animate to store state
+  const didMountRef = useRef(false);
+  useEffect(() => {
+    if (didMountRef.current) return;
+    didMountRef.current = true;
+
+    animatedHeight.setValue(COLLAPSED_HEIGHT);
+    isExpandedRef.current = false;
+
+    requestAnimationFrame(() => {
+      animateTo(isExpanded);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Store-driven animation for ANY external setIsExpanded calls
+  const didSyncRef = useRef(false);
+  useEffect(() => {
+    // Skip first run; mount effect above handled the initial animation
+    if (!didSyncRef.current) {
+      didSyncRef.current = true;
+      return;
+    }
+    animateTo(isExpanded);
+  }, [isExpanded, animateTo]);
+
+  // Pan responder uses ref (not store) to avoid stale closure during gesture
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        return Math.abs(gestureState.dy) > 10;
-      },
+      onMoveShouldSetPanResponder: (_, gestureState) =>
+        Math.abs(gestureState.dy) > 10,
       onPanResponderMove: (_, gestureState) => {
         if (!isExpandedRef.current && gestureState.dy < -20) {
-          expand();
+          setIsExpanded(true);
         } else if (isExpandedRef.current && gestureState.dy > 20) {
-          collapse();
+          setIsExpanded(false);
         }
       },
       onPanResponderRelease: () => {},
     })
   ).current;
 
+  const expand = () => setIsExpanded(true);
+  const collapse = () => setIsExpanded(false);
+  const toggleExpand = () => setIsExpanded(!isExpanded);
+
   const listRef = useRef<typeof DraggableFlatList<WorkoutExercise> | null>(
     null
   );
   const itemRefs = useRef<Record<string, View | null>>({});
-
-  const expand = () => {
-    Animated.spring(animatedHeight, {
-      toValue: maxExpandedHeight,
-      useNativeDriver: false,
-      friction: 10,
-    }).start();
-    setIsExpanded(true);
-    isExpandedRef.current = true;
-  };
-
-  const collapse = () => {
-    Animated.spring(animatedHeight, {
-      toValue: COLLAPSED_HEIGHT,
-      useNativeDriver: false,
-      friction: 10,
-    }).start();
-    setIsExpanded(false);
-    isExpandedRef.current = false;
-  };
-
-  const toggleExpand = () => {
-    if (isExpanded) {
-      collapse();
-    } else {
-      expand();
-    }
-  };
-
-  // Update height when initialExpanded changes
-  useEffect(() => {
-    // Don’t animate before we have the correct maxExpandedHeight
-    // (insets are ready by first render, but this keeps it stable)
-    const run = () => {
-      if (initialExpanded) {
-        // Render expanded content immediately, then animate height up
-        setIsExpanded(true);
-        isExpandedRef.current = true;
-
-        Animated.spring(animatedHeight, {
-          toValue: maxExpandedHeight,
-          useNativeDriver: false,
-          friction: 10,
-        }).start();
-      } else {
-        // Collapse (animate down)
-        setIsExpanded(false);
-        isExpandedRef.current = false;
-
-        Animated.spring(animatedHeight, {
-          toValue: COLLAPSED_HEIGHT,
-          useNativeDriver: false,
-          friction: 10,
-        }).start();
-      }
-    };
-
-    // On first mount, ensure we animate from collapsed → expanded if needed.
-    if (!didInitRef.current) {
-      didInitRef.current = true;
-      requestAnimationFrame(run);
-      return;
-    }
-
-    // On subsequent changes (e.g., initialExpanded prop changes, safe-area changes)
-    run();
-  }, [initialExpanded, maxExpandedHeight, animatedHeight]);
 
   useEffect(() => {
     if (!workoutStartTime) return;
@@ -287,15 +255,12 @@ export default function ActiveWorkoutSheet({
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
-  }, [workoutStartTime]);
+  }, [workoutStartTime, setTimer]);
 
-  // Load exercise details when exercises change
   useEffect(() => {
     if (!activeWorkout?.exercises?.length) return;
-
     for (const ex of activeWorkout.exercises) {
       if (!exercisesById[ex.exercise_id]) {
-        // fire-and-forget is fine; store handles merging
         refetchById(ex.exercise_id).catch(() => {});
       }
     }
@@ -313,28 +278,10 @@ export default function ActiveWorkoutSheet({
     if (!activeWorkout) return;
 
     const prev = lastCommittedRef.current;
-
-    // Prevent redundant saves
-    if (debouncedName === prev.name && debouncedNotes === prev.notes) {
-      return;
-    }
+    if (debouncedName === prev.name && debouncedNotes === prev.notes) return;
 
     const commit = async () => {
       try {
-        console.log(
-          "Sending Debounced Meta",
-          JSON.stringify(
-            {
-              debouncedName,
-              debouncedNotes,
-              workoutName,
-              workoutNotes,
-              activeWorkout,
-            },
-            null,
-            2
-          )
-        );
         await api.put(`/workouts/${activeWorkout.id}`, {
           name: debouncedName,
           notes: debouncedNotes,
@@ -360,13 +307,9 @@ export default function ActiveWorkoutSheet({
       })) || []
     );
 
-  const getDefaultRestTimer = () => {
-    return 3 * 60;
-  };
+  const getDefaultRestTimer = () => 3 * 60;
 
-  const handleShowExercisePicker = () => {
-    setShowExercisePicker(true);
-  };
+  const handleShowExercisePicker = () => setShowExercisePicker(true);
 
   const handleAddExerciseToWorkout = async (exercise: Exercise) => {
     const previousSets = await loadExercisePreviousSets(exercise.id, true);
@@ -390,14 +333,11 @@ export default function ActiveWorkoutSheet({
     const newExercise: WorkoutExercise = {
       exercise_id: exercise.id,
       order: exercises.length,
-      sets: sets,
+      sets,
     };
 
-    const newExercises = [...exercises, newExercise];
-    syncExercises(newExercises);
-
+    syncExercises([...exercises, newExercise]);
     upsert(exercise);
-
     setShowExercisePicker(false);
   };
 
@@ -410,6 +350,7 @@ export default function ActiveWorkoutSheet({
       set_type: "normal",
       rest_timer: getDefaultRestTimer(),
     };
+
     if (fields.includes("weight")) newSet.weight = 0;
     if (fields.includes("reps")) newSet.reps = 0;
     if (fields.includes("distance")) newSet.distance = 0;
@@ -421,22 +362,21 @@ export default function ActiveWorkoutSheet({
       ...exercise,
       sets: [...exercise.sets, newSet],
     };
+
     syncExercises(newExercises);
   };
 
   const updateSet = (
     exerciseIndex: number,
     setIndex: number,
-    fields: Partial<WorkoutSet> // <---- TYPE!
+    fields: Partial<WorkoutSet>
   ) => {
     const newExercises = [...exercises];
-
     const oldExercise = newExercises[exerciseIndex];
-    const oldSets = oldExercise.sets;
 
     newExercises[exerciseIndex] = {
       ...oldExercise,
-      sets: oldSets.map((set, i) =>
+      sets: oldExercise.sets.map((set, i) =>
         i === setIndex ? { ...set, ...fields } : set
       ),
     };
@@ -480,13 +420,10 @@ export default function ActiveWorkoutSheet({
   const handleSaveAndFinish = async () => {
     if (!activeWorkout) return;
 
-    // Check for uncompleted sets
     let uncompletedSetCount = 0;
     exercises.forEach(ex => {
       ex.sets.forEach(set => {
-        if (!set.completed) {
-          uncompletedSetCount++;
-        }
+        if (!set.completed) uncompletedSetCount++;
       });
     });
 
@@ -513,7 +450,6 @@ export default function ActiveWorkoutSheet({
   const saveWorkout = async (removeUncompleted: boolean) => {
     if (!activeWorkout) return;
 
-    // Filter out uncompleted sets if requested
     let exercisesToSave = exercises;
     if (removeUncompleted) {
       exercisesToSave = exercises
@@ -521,19 +457,19 @@ export default function ActiveWorkoutSheet({
           ...ex,
           sets: ex.sets.filter(set => set.completed),
         }))
-        .filter(ex => ex.sets.length > 0); // Remove exercises with no completed sets
+        .filter(ex => ex.sets.length > 0);
     }
 
     try {
       setSaving(true);
-      // optimistic store updates
+
       syncWorkoutPatch({
         exercises: exercisesToSave,
         name: activeWorkout.name,
         notes: activeWorkout.notes,
         ended_at: new Date().toISOString(),
       });
-      // Use PUT instead of PATCH - backend requires PUT
+
       const response = await api.put(`/workouts/${activeWorkout.id}`, {
         exercises: exercisesToSave,
         name: activeWorkout.name,
@@ -543,26 +479,23 @@ export default function ActiveWorkoutSheet({
 
       upsertWorkout(response.data as WorkoutSession);
       endWorkout();
-      // Get workout count for summary
+
       const workoutNumber = (totalCount || 0) + 1;
 
-      // Build exercise summaries (use saved exercises, not original)
       const exerciseSummaries = exercisesToSave.map(ex => {
         const detail = exercisesById[ex.exercise_id];
         const sets = ex.sets;
         let bestSet = "";
 
-        // Determine best set based on exercise type
         if (detail?.exercise_kind === "Cardio") {
-          // For cardio, show best distance or longest time
           const bestDistanceSet = sets.reduce(
             (best, set) =>
               (set.distance || 0) > (best.distance || 0) ? set : best,
-            sets[0] || {}
+            sets[0] || ({} as any)
           );
-          if (bestDistanceSet?.distance) {
+          if (bestDistanceSet?.distance)
             bestSet = `${bestDistanceSet.distance} km`;
-          } else if (bestDistanceSet?.duration) {
+          else if (bestDistanceSet?.duration) {
             const mins = Math.floor((bestDistanceSet.duration || 0) / 60);
             bestSet = `${mins}m`;
           }
@@ -570,22 +503,21 @@ export default function ActiveWorkoutSheet({
           detail?.exercise_kind &&
           ["Plank", "Static Hold"].includes(detail.exercise_kind)
         ) {
-          // Duration-based
           const bestDurationSet = sets.reduce(
             (best, set) =>
               (set.duration || 0) > (best.duration || 0) ? set : best,
-            sets[0] || {}
+            sets[0] || ({} as any)
           );
           const mins = Math.floor((bestDurationSet?.duration || 0) / 60);
           const secs = (bestDurationSet?.duration || 0) % 60;
           bestSet = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
         } else {
-          // Weight-based - find highest volume set
           const bestWeightSet = sets.reduce((best, set) => {
             const volume = (set.weight || 0) * (set.reps || 0);
             const bestVolume = (best.weight || 0) * (best.reps || 0);
             return volume > bestVolume ? set : best;
-          }, sets[0] || {});
+          }, sets[0] || ({} as any));
+
           if (bestWeightSet?.weight) {
             bestSet = `${bestWeightSet.weight} kg × ${bestWeightSet.reps || 0}`;
           } else if (bestWeightSet?.reps) {
@@ -600,26 +532,22 @@ export default function ActiveWorkoutSheet({
         };
       });
 
-      // Calculate total volume (only for weight exercises, use saved exercises)
       let totalVolume = 0;
       exercisesToSave.forEach(ex => {
         ex.sets.forEach(set => {
-          if (set.weight && set.reps) {
-            totalVolume += set.weight * set.reps;
-          }
+          if (set.weight && set.reps) totalVolume += set.weight * set.reps;
         });
       });
 
-      // Build summary data
       const summary: WorkoutSummaryData = {
         name: activeWorkout.name || "Workout",
         date: new Date(),
         duration: timer,
-        totalVolume: totalVolume,
-        prCount: 0, // TODO: Could fetch from backend PR endpoint
+        totalVolume,
+        prCount: 0,
         exerciseCount: exercises.length,
         exercises: exerciseSummaries,
-        workoutNumber: workoutNumber,
+        workoutNumber,
       };
 
       openWorkoutComplete(summary);
@@ -637,18 +565,15 @@ export default function ActiveWorkoutSheet({
 
   const handleToggleDescription = () => {
     if (showDescription) {
-      // Remove description
       syncNotes(undefined);
       setShowDescription(false);
     } else {
-      // Add description
       setShowDescription(true);
     }
     setShowMenu(false);
   };
 
   const handleCancelWorkout = () => {
-    // Check if this is a scheduled workout
     if (activeWorkout?.planned_workout_id) {
       Alert.alert(
         "Cancel Scheduled Workout",
@@ -666,10 +591,8 @@ export default function ActiveWorkoutSheet({
             text: "Cancel for Today",
             style: "destructive",
             onPress: async () => {
-              // Mark the planned workout as skipped
               try {
                 syncWorkoutPatch({ skipped: true, exercises: [] });
-
                 const res = await api.put(`/workouts/${activeWorkout.id}`, {
                   skipped: true,
                   exercises: [],
@@ -688,7 +611,6 @@ export default function ActiveWorkoutSheet({
         ]
       );
     } else {
-      // Unscheduled workout (quick start or template without scheduling) - delete it entirely
       Alert.alert(
         "Cancel Workout",
         "Are you sure you want to cancel this workout? All progress will be lost.",
@@ -698,10 +620,8 @@ export default function ActiveWorkoutSheet({
             text: "Cancel Workout",
             style: "destructive",
             onPress: async () => {
-              // Delete the workout session from database
               try {
                 if (activeWorkoutId) removeWorkout(activeWorkoutId);
-
                 await api.delete(`/workouts/${activeWorkout?.id}`);
               } catch (error) {
                 console.error("Failed to delete workout:", error);
@@ -728,21 +648,15 @@ export default function ActiveWorkoutSheet({
   };
 
   const handleReorderExercises = (data: WorkoutExercise[]) => {
-    const reordered = data.map((ex, index) => ({
-      ...ex,
-      order: index, // keep consistent with backend ordering
-    }));
+    const reordered = data.map((ex, index) => ({ ...ex, order: index }));
     syncExercises(reordered);
   };
 
-  if (!activeWorkout) {
-    return null;
-  }
+  if (!activeWorkout) return null;
 
   return (
     <>
       <Animated.View style={[styles.container, { height: animatedHeight }]}>
-        {/* Top Header with drag handle - different content for collapsed vs expanded */}
         <View {...panResponder.panHandlers}>
           <TouchableOpacity
             style={styles.collapsedHeader}
@@ -752,7 +666,6 @@ export default function ActiveWorkoutSheet({
           >
             <View style={styles.dragHandle} />
             {!isExpanded ? (
-              // Collapsed: show name and timer
               <View style={styles.collapsedContent}>
                 <View style={styles.collapsedLeft}>
                   <Ionicons name="barbell" size={24} color="#007AFF" />
@@ -768,12 +681,8 @@ export default function ActiveWorkoutSheet({
                 </View>
               </View>
             ) : (
-              // Expanded: just show Finish button
               <View style={styles.expandedTopBar}>
-                {/* Spacer to push Finish to the right, same as before */}
                 <View style={{ flex: 1 }} />
-
-                {/* Centered fading-in timer (overlay, does NOT move Finish) */}
                 <Animated.View
                   pointerEvents="none"
                   style={[
@@ -786,7 +695,6 @@ export default function ActiveWorkoutSheet({
                   </Text>
                 </Animated.View>
 
-                {/* Finish stays on the right exactly like before */}
                 <TouchableOpacity
                   style={styles.finishButton}
                   onPress={handleSaveAndFinish}
@@ -807,30 +715,22 @@ export default function ActiveWorkoutSheet({
           </TouchableOpacity>
         </View>
 
-        {/* Expanded Content */}
         {isExpanded && (
           <View style={styles.expandedContent}>
             <DraggableFlatList
               ref={listRef as any}
               data={exercises || []}
-              // ALL scrollable interior padding lives here
               contentContainerStyle={{
                 paddingTop: 4,
                 paddingBottom: isDraggingList ? extraTopPadding : 32,
                 paddingHorizontal: isDraggingList ? 0 : 20,
               }}
               keyExtractor={item => `${item.exercise_id}-${item.order}`}
-              // SCROLL → drive the header timer fade
-              // ✅ use this instead
-              onScrollOffsetChange={offset => {
-                scrollY.setValue(offset);
-              }}
+              onScrollOffsetChange={offset => scrollY.setValue(offset)}
               scrollEventThrottle={16}
-              // HEADER (scrolls)
               ListHeaderComponentStyle={{ paddingLeft: 0 }}
               ListHeaderComponent={
                 <View style={isDraggingList ? { paddingHorizontal: 20 } : {}}>
-                  {/* Row 1: Workout Name + Menu */}
                   <View style={styles.nameRow}>
                     <Ionicons
                       name="barbell"
@@ -857,7 +757,6 @@ export default function ActiveWorkoutSheet({
                     </TouchableOpacity>
                   </View>
 
-                  {/* Row 2: Date */}
                   <View style={styles.dateRow}>
                     <Ionicons
                       name="calendar-outline"
@@ -875,7 +774,6 @@ export default function ActiveWorkoutSheet({
                     </Text>
                   </View>
 
-                  {/* Row 3: Big Timer – fades out on scroll */}
                   <Animated.View
                     style={[styles.timerRow, { opacity: mainTimerOpacity }]}
                   >
@@ -885,7 +783,6 @@ export default function ActiveWorkoutSheet({
                     </Text>
                   </Animated.View>
 
-                  {/* Dropdown Menu */}
                   {showMenu && (
                     <View style={styles.menuDropdown}>
                       <TouchableOpacity
@@ -910,7 +807,6 @@ export default function ActiveWorkoutSheet({
                     </View>
                   )}
 
-                  {/* Description Input */}
                   {showDescription && (
                     <View style={styles.descriptionContainer}>
                       <TextInput
@@ -926,7 +822,6 @@ export default function ActiveWorkoutSheet({
                   )}
                 </View>
               }
-              // FOOTER (scrolls)
               ListFooterComponent={
                 <View style={styles.footer}>
                   <Button
@@ -944,9 +839,7 @@ export default function ActiveWorkoutSheet({
                   />
                 </View>
               }
-              onDragBegin={() => {
-                setIsDraggingList(true);
-              }}
+              onDragBegin={() => setIsDraggingList(true)}
               onDragEnd={({ data }) => {
                 setIsDraggingList(false);
                 setExtraTopPadding(0);
@@ -966,6 +859,7 @@ export default function ActiveWorkoutSheet({
               renderItem={({ item, drag, getIndex, isActive }) => {
                 const index = getIndex?.();
                 if (index == null) return null;
+
                 const detail = exercisesById[item.exercise_id];
                 const itemKey = `${item.exercise_id}-${item.order}`;
 
@@ -983,16 +877,11 @@ export default function ActiveWorkoutSheet({
                     }
 
                     ref.measure((x, y, width, height, pageX, pageY) => {
-                      const desiredY = e.nativeEvent.locationY;
-                      const cumulativeHeightsOfOtherItems = index * height;
-                      const baseAbsoluteLocation = pageY;
-                      const diff = baseAbsoluteLocation - desiredY;
-
-                      setExtraTopPadding(cumulativeHeightsOfOtherItems);
+                      setExtraTopPadding(index * height);
                       setTimeout(() => {
                         // @ts-ignore
                         listRef.current?.scrollToOffset({
-                          offset: cumulativeHeightsOfOtherItems,
+                          offset: index * height,
                           animated: false,
                         });
                         drag();
@@ -1013,7 +902,6 @@ export default function ActiveWorkoutSheet({
                       isDraggingList && { paddingHorizontal: 20 },
                     ]}
                   >
-                    {/* HEADER – always visible */}
                     <View style={styles.exerciseHeader}>
                       <TouchableOpacity
                         style={styles.exerciseNameContainer}
@@ -1068,7 +956,6 @@ export default function ActiveWorkoutSheet({
                       </TouchableOpacity>
                     </View>
 
-                    {/* BODY – only rendered in full mode */}
                     {!isCompact && (
                       <>
                         {item.sets.length > 0 && (
@@ -1078,12 +965,7 @@ export default function ActiveWorkoutSheet({
                               showCompleteColumn
                             />
 
-                            {/* Full-bleed rows: cancel out list/card horizontal padding */}
-                            <View
-                              style={{
-                                marginHorizontal: -20, // cancels the 20px horizontal padding from list/card
-                              }}
-                            >
+                            <View style={{ marginHorizontal: -20 }}>
                               {item.sets.map((set, setIndex) => (
                                 <SwipeToDeleteRow
                                   key={setIndex}
@@ -1127,7 +1009,6 @@ export default function ActiveWorkoutSheet({
         )}
       </Animated.View>
 
-      {/* Exercise Picker Modal */}
       <ExercisePickerModal
         visible={showExercisePicker}
         onClose={() => setShowExercisePicker(false)}
@@ -1168,7 +1049,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 0,
     right: 0,
-    bottom: 60, // Position above the tab bar (60px tab bar height)
+    bottom: 60,
     backgroundColor: "#FFFFFF",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
@@ -1230,9 +1111,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 0,
     paddingVertical: 0,
-    // minHeight: 44,
   },
-
   topBarTimerOverlay: {
     position: "absolute",
     left: 0,
@@ -1242,13 +1121,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-
   topBarTimerText: {
-    fontSize: 16, // slightly larger
+    fontSize: 16,
     fontWeight: "600",
-    color: "#1c1c1ed2", // normal text color, not purple
+    color: "#1c1c1ed2",
   },
-
   expandedContent: {
     flex: 1,
   },
@@ -1318,7 +1195,6 @@ const styles = StyleSheet.create({
     color: "#1C1C1E",
   },
   descriptionContainer: {
-    // paddingHorizontal: 20,
     paddingVertical: 8,
   },
   descriptionInput: {
@@ -1340,19 +1216,6 @@ const styles = StyleSheet.create({
   },
   finishButtonTextDisabled: {
     opacity: 0.5,
-  },
-  exercisesList: {
-    flex: 0,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-  },
-  emptyState: {
-    alignItems: "center",
-    padding: 32,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: "#8E8E93",
   },
   exerciseCard: {
     backgroundColor: "#FFFFFF",
@@ -1392,16 +1255,11 @@ const styles = StyleSheet.create({
   addSetText: {
     fontSize: 16,
     fontWeight: "600",
-    // color: "#007AFF",
     marginLeft: 6,
-  },
-  bottomSpacer: {
-    height: 100,
   },
   footer: {
     paddingHorizontal: 0,
     paddingVertical: 16,
-
     backgroundColor: "#FFFFFF",
   },
   addExerciseButton: {
@@ -1422,9 +1280,11 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#FF3B30",
   },
-  topBarTimerContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingLeft: 20,
-  },
 });
+
+// ActiveWorkoutSheet.whyDidYouRender = true;
+
+function useTimer() {
+  const [seconds, setSeconds] = useState(0);
+  return { timer: seconds, setTimer: setSeconds };
+}

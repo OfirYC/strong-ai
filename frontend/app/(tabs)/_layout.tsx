@@ -1,3 +1,11 @@
+// _layout.tsx
+if (__DEV__) {
+  console.log("Development mode - loading wdyr");
+  require("../../wdyr");
+} else {
+  console.log("Production mode - not loading wdyr");
+}
+
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import React, { useState } from "react";
@@ -6,7 +14,7 @@ import ActiveWorkoutSheet from "../../components/ActiveWorkoutSheet";
 import AIChatModal from "../../components/AIChatModal";
 import WorkoutCompleteModal from "../../components/WorkoutCompleteModal";
 import { useAuthStore } from "../../store/authStore";
-import { useWorkoutCompleteUIStore } from "../../store/workoutCompleteUIStore";
+import { useActiveWorkoutSheetUIStore } from "../../store/workoutCompleteUIStore";
 import { useWorkoutStore } from "../../store/workoutStore";
 
 export default function TabLayout() {
@@ -15,13 +23,13 @@ export default function TabLayout() {
 
   const [showAIChat, setShowAIChat] = useState(false);
 
-  const workoutCompleteVisible = useWorkoutCompleteUIStore(
+  const workoutCompleteVisible = useActiveWorkoutSheetUIStore(
     s => s.workoutCompleteVisible
   );
-  const workoutCompleteSummary = useWorkoutCompleteUIStore(
+  const workoutCompleteSummary = useActiveWorkoutSheetUIStore(
     s => s.workoutCompleteSummary
   );
-  const closeWorkoutComplete = useWorkoutCompleteUIStore(
+  const closeWorkoutComplete = useActiveWorkoutSheetUIStore(
     s => s.closeWorkoutComplete
   );
 
