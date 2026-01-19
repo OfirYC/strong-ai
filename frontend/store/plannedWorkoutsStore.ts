@@ -209,38 +209,7 @@ function sortForDate(items: PlannedWorkout[]) {
 
 export const usePlannedWorkoutsStoreInternal = create<PlannedWorkoutsStore>(
   (set, get) => {
-    const debugSet: typeof set = (partial: any, replace?: any) => {
-      // 1) Try to extract a useful “action name”
-      // If partial is a function, we can’t easily name it; still log stack.
-      const action =
-        typeof partial === "function"
-          ? "debugSet(fn)"
-          : "debugSet(object keys: " +
-            Object.keys(partial ?? {}).join(",") +
-            ")";
-
-      // 2) Optional: detect if byId size changes
-      const prevCount = Object.keys(get().byId).length;
-
-      // 3) Log stack so you see exactly who called it
-      console.groupCollapsed(`[plannedWorkoutsStore] ${action}`);
-      console.log("prevCount:", prevCount);
-      console.log(partial);
-      console.log(replace);
-      console.trace();
-      console.groupEnd();
-
-      // 4) Call real set
-      set(partial, replace);
-
-      // 5) After-state (optional)
-      const nextCount = Object.keys(get().byId).length;
-      if (nextCount !== prevCount) {
-        console.log(
-          `[plannedWorkoutsStore] byId count changed: ${prevCount} -> ${nextCount}`
-        );
-      }
-    };
+  
     return {
       byId: {},
       loading: false,
@@ -248,37 +217,37 @@ export const usePlannedWorkoutsStoreInternal = create<PlannedWorkoutsStore>(
       loadedRanges: {},
 
       refetchByDate: async date => {
-        debugSet({ loading: true });
+        set({ loading: true });
         try {
           const res = await api.get(`/planned-workouts?date=${date}`);
           const items = (res.data ?? []) as PlannedWorkout[];
 
           // Upsert + mark loaded
           get().upsertMany(items);
-          debugSet(s => ({
+          set(s => ({
             loadedDates: { ...s.loadedDates, [date]: true },
           }));
         } finally {
-          debugSet({ loading: false });
+          set({ loading: false });
         }
       },
 
       refetchRange: async (startDate, endDate) => {
-        debugSet({ loading: true });
+        set({ loading: true });
         try {
           const res = await api.get(
             `/planned-workouts?start_date=${startDate}&end_date=${endDate}`
           );
           const items = (res.data ?? []) as PlannedWorkout[];
           get().upsertMany(items);
-          debugSet(s => ({
+          set(s => ({
             loadedRanges: {
               ...s.loadedRanges,
               [rangeKey(startDate, endDate)]: true,
             },
           }));
         } finally {
-          debugSet({ loading: false });
+          set({ loading: false });
         }
       },
 
@@ -299,18 +268,17 @@ export const usePlannedWorkoutsStoreInternal = create<PlannedWorkoutsStore>(
         if (existing) return existing;
 
         const p = (async () => {
-          debugSet({ loading: true });
+          set({ loading: true });
           try {
             const res = await api.get(`/planned-workouts?date=${date}`);
-            console.log("Res length", res.data.length);
             const items = (res.data ?? []) as PlannedWorkout[];
             get().upsertMany(items);
-            debugSet(s => ({
+            set(s => ({
               loadedDates: { ...s.loadedDates, [date]: true },
             }));
             return get().selectByDate(date);
           } finally {
-            debugSet({ loading: false });
+            set({ loading: false });
             inFlightDate.delete(date);
           }
         })();
@@ -331,19 +299,19 @@ export const usePlannedWorkoutsStoreInternal = create<PlannedWorkoutsStore>(
         if (existing) return existing;
 
         const p = (async () => {
-          debugSet({ loading: true });
+          set({ loading: true });
           try {
             const res = await api.get(
               `/planned-workouts?start_date=${startDate}&end_date=${endDate}`
             );
             const items = (res.data ?? []) as PlannedWorkout[];
             get().upsertMany(items);
-            debugSet(s => ({
+            set(s => ({
               loadedRanges: { ...s.loadedRanges, [key]: true },
             }));
             return get().selectGroupedByDateInRange(startDate, endDate);
           } finally {
-            debugSet({ loading: false });
+            set({ loading: false });
             inFlightRange.delete(key);
           }
         })();
@@ -375,12 +343,12 @@ export const usePlannedWorkoutsStoreInternal = create<PlannedWorkoutsStore>(
       },
 
       upsert: pw =>
-        debugSet(s => ({
+        set(s => ({
           byId: { ...s.byId, [pw.id]: pw },
         })),
 
       upsertMany: pws =>
-        debugSet(s => {
+        set(s => {
           if (!pws?.length) return s;
 
           // Merge byId
@@ -391,14 +359,14 @@ export const usePlannedWorkoutsStoreInternal = create<PlannedWorkoutsStore>(
         }),
 
       patch: (id, partial) =>
-        debugSet(s => {
+        set(s => {
           const prev = s.byId[id];
           if (!prev) return s;
           return { byId: { ...s.byId, [id]: { ...prev, ...partial } } };
         }),
 
       remove: id =>
-        debugSet(s => {
+        set(s => {
           const next = { ...s.byId };
           delete next[id];
           return { byId: next };

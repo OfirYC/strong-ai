@@ -377,7 +377,6 @@ export const useWorkoutsStoreInternal = create<WorkoutsStore>((set, get) => ({
       try {
         const res = await api.get(`/workouts/batch/${missing.join(",")}`);
         const arr = (res.data ?? []) as WorkoutSession[];
-        console.log("Fetched batch workouts:", arr.length);
         if (arr.length) {
           const map: Record<string, WorkoutSession> = {};
           for (const w of arr) map[w.id] = w;

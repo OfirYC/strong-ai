@@ -48,10 +48,10 @@ const isSessionOnDate = (session: any, ymd: string) => {
     session?.created_at ??
     session?.ended_at ??
     session?.date; // whichever exists in your model
-
   if (!raw) return false;
 
   const dt = new Date(raw);
+
   if (Number.isNaN(dt.getTime())) return false;
 
   return toLocalYMD(dt) === ymd;
@@ -84,6 +84,7 @@ export default function WorkoutScreen() {
   // Workouts sessions cache
   const {
     byId: workoutsById,
+
     getManyByIds,
     getById: getWorkoutById,
     getByDate: getWorkoutSessionsByDate,
@@ -435,49 +436,54 @@ export default function WorkoutScreen() {
     skipped: 3,
   };
 
+  const sessionsByPlannedAndDate = useMemo(() => {
+    const map = new Map<string, WorkoutSession>();
+
+    for (const s of Object.values(workoutsById)) {
+      const plannedId = (s as any)?.planned_workout_id as string | undefined;
+      if (!plannedId) continue;
+
+      // use your existing date logic (local YMD)
+      const ymd = (() => {
+        const raw =
+          (s as any)?.started_at ??
+          (s as any)?.created_at ??
+          (s as any)?.ended_at ??
+          (s as any)?.date;
+
+        if (!raw) return null;
+        const dt = new Date(raw);
+        if (Number.isNaN(dt.getTime())) return null;
+        return toLocalYMD(dt);
+      })();
+
+      if (!ymd) continue;
+
+      map.set(`${plannedId}__${ymd}`, s as WorkoutSession);
+    }
+
+    return map;
+  }, [workoutsById]);
+
   // Enrich planned workouts using workoutsStore (single source of truth for workout session fields)
   const todaysWorkouts: EnrichedPlannedWorkout[] = useMemo(() => {
-    const planned = (todaysPlannedBase ?? []).map(pw => {
-      const sid = pw.workout_session_id;
-      if (!sid) return pw as EnrichedPlannedWorkout;
-
-      const session = workoutsById[sid];
-      if (!session) return pw as EnrichedPlannedWorkout;
-
-      return {
-        ...(pw as EnrichedPlannedWorkout),
-        actualName: session.name ?? pw.name,
-        actualNotes: session.notes ?? pw.notes,
-        status: session.ended_at
-          ? "completed"
-          : session.skipped
-          ? "skipped"
-          : session.started_at
-          ? "in_progress"
-          : "planned",
-      } as const;
-    });
-
-    const plannedSessionIds = new Set(
-      (todaysPlannedBase ?? [])
-        .map(pw => pw.workout_session_id)
-        .filter(Boolean) as string[]
-    );
-
     // sessions that exist in cache and happened today, but are NOT linked to a planned workout
     const sessionOnly = Object.values(workoutsById)
       .filter(s => isSessionOnDate(s, today))
-      .filter(s => !plannedSessionIds.has((s as any).id))
-      .map(s => {
+      .map(_s => {
+        const s = _s as WorkoutSession;
         const sid = (s as any).id as string;
 
-        const status: StorePlannedWorkout["status"] = (s as any).ended_at
+        const status: StorePlannedWorkout["status"] = s.skipped
+          ? "skipped"
+          : s.ended_at
           ? "completed"
           : "in_progress";
 
         // Pseudo planned workout card shape
+
         return {
-          id: `session:${sid}`, // unique key for list rendering
+          id: sid, // unique key for list rendering
           date: today,
           status,
           name: (s as any).name ?? "Workout",
@@ -486,8 +492,46 @@ export default function WorkoutScreen() {
           actualName: (s as any).name ?? "Workout",
           actualNotes: (s as any).notes ?? "",
           __sessionOnly: true,
-        } as EnrichedPlannedWorkout;
+          planned_workout_id: s.planned_workout_id,
+        } as any;
       });
+
+    const planned = (todaysPlannedBase ?? [])
+      .map(pw => {
+        const actualSession = sessionsByPlannedAndDate.get(
+          `${pw.id}__${pw.date}`
+        );
+
+        if (!actualSession) {
+          // No session for THIS date → planned stays planned (or whatever pw.status is)
+          // Critical: do NOT propagate an old workout_session_id into today’s card.
+          const { workout_session_id, ...rest } = pw as any;
+          return {
+            ...(rest as EnrichedPlannedWorkout),
+            workout_session_id: undefined,
+            actualName: pw.name,
+            actualNotes: pw.notes,
+            status: pw.status, // usually "planned" for today's occurrence
+          };
+        }
+
+        const derivedStatus: StorePlannedWorkout["status"] = (
+          actualSession as any
+        ).ended_at
+          ? "completed"
+          : (actualSession as any).skipped
+          ? "skipped"
+          : "in_progress";
+
+        return {
+          ...(pw as EnrichedPlannedWorkout),
+          workout_session_id: (actualSession as any).id, // session for THIS date
+          actualName: (actualSession as any).name ?? pw.name,
+          actualNotes: (actualSession as any).notes ?? pw.notes,
+          status: derivedStatus,
+        };
+      })
+      .filter(pw => pw.status == "planned");
 
     return [...planned, ...sessionOnly];
   }, [todaysPlannedBase, workoutsById, today]);

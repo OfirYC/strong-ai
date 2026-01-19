@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useState, useCallback, act } from "react";
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import RoutineDetailModal from "./RoutineDetailModal";
-import { TemplateExercise, WorkoutTemplate } from "../types";
+import { TemplateExercise, WorkoutSession, WorkoutTemplate } from "../types";
 import { useAuthStore } from "../store/authStore";
 
 // STORES
@@ -38,6 +38,16 @@ interface CalendarModalProps {
   onClose: () => void;
   onDateSelect?: (date: string, workouts: PlannedWorkout[]) => void;
 }
+
+const toLocalYMD = (d: Date) => d.toLocaleDateString("en-CA"); // YYYY-MM-DD
+
+const getSessionLocalYMD = (s: any) => {
+  const raw = s?.started_at ?? s?.created_at ?? s?.ended_at ?? s?.date;
+  if (!raw) return null;
+  const dt = new Date(raw);
+  if (Number.isNaN(dt.getTime())) return null;
+  return toLocalYMD(dt);
+};
 
 export default function CalendarModal({
   visible,
@@ -81,8 +91,8 @@ export default function CalendarModal({
     const lastDay = new Date(year, month + 1, 0);
 
     return {
-      startDate: firstDay.toISOString().split("T")[0],
-      endDate: lastDay.toISOString().split("T")[0],
+      startDate: toLocalYMD(firstDay),
+      endDate: toLocalYMD(lastDay),
     };
   }, [currentDate]);
 
@@ -95,7 +105,7 @@ export default function CalendarModal({
   } = usePlannedWorkouts({ startDate, endDate, expandRecurring: true });
 
   // Workouts store: session enrichment
-  const { byId: workoutsById, getManyByIds } = useWorkouts();
+  const { byId: workoutsById, getManyByIds, getByDateRange } = useWorkouts();
 
   // Load month planned workouts when modal opens / month changes
   useEffect(() => {
@@ -103,15 +113,10 @@ export default function CalendarModal({
     getRange(startDate, endDate).catch(() => {});
   }, [visible, startDate, endDate, getRange]);
 
-  // Group by date (YYYY-MM-DD)
-  const workoutsByDate = useMemo(() => {
-    const grouped: Record<string, PlannedWorkout[]> = {};
-    for (const w of monthPlannedWorkouts as PlannedWorkout[]) {
-      if (!grouped[w.date]) grouped[w.date] = [];
-      grouped[w.date].push(w);
-    }
-    return grouped;
-  }, [monthPlannedWorkouts]);
+  useEffect(() => {
+    if (!visible) return;
+    getByDateRange({ startDate, endDate }).catch();
+  }, [visible, startDate, endDate, getByDateRange]);
 
   // Fetch missing workout sessions for enrichment (name/notes/status consistency)
   const monthWorkoutSessionIds = useMemo(() => {
@@ -122,6 +127,82 @@ export default function CalendarModal({
     return Array.from(ids);
   }, [monthPlannedWorkouts]);
 
+  const sessionsByPlannedAndDate = useMemo(() => {
+    const map = new Map<string, any>();
+
+    for (const s of Object.values(workoutsById)) {
+      const plannedId = (s as any)?.planned_workout_id as string | undefined;
+      if (!plannedId) continue;
+
+      const ymd = getSessionLocalYMD(s);
+      if (!ymd) continue;
+
+      map.set(`${plannedId}__${ymd}`, s);
+    }
+
+    return map;
+  }, [workoutsById]);
+  const isSessionInMonthRange = (s: any) => {
+    const ymd = getSessionLocalYMD(s); // from previous message (started_at/created_at/ended_at)
+    if (!ymd) return null;
+    if (ymd < startDate || ymd > endDate) return null; // inclusive
+    return ymd;
+  };
+
+  const sessionOnlyByDate = useMemo(() => {
+    const grouped: Record<string, PlannedWorkout[]> = {};
+
+    for (const s of Object.values(workoutsById)) {
+      const plannedId = (s as any)?.planned_workout_id;
+      if (plannedId) continue; // NOT session-only
+
+      const ymd = isSessionInMonthRange(s);
+      if (!ymd) continue;
+
+      const status: PlannedWorkout["status"] = (s as any).skipped
+        ? "skipped"
+        : (s as any).ended_at
+        ? "completed"
+        : (s as any).started_at
+        ? "in_progress"
+        : "planned";
+
+      const sid = (s as any).id as string;
+
+      const pseudo: PlannedWorkout = {
+        id: `session-${sid}`, // unique key (avoid collisions with planned ids)
+        date: ymd,
+        name: (s as any).name ?? "Workout",
+        notes: (s as any).notes ?? "",
+        status,
+        workout_session_id: sid,
+        type: "quick_start",
+      };
+
+      if (!grouped[ymd]) grouped[ymd] = [];
+      grouped[ymd].push(pseudo);
+    }
+
+    return grouped;
+  }, [workoutsById, startDate, endDate]);
+  // Group by date (YYYY-MM-DD)
+  const workoutsByDate = useMemo(() => {
+    const grouped: Record<string, PlannedWorkout[]> = {};
+
+    // planned workouts (expanded recurring)
+    for (const w of monthPlannedWorkouts as PlannedWorkout[]) {
+      if (!grouped[w.date]) grouped[w.date] = [];
+      grouped[w.date].push(w);
+    }
+
+    // session-only workouts (quick start etc.)
+    for (const [date, sessions] of Object.entries(sessionOnlyByDate)) {
+      if (!grouped[date]) grouped[date] = [];
+      grouped[date].push(...sessions);
+    }
+
+    return grouped;
+  }, [monthPlannedWorkouts, sessionOnlyByDate]);
   useEffect(() => {
     if (!visible) return;
     if (monthWorkoutSessionIds.length === 0) return;
@@ -136,26 +217,41 @@ export default function CalendarModal({
   const getWorkoutsForDate = useCallback(
     (dateStr: string) => {
       const base = workoutsByDate[dateStr] || [];
+
       return base.map(pw => {
-        if (!pw.workout_session_id) return pw;
-        const session = workoutsById[pw.workout_session_id];
-        if (!session) return pw;
+        // Find the actual session for THIS planned workout occurrence date
+        const actualSession = sessionsByPlannedAndDate.get(
+          `${pw.id}__${pw.date}`
+        ) as WorkoutSession;
+
+        if (!actualSession) {
+          // No session for this occurrence date -> do NOT leak an old workout_session_id/status
+          const { workout_session_id, ...rest } = pw as any;
+          return {
+            ...(rest as PlannedWorkout),
+            workout_session_id: undefined,
+            status: pw.status ?? "planned",
+          };
+        }
+
+        const derivedStatus: PlannedWorkout["status"] = actualSession.ended_at
+          ? "completed"
+          : actualSession.skipped
+          ? "skipped"
+          : actualSession.started_at
+          ? "in_progress"
+          : "planned";
 
         return {
           ...pw,
-          name: session.name ?? pw.name,
-          notes: session.notes ?? pw.notes,
-          status: session.ended_at
-            ? "completed"
-            : session.skipped
-            ? "skipped"
-            : session.started_at
-            ? "in_progress"
-            : "planned",
+          workout_session_id: actualSession.id, // session for THIS date
+          name: actualSession.name ?? pw.name,
+          notes: actualSession.notes ?? pw.notes,
+          status: derivedStatus,
         } as const;
       });
     },
-    [workoutsByDate, workoutsById]
+    [workoutsByDate, sessionsByPlannedAndDate]
   );
 
   const getDaysInMonth = () => {
