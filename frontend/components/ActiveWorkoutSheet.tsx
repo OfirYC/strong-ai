@@ -24,6 +24,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useDebounce } from "use-debounce";
 import { useMultipleExercisesPreviousSets } from "../hooks/usePreviousSetValues";
 import { useExercises } from "../store/exercisesStore";
+import { useActiveWorkoutSheetUIStore } from "../store/workoutCompleteUIStore";
 import { useWorkoutStore } from "../store/workoutStore";
 import { useWorkouts } from "../store/workoutsStore";
 import {
@@ -41,7 +42,6 @@ import ExerciseDetailModal from "./ExerciseDetailModal";
 import ExercisePickerModal from "./ExercisePickerModal";
 import SetRowInput, { SetHeader } from "./SetRowInput";
 import SwipeToDeleteRow from "./SwipeToDeleteRow";
-import { useActiveWorkoutSheetUIStore } from "../store/workoutCompleteUIStore";
 
 interface WorkoutSummaryData {
   name: string;
@@ -60,6 +60,18 @@ interface WorkoutSummaryData {
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const COLLAPSED_HEIGHT = 80;
+
+const formatTime = (seconds: number) => {
+  const hrs = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  if (hrs > 0) {
+    return `${hrs}:${mins.toString().padStart(2, "0")}:${secs
+      .toString()
+      .padStart(2, "0")}`;
+  }
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+};
 
 interface ActiveWorkoutSheetProps {
   onFinishWorkout: () => void;
@@ -135,7 +147,7 @@ export default function ActiveWorkoutSheet({
     !!activeWorkout?.notes
   );
 
-  const { timer, setTimer } = useTimer();
+  const elapsedSecondsRef = useRef(0);
   const [saving, setSaving] = useState(false);
   const [showExercisePicker, setShowExercisePicker] = useState(false);
   const [showCreateExercise, setShowCreateExercise] = useState(false);
@@ -243,19 +255,6 @@ export default function ActiveWorkoutSheet({
     null
   );
   const itemRefs = useRef<Record<string, View | null>>({});
-
-  useEffect(() => {
-    if (!workoutStartTime) return;
-
-    const updateTimer = () => {
-      const elapsed = Math.floor((Date.now() - workoutStartTime) / 1000);
-      setTimer(elapsed);
-    };
-
-    updateTimer();
-    const interval = setInterval(updateTimer, 1000);
-    return () => clearInterval(interval);
-  }, [workoutStartTime, setTimer]);
 
   useEffect(() => {
     if (!activeWorkout?.exercises?.length) return;
@@ -542,7 +541,7 @@ export default function ActiveWorkoutSheet({
       const summary: WorkoutSummaryData = {
         name: activeWorkout.name || "Workout",
         date: new Date(),
-        duration: timer,
+        duration: elapsedSecondsRef.current,
         totalVolume,
         prCount: 0,
         exerciseCount: exercises.length,
@@ -635,18 +634,6 @@ export default function ActiveWorkoutSheet({
     }
   };
 
-  const formatTime = (seconds: number) => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    if (hrs > 0) {
-      return `${hrs}:${mins.toString().padStart(2, "0")}:${secs
-        .toString()
-        .padStart(2, "0")}`;
-    }
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  };
-
   const handleReorderExercises = (data: WorkoutExercise[]) => {
     const reordered = data.map((ex, index) => ({ ...ex, order: index }));
     syncExercises(reordered);
@@ -676,7 +663,13 @@ export default function ActiveWorkoutSheet({
                 <View style={styles.collapsedRight}>
                   <View style={styles.timerBadge}>
                     <Ionicons name="time" size={16} color="#007AFF" />
-                    <Text style={styles.timerText}>{formatTime(timer)}</Text>
+                    <WorkoutElapsedTimerText
+                      startTime={workoutStartTime}
+                      onTick={secs => {
+                        elapsedSecondsRef.current = secs;
+                      }}
+                      textStyle={styles.timerText}
+                    />
                   </View>
                 </View>
               </View>
@@ -690,9 +683,13 @@ export default function ActiveWorkoutSheet({
                     { opacity: timerTopOpacity },
                   ]}
                 >
-                  <Text style={styles.topBarTimerText}>
-                    {formatTime(timer)}
-                  </Text>
+                  <WorkoutElapsedTimerText
+                    startTime={workoutStartTime}
+                    onTick={secs => {
+                      elapsedSecondsRef.current = secs;
+                    }}
+                    textStyle={styles.topBarTimerText}
+                  />
                 </Animated.View>
 
                 <TouchableOpacity
@@ -778,9 +775,13 @@ export default function ActiveWorkoutSheet({
                     style={[styles.timerRow, { opacity: mainTimerOpacity }]}
                   >
                     <Ionicons name="time-outline" size={18} color="#007AFF" />
-                    <Text style={styles.timerTextLarge}>
-                      {formatTime(timer)}
-                    </Text>
+                    <WorkoutElapsedTimerText
+                      startTime={workoutStartTime}
+                      onTick={secs => {
+                        elapsedSecondsRef.current = secs;
+                      }}
+                      textStyle={styles.timerTextLarge}
+                    />
                   </Animated.View>
 
                   {showMenu && (
@@ -862,146 +863,29 @@ export default function ActiveWorkoutSheet({
 
                 const detail = exercisesById[item.exercise_id];
                 const itemKey = `${item.exercise_id}-${item.order}`;
-
-                const handleLongPress = (e: GestureResponderEvent) => {
-                  setIsDraggingList(true);
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
-                    () => {}
-                  );
-
-                  requestAnimationFrame(() => {
-                    const ref = itemRefs.current[itemKey];
-                    if (!ref) {
-                      drag();
-                      return;
-                    }
-
-                    ref.measure((x, y, width, height, pageX, pageY) => {
-                      setExtraTopPadding(index * height);
-                      setTimeout(() => {
-                        // @ts-ignore
-                        listRef.current?.scrollToOffset({
-                          offset: index * height,
-                          animated: false,
-                        });
-                        drag();
-                      }, 0);
-                    });
-                  });
-                };
-
-                const isCompact = isDraggingList;
+                const previousSetsForExercise = previousMap[item.exercise_id];
 
                 return (
-                  <View
-                    ref={el => {
-                      itemRefs.current[itemKey] = el;
-                    }}
-                    style={[
-                      styles.exerciseCard,
-                      isDraggingList && { paddingHorizontal: 20 },
-                    ]}
-                  >
-                    <View style={styles.exerciseHeader}>
-                      <TouchableOpacity
-                        style={styles.exerciseNameContainer}
-                        onPress={() => {
-                          if (!isDraggingList && detail) {
-                            setSelectedExercise(detail);
-                            setShowExerciseDetail(true);
-                          }
-                        }}
-                        onLongPress={handleLongPress}
-                        delayLongPress={150}
-                      >
-                        <Text
-                          style={[
-                            styles.exerciseNameClickable,
-                            isActive && {
-                              opacity: 0.95,
-                              shadowColor: "#000",
-                              shadowOffset: { width: 0, height: 4 },
-                              shadowOpacity: 0.15,
-                              shadowRadius: 8,
-                            },
-                          ]}
-                        >
-                          {detail?.name ?? "Loading..."}
-                        </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={styles.exerciseMenuButton}
-                        disabled={isDraggingList}
-                        onPress={() => {
-                          Alert.alert(
-                            detail?.name || "Exercise",
-                            "What would you like to do?",
-                            [
-                              { text: "Cancel", style: "cancel" },
-                              {
-                                text: "Delete Exercise",
-                                style: "destructive",
-                                onPress: () => removeExercise(index),
-                              },
-                            ]
-                          );
-                        }}
-                      >
-                        <Ionicons
-                          name="ellipsis-horizontal"
-                          size={20}
-                          color="#8E8E93"
-                        />
-                      </TouchableOpacity>
-                    </View>
-
-                    {!isCompact && (
-                      <>
-                        {item.sets.length > 0 && (
-                          <View style={styles.setsContainer}>
-                            <SetHeader
-                              exerciseKind={detail?.exercise_kind || "Barbell"}
-                              showCompleteColumn
-                            />
-
-                            <View style={{ marginHorizontal: -20 }}>
-                              {item.sets.map((set, setIndex) => (
-                                <SwipeToDeleteRow
-                                  key={setIndex}
-                                  onDelete={() => removeSet(index, setIndex)}
-                                >
-                                  <SetRowInput
-                                    previousSetData={
-                                      previousMap[item.exercise_id]?.[setIndex]
-                                    }
-                                    exerciseId={item.exercise_id}
-                                    set={set}
-                                    setIndex={setIndex}
-                                    exerciseKind={
-                                      detail?.exercise_kind || "Barbell"
-                                    }
-                                    onUpdateSet={fields =>
-                                      updateSet(index, setIndex, fields)
-                                    }
-                                    showCompleteButton
-                                  />
-                                </SwipeToDeleteRow>
-                              ))}
-                            </View>
-                          </View>
-                        )}
-
-                        <TouchableOpacity
-                          style={styles.addSetButton}
-                          onPress={() => addSet(index)}
-                        >
-                          <Ionicons name="add" size={20} color="" />
-                          <Text style={styles.addSetText}>Add Set</Text>
-                        </TouchableOpacity>
-                      </>
-                    )}
-                  </View>
+                  <ExerciseRow
+                    item={item}
+                    index={index}
+                    isActive={!!isActive}
+                    isDraggingList={isDraggingList}
+                    detail={detail}
+                    itemKey={itemKey}
+                    previousSetsForExercise={previousSetsForExercise}
+                    onDrag={drag}
+                    listRef={listRef}
+                    itemRefs={itemRefs}
+                    setIsDraggingList={setIsDraggingList}
+                    setExtraTopPadding={setExtraTopPadding}
+                    removeExercise={removeExercise}
+                    removeSet={removeSet}
+                    updateSet={updateSet}
+                    addSet={addSet}
+                    setSelectedExercise={setSelectedExercise}
+                    setShowExerciseDetail={setShowExerciseDetail}
+                  />
                 );
               }}
             />
@@ -1282,9 +1166,272 @@ const styles = StyleSheet.create({
   },
 });
 
-// ActiveWorkoutSheet.whyDidYouRender = true;
-
-function useTimer() {
+const WorkoutElapsedTimerText = React.memo(function WorkoutElapsedTimerText({
+  startTime,
+  onTick,
+  textStyle,
+}: {
+  startTime?: any; // your workoutStartTime type (number/string) - keep loose
+  onTick?: (seconds: number) => void;
+  textStyle?: any;
+}) {
   const [seconds, setSeconds] = useState(0);
-  return { timer: seconds, setTimer: setSeconds };
-}
+  const onTickRef = useRef(onTick);
+
+  useEffect(() => {
+    onTickRef.current = onTick;
+  }, [onTick]);
+
+  useEffect(() => {
+    if (!startTime) return;
+
+    const startMs =
+      typeof startTime === "string"
+        ? new Date(startTime).getTime()
+        : typeof startTime === "number"
+        ? startTime
+        : new Date(startTime).getTime();
+
+    const tick = () => {
+      const elapsed = Math.max(0, Math.floor((Date.now() - startMs) / 1000));
+      setSeconds(elapsed);
+      onTickRef.current?.(elapsed);
+    };
+
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [startTime]);
+
+  return <Text style={textStyle}>{formatTime(seconds)}</Text>;
+});
+
+type ExerciseRowProps = {
+  item: WorkoutExercise;
+  index: number;
+  isActive: boolean;
+  isDraggingList: boolean;
+  detail?: Exercise;
+  itemKey: string;
+  previousSetsForExercise?: any[]; // matches your previousMap shape
+  onDrag: () => void;
+
+  listRef: React.MutableRefObject<
+    typeof DraggableFlatList<WorkoutExercise> | null
+  >;
+  itemRefs: React.MutableRefObject<Record<string, View | null>>;
+  setIsDraggingList: (v: boolean) => void;
+  setExtraTopPadding: (v: number) => void;
+
+  removeExercise: (exerciseIndex: number) => void;
+  removeSet: (exerciseIndex: number, setIndex: number) => void;
+  updateSet: (
+    exerciseIndex: number,
+    setIndex: number,
+    fields: Partial<WorkoutSet>
+  ) => void;
+  addSet: (exerciseIndex: number) => void;
+
+  setSelectedExercise: (ex: Exercise | null) => void;
+  setShowExerciseDetail: (v: boolean) => void;
+};
+
+const ExerciseRow = React.memo(
+  function ExerciseRow({
+    item,
+    index,
+    isActive,
+    isDraggingList,
+    detail,
+    itemKey,
+    previousSetsForExercise,
+    onDrag,
+
+    listRef,
+    itemRefs,
+    setIsDraggingList,
+    setExtraTopPadding,
+
+    removeExercise,
+    removeSet,
+    updateSet,
+    addSet,
+
+    setSelectedExercise,
+    setShowExerciseDetail,
+  }: ExerciseRowProps) {
+    const setUpdaterRef = useRef<
+      Record<string, (fields: Partial<WorkoutSet>) => void>
+    >({});
+
+    const getSetUpdater = useCallback(
+      (exerciseIndex: number, setIndex: number) => {
+        const key = `${exerciseIndex}:${setIndex}`;
+        if (!setUpdaterRef.current[key]) {
+          setUpdaterRef.current[key] = fields =>
+            updateSet(exerciseIndex, setIndex, fields);
+        }
+        return setUpdaterRef.current[key];
+      },
+      [updateSet]
+    );
+
+    const deleteRef = useRef<Record<string, () => void>>({});
+
+    const getDelete = useCallback(
+      (exerciseIndex: number, setIndex: number) => {
+        const key = `${exerciseIndex}:${setIndex}`;
+        if (!deleteRef.current[key]) {
+          deleteRef.current[key] = () => removeSet(exerciseIndex, setIndex);
+        }
+        return deleteRef.current[key];
+      },
+      [removeSet]
+    );
+    const handleLongPress = useCallback(() => {
+      setIsDraggingList(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+
+      requestAnimationFrame(() => {
+        const ref = itemRefs.current[itemKey];
+        if (!ref) {
+          onDrag();
+          return;
+        }
+
+        ref.measure((x, y, width, height) => {
+          setExtraTopPadding(index * height);
+
+          setTimeout(() => {
+            // @ts-ignore
+            listRef.current?.scrollToOffset({
+              offset: index * height,
+              animated: false,
+            } as any);
+            onDrag();
+          }, 0);
+        });
+      });
+    }, [
+      index,
+      itemKey,
+      itemRefs,
+      listRef,
+      onDrag,
+      setExtraTopPadding,
+      setIsDraggingList,
+    ]);
+
+    const isCompact = isDraggingList;
+
+    return (
+      <View
+        ref={el => {
+          itemRefs.current[itemKey] = el;
+        }}
+        style={[
+          styles.exerciseCard,
+          isDraggingList && { paddingHorizontal: 20 },
+        ]}
+      >
+        <View style={styles.exerciseHeader}>
+          <TouchableOpacity
+            style={styles.exerciseNameContainer}
+            onPress={() => {
+              if (!isDraggingList && detail) {
+                setSelectedExercise(detail);
+                setShowExerciseDetail(true);
+              }
+            }}
+            onLongPress={handleLongPress}
+            delayLongPress={150}
+          >
+            <Text
+              style={[
+                styles.exerciseNameClickable,
+                isActive && {
+                  opacity: 0.95,
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.15,
+                  shadowRadius: 8,
+                },
+              ]}
+            >
+              {detail?.name ?? "Loading..."}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.exerciseMenuButton}
+            disabled={isDraggingList}
+            onPress={() => {
+              Alert.alert(
+                detail?.name || "Exercise",
+                "What would you like to do?",
+                [
+                  { text: "Cancel", style: "cancel" },
+                  {
+                    text: "Delete Exercise",
+                    style: "destructive",
+                    onPress: () => removeExercise(index),
+                  },
+                ]
+              );
+            }}
+          >
+            <Ionicons name="ellipsis-horizontal" size={20} color="#8E8E93" />
+          </TouchableOpacity>
+        </View>
+
+        {!isCompact && (
+          <>
+            {item.sets.length > 0 && (
+              <View style={styles.setsContainer}>
+                <SetHeader
+                  exerciseKind={detail?.exercise_kind || "Barbell"}
+                  showCompleteColumn
+                />
+
+                <View style={{ marginHorizontal: -20 }}>
+                  {item.sets.map((set, setIndex) => (
+                    <SwipeToDeleteRow
+                      key={setIndex}
+                      onDelete={getDelete(index, setIndex)}
+                    >
+                      <SetRowInput
+                        previousSetData={previousSetsForExercise?.[setIndex]}
+                        exerciseId={item.exercise_id}
+                        set={set}
+                        setIndex={setIndex}
+                        exerciseKind={detail?.exercise_kind || "Barbell"}
+                        onUpdateSet={getSetUpdater(index, setIndex)}
+                        showCompleteButton
+                      />
+                    </SwipeToDeleteRow>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={styles.addSetButton}
+              onPress={() => addSet(index)}
+            >
+              <Ionicons name="add" size={20} color="" />
+              <Text style={styles.addSetText}>Add Set</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+    );
+  },
+  // Custom compare: if the `item` reference didn’t change, skip re-render.
+  // Your updateSet/addSet replace only one exercise object; others keep the same reference.
+  (prev, next) =>
+    prev.item === next.item &&
+    prev.isDraggingList === next.isDraggingList &&
+    prev.isActive === next.isActive &&
+    prev.detail === next.detail &&
+    prev.previousSetsForExercise === next.previousSetsForExercise
+);

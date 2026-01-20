@@ -18,7 +18,6 @@ import { useActiveWorkoutSheetUIStore } from "../../store/workoutCompleteUIStore
 import { useWorkoutStore } from "../../store/workoutStore";
 
 export default function TabLayout() {
-  const { activeWorkout } = useWorkoutStore();
   const { user } = useAuthStore();
 
   const [showAIChat, setShowAIChat] = useState(false);
@@ -97,7 +96,7 @@ export default function TabLayout() {
         />
       </Tabs>
 
-      {activeWorkout && <ActiveWorkoutSheet onFinishWorkout={() => {}} />}
+      <ActiveWorkoutSheet onFinishWorkout={() => {}} />
 
       {/* Completion modal lives OUTSIDE the activeWorkout conditional */}
       <WorkoutCompleteModal
