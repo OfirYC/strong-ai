@@ -47,6 +47,7 @@ const SET_TYPE_DESCRIPTIONS: Record<SetType, string> = {
     "A set where you attempted another rep but could not complete it (reached muscle failure).",
 };
 
+const MS_ENABLED_EXERCISE_KINDS: ExerciseKind[] = ["Cardio", "Weighted Cardio"];
 export interface SetData {
   weight?: number;
   reps?: number;
@@ -391,6 +392,9 @@ function SetRowInput({
                 styles.durationInput,
                 isCompleted && styles.durationInputCompleted,
               ]}
+              enableMilliseconds={MS_ENABLED_EXERCISE_KINDS.includes(
+                exerciseKind
+              )}
             />
           </View>
         )}
