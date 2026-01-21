@@ -167,385 +167,363 @@ function formatPreviousToText(
  * Reusable set row input component used in both ActiveWorkoutSheet and CreateRoutine
  * Renders appropriate inputs based on exercise kind (weight/reps, duration, distance, etc.)
  */
-const SetRowInput = React.memo(
-  function SetRowInput({
-    set,
-    setIndex,
-    exerciseId,
-    exerciseKind,
-    onUpdateSet,
-    showCompleteButton = false,
-    containerStyle,
-    previousSetData: previousData,
-  }: SetRowInputProps) {
-    const [showSetTypeDropdown, setShowSetTypeDropdown] = useState(false);
 
-    const rowAnim = useRef(new Animated.Value(1)).current;
-    const rowShake = useRef(new Animated.Value(0)).current;
+function SetRowInput({
+  set,
+  setIndex,
+  exerciseId,
+  exerciseKind,
+  onUpdateSet,
+  showCompleteButton = false,
+  containerStyle,
+  previousSetData: previousData,
+}: SetRowInputProps) {
+  const [showSetTypeDropdown, setShowSetTypeDropdown] = useState(false);
 
-    const isSameAsPrevious = useMemo(() => {
-      if (!previousData) return false;
-      return (
-        (previousData.weight ?? null) === (set.weight ?? null) &&
-        (previousData.reps ?? null) === (set.reps ?? null) &&
-        (previousData.duration ?? null) === (set.duration ?? null) &&
-        (previousData.distance ?? null) === (set.distance ?? null)
-      );
-    }, [previousData, set.weight, set.reps, set.duration, set.distance]);
+  const rowAnim = useRef(new Animated.Value(1)).current;
+  const rowShake = useRef(new Animated.Value(0)).current;
 
-    const runShakeAnimation = () => {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(
+  const isSameAsPrevious = useMemo(() => {
+    if (!previousData) return false;
+    return (
+      (previousData.weight ?? null) === (set.weight ?? null) &&
+      (previousData.reps ?? null) === (set.reps ?? null) &&
+      (previousData.duration ?? null) === (set.duration ?? null) &&
+      (previousData.distance ?? null) === (set.distance ?? null)
+    );
+  }, [previousData, set.weight, set.reps, set.duration, set.distance]);
+
+  const runShakeAnimation = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(
+      () => {}
+    );
+
+    rowShake.setValue(0);
+
+    Animated.sequence([
+      Animated.timing(rowShake, {
+        toValue: 1,
+        duration: 40,
+        useNativeDriver: true,
+      }),
+      Animated.timing(rowShake, {
+        toValue: -1,
+        duration: 40,
+        useNativeDriver: true,
+      }),
+      Animated.timing(rowShake, {
+        toValue: 1,
+        duration: 40,
+        useNativeDriver: true,
+      }),
+      Animated.spring(rowShake, {
+        toValue: 0,
+        tension: 120,
+        friction: 6,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const runCompleteSuccessAnimation = () => {
+    // quick tap-expand animation on the entire row
+    Animated.sequence([
+      Animated.timing(rowAnim, {
+        toValue: 1.03,
+        duration: 80,
+        useNativeDriver: true,
+      }),
+      Animated.spring(rowAnim, {
+        toValue: 1,
+        tension: 140,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const isClickable = !!previousData && !isSameAsPrevious;
+  const previousColor = isClickable ? "#3e3e41ff" : "#8E8E93";
+
+  const fields = getExerciseFields(exerciseKind);
+  const isCompleted = set.completed;
+  const setType: SetType = set.set_type || "normal";
+
+  const previousText = useMemo(
+    () => formatPreviousToText(previousData, exerciseKind),
+    [previousData, exerciseKind]
+  );
+  const handleApplyPrevious = () => {
+    if (!previousData || isSameAsPrevious) {
+      runShakeAnimation();
+      return;
+    }
+
+    Haptics.selectionAsync().catch(() => {});
+
+    // SUCCESS animation (scale)
+    Animated.sequence([
+      Animated.timing(rowAnim, {
+        toValue: 1.04,
+        duration: 80,
+        useNativeDriver: true,
+      }),
+      Animated.timing(rowAnim, {
+        toValue: 1,
+        duration: 120,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    const fields: Partial<SetData> = {};
+    if (previousData.weight !== undefined) fields.weight = previousData.weight;
+    if (previousData.reps !== undefined) fields.reps = previousData.reps;
+    if (previousData.duration !== undefined)
+      fields.duration = previousData.duration;
+    if (previousData.distance !== undefined)
+      fields.distance = previousData.distance;
+
+    onUpdateSet(fields);
+  };
+
+  const timerKey = `${exerciseId}-${setIndex}`;
+
+  const handleToggleComplete = () => {
+    const nextCompleted = !isCompleted;
+
+    if (nextCompleted) {
+      // Positive “success” feedback when completing a set
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
         () => {}
       );
-
-      rowShake.setValue(0);
-
-      Animated.sequence([
-        Animated.timing(rowShake, {
-          toValue: 1,
-          duration: 40,
-          useNativeDriver: true,
-        }),
-        Animated.timing(rowShake, {
-          toValue: -1,
-          duration: 40,
-          useNativeDriver: true,
-        }),
-        Animated.timing(rowShake, {
-          toValue: 1,
-          duration: 40,
-          useNativeDriver: true,
-        }),
-        Animated.spring(rowShake, {
-          toValue: 0,
-          tension: 120,
-          friction: 6,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    };
-
-    const runCompleteSuccessAnimation = () => {
-      // quick tap-expand animation on the entire row
-      Animated.sequence([
-        Animated.timing(rowAnim, {
-          toValue: 1.03,
-          duration: 80,
-          useNativeDriver: true,
-        }),
-        Animated.spring(rowAnim, {
-          toValue: 1,
-          tension: 140,
-          friction: 8,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    };
-
-    const isClickable = !!previousData && !isSameAsPrevious;
-    const previousColor = isClickable ? "#3e3e41ff" : "#8E8E93";
-
-    const fields = getExerciseFields(exerciseKind);
-    const isCompleted = set.completed;
-    const setType: SetType = set.set_type || "normal";
-
-    const previousText = useMemo(
-      () => formatPreviousToText(previousData, exerciseKind),
-      [previousData, exerciseKind]
-    );
-    const handleApplyPrevious = () => {
-      if (!previousData || isSameAsPrevious) {
-        runShakeAnimation();
-        return;
-      }
-
+      runCompleteSuccessAnimation();
+    } else {
+      // Optional: light haptic when un-completing
       Haptics.selectionAsync().catch(() => {});
+    }
 
-      // SUCCESS animation (scale)
-      Animated.sequence([
-        Animated.timing(rowAnim, {
-          toValue: 1.04,
-          duration: 80,
-          useNativeDriver: true,
-        }),
-        Animated.timing(rowAnim, {
-          toValue: 1,
-          duration: 120,
-          useNativeDriver: true,
-        }),
-      ]).start();
+    onUpdateSet({ completed: nextCompleted });
+  };
 
-      const fields: Partial<SetData> = {};
-      if (previousData.weight !== undefined)
-        fields.weight = previousData.weight;
-      if (previousData.reps !== undefined) fields.reps = previousData.reps;
-      if (previousData.duration !== undefined)
-        fields.duration = previousData.duration;
-      if (previousData.distance !== undefined)
-        fields.distance = previousData.distance;
+  return (
+    <>
+      <Animated.View
+        style={[
+          styles.setRow,
+          isCompleted && styles.setRowCompleted,
+          containerStyle,
+          {
+            transform: [
+              { scale: rowAnim },
+              {
+                translateX: rowShake.interpolate({
+                  inputRange: [-1, 1],
+                  outputRange: [-4, 4],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        {/* SET column (fixed width, matches header) */}
+        <View style={styles.setIndexColumn}>
+          <SetNumber
+            setIndex={setIndex}
+            completed={!!set.completed}
+            setType={setType}
+            onClick={() => setShowSetTypeDropdown(!showSetTypeDropdown)}
+          />
+        </View>
 
-      onUpdateSet(fields);
-    };
+        {/* PREVIOUS column (tap to apply) */}
+        <View style={styles.setFieldColumn}>
+          <TouchableOpacity
+            style={styles.previousCell}
+            onPress={handleApplyPrevious}
+            activeOpacity={0.7}
+          >
+            <Text
+              style={[styles.previousText, { color: previousColor }]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {previousText}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-    const timerKey = `${exerciseId}-${setIndex}`;
-
-    const handleToggleComplete = () => {
-      const nextCompleted = !isCompleted;
-
-      if (nextCompleted) {
-        // Positive “success” feedback when completing a set
-        Haptics.notificationAsync(
-          Haptics.NotificationFeedbackType.Success
-        ).catch(() => {});
-        runCompleteSuccessAnimation();
-      } else {
-        // Optional: light haptic when un-completing
-        Haptics.selectionAsync().catch(() => {});
-      }
-
-      onUpdateSet({ completed: nextCompleted });
-    };
-
-    return (
-      <>
-        <Animated.View
-          style={[
-            styles.setRow,
-            isCompleted && styles.setRowCompleted,
-            containerStyle,
-            {
-              transform: [
-                { scale: rowAnim },
-                {
-                  translateX: rowShake.interpolate({
-                    inputRange: [-1, 1],
-                    outputRange: [-4, 4],
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          {/* SET column (fixed width, matches header) */}
-          <View style={styles.setIndexColumn}>
-            <SetNumber
-              setIndex={setIndex}
-              completed={!!set.completed}
-              setType={setType}
-              onClick={() => setShowSetTypeDropdown(!showSetTypeDropdown)}
+        {/* Weight / reps / duration / distance columns (flex, full width) */}
+        {fields.includes("weight") && (
+          <View style={styles.setFieldColumn}>
+            <DecimalInput
+              style={[
+                styles.setInput,
+                isCompleted ? styles.setInputCompleted : undefined,
+              ]}
+              value={set.weight || 0}
+              onChangeValue={value => onUpdateSet({ weight: value })}
+              placeholder="0"
             />
           </View>
+        )}
 
-          {/* PREVIOUS column (tap to apply) */}
+        {fields.includes("reps") && (
           <View style={styles.setFieldColumn}>
+            <TextInput
+              style={[styles.setInput, isCompleted && styles.setInputCompleted]}
+              value={set.reps?.toString() || ""}
+              onChangeText={value =>
+                onUpdateSet({ reps: parseInt(value) || 0 })
+              }
+              keyboardType="number-pad"
+              placeholder="0"
+              placeholderTextColor="#999"
+            />
+          </View>
+        )}
+
+        {fields.includes("duration") && (
+          <View style={styles.setFieldColumn}>
+            <DurationInput
+              value={set.duration || 0}
+              onChangeValue={value => onUpdateSet({ duration: value })}
+              style={[
+                styles.durationInput,
+                isCompleted && styles.durationInputCompleted,
+              ]}
+            />
+          </View>
+        )}
+
+        {fields.includes("distance") && (
+          <View style={styles.setFieldColumn}>
+            <DecimalInput
+              style={[styles.setInput, isCompleted && styles.setInputCompleted]}
+              value={set.distance || 0}
+              onChangeValue={value => onUpdateSet({ distance: value })}
+              placeholder="0"
+            />
+          </View>
+        )}
+
+        {/* Complete button column (fixed width, matches header) */}
+        {showCompleteButton && (
+          <View style={styles.completeColumn}>
             <TouchableOpacity
-              style={styles.previousCell}
-              onPress={handleApplyPrevious}
-              activeOpacity={0.7}
+              style={[
+                styles.completeButton,
+                isCompleted && styles.completeButtonActive,
+              ]}
+              onPress={handleToggleComplete}
             >
-              <Text
-                style={[styles.previousText, { color: previousColor }]}
-                numberOfLines={1}
-                ellipsizeMode="tail"
-              >
-                {previousText}
-              </Text>
+              <MaterialCommunityIcons
+                name="check" // medium weight
+                size={18}
+                color={isCompleted ? "#FFFFFF" : "#000000"}
+              />
             </TouchableOpacity>
           </View>
+        )}
+      </Animated.View>
 
-          {/* Weight / reps / duration / distance columns (flex, full width) */}
-          {fields.includes("weight") && (
-            <View style={styles.setFieldColumn}>
-              <DecimalInput
-                style={[
-                  styles.setInput,
-                  isCompleted ? styles.setInputCompleted : undefined,
-                ]}
-                value={set.weight || 0}
-                onChangeValue={value => onUpdateSet({ weight: value })}
-                placeholder="0"
-              />
-            </View>
-          )}
-
-          {fields.includes("reps") && (
-            <View style={styles.setFieldColumn}>
-              <TextInput
-                style={[
-                  styles.setInput,
-                  isCompleted && styles.setInputCompleted,
-                ]}
-                value={set.reps?.toString() || ""}
-                onChangeText={value =>
-                  onUpdateSet({ reps: parseInt(value) || 0 })
-                }
-                keyboardType="number-pad"
-                placeholder="0"
-                placeholderTextColor="#999"
-              />
-            </View>
-          )}
-
-          {fields.includes("duration") && (
-            <View style={styles.setFieldColumn}>
-              <DurationInput
-                value={set.duration || 0}
-                onChangeValue={value => onUpdateSet({ duration: value })}
-                style={[
-                  styles.durationInput,
-                  isCompleted && styles.durationInputCompleted,
-                ]}
-              />
-            </View>
-          )}
-
-          {fields.includes("distance") && (
-            <View style={styles.setFieldColumn}>
-              <DecimalInput
-                style={[
-                  styles.setInput,
-                  isCompleted && styles.setInputCompleted,
-                ]}
-                value={set.distance || 0}
-                onChangeValue={value => onUpdateSet({ distance: value })}
-                placeholder="0"
-              />
-            </View>
-          )}
-
-          {/* Complete button column (fixed width, matches header) */}
-          {showCompleteButton && (
-            <View style={styles.completeColumn}>
-              <TouchableOpacity
-                style={[
-                  styles.completeButton,
-                  isCompleted && styles.completeButtonActive,
-                ]}
-                onPress={handleToggleComplete}
-              >
-                <MaterialCommunityIcons
-                  name="check" // medium weight
-                  size={18}
-                  color={isCompleted ? "#FFFFFF" : "#000000"}
-                />
-              </TouchableOpacity>
-            </View>
-          )}
-        </Animated.View>
-
-        {/* <RestTimerRow
+      <RestTimerRow
         timerKey={timerKey}
         value={set.rest_timer ?? null}
         isSetCompleted={!!set.completed}
         onChangeValue={v => onUpdateSet({ rest_timer: v })}
-      /> */}
+      />
 
-        {/* Set Type Dropdown Modal */}
-        {showSetTypeDropdown && (
-          <Modal
-            visible={showSetTypeDropdown}
-            transparent
-            animationType="fade"
-            onRequestClose={() => setShowSetTypeDropdown(false)}
+      {/* Set Type Dropdown Modal */}
+      {showSetTypeDropdown && (
+        <Modal
+          visible={showSetTypeDropdown}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowSetTypeDropdown(false)}
+        >
+          <Pressable
+            style={styles.dropdownOverlay}
+            onPress={() => setShowSetTypeDropdown(false)}
           >
-            <Pressable
-              style={styles.dropdownOverlay}
-              onPress={() => setShowSetTypeDropdown(false)}
-            >
-              <View style={styles.dropdownContainer}>
-                <Text style={styles.dropdownTitle}>Set Type</Text>
-                {SET_TYPES.map(type => {
-                  const config = SET_TYPE_CONFIG[type];
-                  const isSelected = type === setType;
+            <View style={styles.dropdownContainer}>
+              <Text style={styles.dropdownTitle}>Set Type</Text>
+              {SET_TYPES.map(type => {
+                const config = SET_TYPE_CONFIG[type];
+                const isSelected = type === setType;
 
-                  return (
-                    <TouchableOpacity
-                      key={type}
-                      style={[
-                        styles.dropdownOption,
-                        isSelected && styles.dropdownOptionSelected,
-                      ]}
-                      onPress={() => {
-                        onUpdateSet({ set_type: type });
-                        setShowSetTypeDropdown(false);
-                      }}
-                    >
-                      {type !== "normal" ? (
-                        <View
-                          style={[
-                            styles.dropdownIndicator,
-                            { backgroundColor: config.bgColor },
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.dropdownInitial,
-                              { color: config.color },
-                            ]}
-                          >
-                            {config.initial}
-                          </Text>
-                        </View>
-                      ) : (
-                        <View style={styles.dropdownIndicatorNormal}>
-                          <Text style={styles.dropdownNumber}>#</Text>
-                        </View>
-                      )}
-                      <Text
+                return (
+                  <TouchableOpacity
+                    key={type}
+                    style={[
+                      styles.dropdownOption,
+                      isSelected && styles.dropdownOptionSelected,
+                    ]}
+                    onPress={() => {
+                      onUpdateSet({ set_type: type });
+                      setShowSetTypeDropdown(false);
+                    }}
+                  >
+                    {type !== "normal" ? (
+                      <View
                         style={[
-                          styles.dropdownLabel,
-                          isSelected && styles.dropdownLabelSelected,
+                          styles.dropdownIndicator,
+                          { backgroundColor: config.bgColor },
                         ]}
                       >
-                        {config.label}
-                      </Text>
+                        <Text
+                          style={[
+                            styles.dropdownInitial,
+                            { color: config.color },
+                          ]}
+                        >
+                          {config.initial}
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={styles.dropdownIndicatorNormal}>
+                        <Text style={styles.dropdownNumber}>#</Text>
+                      </View>
+                    )}
+                    <Text
+                      style={[
+                        styles.dropdownLabel,
+                        isSelected && styles.dropdownLabelSelected,
+                      ]}
+                    >
+                      {config.label}
+                    </Text>
 
-                      {isSelected && (
-                        <Ionicons
-                          name="checkmark"
-                          size={20}
-                          color="#007AFF"
-                          style={styles.checkIcon}
-                        />
-                      )}
-                      <TouchableOpacity
-                        style={styles.infoButton}
-                        onPress={e => {
-                          e.stopPropagation();
-                          Alert.alert(
-                            config.label,
-                            SET_TYPE_DESCRIPTIONS[type]
-                          );
-                        }}
-                      >
-                        <Ionicons
-                          name="help-circle-outline"
-                          size={20}
-                          color="#8E8E93"
-                        />
-                      </TouchableOpacity>
+                    {isSelected && (
+                      <Ionicons
+                        name="checkmark"
+                        size={20}
+                        color="#007AFF"
+                        style={styles.checkIcon}
+                      />
+                    )}
+                    <TouchableOpacity
+                      style={styles.infoButton}
+                      onPress={e => {
+                        e.stopPropagation();
+                        Alert.alert(config.label, SET_TYPE_DESCRIPTIONS[type]);
+                      }}
+                    >
+                      <Ionicons
+                        name="help-circle-outline"
+                        size={20}
+                        color="#8E8E93"
+                      />
                     </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </Pressable>
-          </Modal>
-        )}
-      </>
-    );
-  },
-  (prev, next) => {
-    // re-render only if the actual set data / previous set / kind / completion changes
-    return (
-      prev.set === next.set &&
-      prev.previousSetData === next.previousSetData &&
-      prev.exerciseKind === next.exerciseKind &&
-      prev.showCompleteButton === next.showCompleteButton &&
-      prev.setIndex === next.setIndex
-      // IMPORTANT: do NOT compare onUpdateSet because we will make it stable (next step)
-    );
-  }
-);
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </Pressable>
+        </Modal>
+      )}
+    </>
+  );
+}
 export default SetRowInput;
 /* -------------------------------------------------------------------------- */
 /* SET HEADER (unchanged)                                                     */

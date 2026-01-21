@@ -11,7 +11,6 @@ import {
   Alert,
   Animated,
   Dimensions,
-  GestureResponderEvent,
   PanResponder,
   StyleSheet,
   Text,
@@ -115,6 +114,7 @@ export default function ActiveWorkoutSheet({
 
   const syncExercises = (nextExercises: WorkoutExercise[]) => {
     if (!activeWorkoutId) return;
+
     updateWorkout(nextExercises);
     patchWorkout(activeWorkoutId, { exercises: nextExercises });
   };
@@ -1236,202 +1236,161 @@ type ExerciseRowProps = {
   setShowExerciseDetail: (v: boolean) => void;
 };
 
-const ExerciseRow = React.memo(
-  function ExerciseRow({
-    item,
-    index,
-    isActive,
-    isDraggingList,
-    detail,
-    itemKey,
-    previousSetsForExercise,
-    onDrag,
+const ExerciseRow = React.memo(function ExerciseRow({
+  item,
+  index,
+  isActive,
+  isDraggingList,
+  detail,
+  itemKey,
+  previousSetsForExercise,
+  onDrag,
 
-    listRef,
-    itemRefs,
-    setIsDraggingList,
-    setExtraTopPadding,
+  listRef,
+  itemRefs,
+  setIsDraggingList,
+  setExtraTopPadding,
 
-    removeExercise,
-    removeSet,
-    updateSet,
-    addSet,
+  removeExercise,
+  removeSet,
+  updateSet,
+  addSet,
 
-    setSelectedExercise,
-    setShowExerciseDetail,
-  }: ExerciseRowProps) {
-    const setUpdaterRef = useRef<
-      Record<string, (fields: Partial<WorkoutSet>) => void>
-    >({});
+  setSelectedExercise,
+  setShowExerciseDetail,
+}: ExerciseRowProps) {
+  const handleLongPress = useCallback(() => {
+    setIsDraggingList(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 
-    const getSetUpdater = useCallback(
-      (exerciseIndex: number, setIndex: number) => {
-        const key = `${exerciseIndex}:${setIndex}`;
-        if (!setUpdaterRef.current[key]) {
-          setUpdaterRef.current[key] = fields =>
-            updateSet(exerciseIndex, setIndex, fields);
-        }
-        return setUpdaterRef.current[key];
-      },
-      [updateSet]
-    );
+    requestAnimationFrame(() => {
+      const ref = itemRefs.current[itemKey];
+      if (!ref) {
+        onDrag();
+        return;
+      }
 
-    const deleteRef = useRef<Record<string, () => void>>({});
+      ref.measure((x, y, width, height) => {
+        setExtraTopPadding(index * height);
 
-    const getDelete = useCallback(
-      (exerciseIndex: number, setIndex: number) => {
-        const key = `${exerciseIndex}:${setIndex}`;
-        if (!deleteRef.current[key]) {
-          deleteRef.current[key] = () => removeSet(exerciseIndex, setIndex);
-        }
-        return deleteRef.current[key];
-      },
-      [removeSet]
-    );
-    const handleLongPress = useCallback(() => {
-      setIsDraggingList(true);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-
-      requestAnimationFrame(() => {
-        const ref = itemRefs.current[itemKey];
-        if (!ref) {
+        setTimeout(() => {
+          // @ts-ignore
+          listRef.current?.scrollToOffset({
+            offset: index * height,
+            animated: false,
+          } as any);
           onDrag();
-          return;
-        }
-
-        ref.measure((x, y, width, height) => {
-          setExtraTopPadding(index * height);
-
-          setTimeout(() => {
-            // @ts-ignore
-            listRef.current?.scrollToOffset({
-              offset: index * height,
-              animated: false,
-            } as any);
-            onDrag();
-          }, 0);
-        });
+        }, 0);
       });
-    }, [
-      index,
-      itemKey,
-      itemRefs,
-      listRef,
-      onDrag,
-      setExtraTopPadding,
-      setIsDraggingList,
-    ]);
+    });
+  }, [
+    index,
+    itemKey,
+    itemRefs,
+    listRef,
+    onDrag,
+    setExtraTopPadding,
+    setIsDraggingList,
+  ]);
 
-    const isCompact = isDraggingList;
+  const isCompact = isDraggingList;
 
-    return (
-      <View
-        ref={el => {
-          itemRefs.current[itemKey] = el;
-        }}
-        style={[
-          styles.exerciseCard,
-          isDraggingList && { paddingHorizontal: 20 },
-        ]}
-      >
-        <View style={styles.exerciseHeader}>
-          <TouchableOpacity
-            style={styles.exerciseNameContainer}
-            onPress={() => {
-              if (!isDraggingList && detail) {
-                setSelectedExercise(detail);
-                setShowExerciseDetail(true);
-              }
-            }}
-            onLongPress={handleLongPress}
-            delayLongPress={150}
+  return (
+    <View
+      ref={el => {
+        itemRefs.current[itemKey] = el;
+      }}
+      style={[styles.exerciseCard, isDraggingList && { paddingHorizontal: 20 }]}
+    >
+      <View style={styles.exerciseHeader}>
+        <TouchableOpacity
+          style={styles.exerciseNameContainer}
+          onPress={() => {
+            if (!isDraggingList && detail) {
+              setSelectedExercise(detail);
+              setShowExerciseDetail(true);
+            }
+          }}
+          onLongPress={handleLongPress}
+          delayLongPress={150}
+        >
+          <Text
+            style={[
+              styles.exerciseNameClickable,
+              isActive && {
+                opacity: 0.95,
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.15,
+                shadowRadius: 8,
+              },
+            ]}
           >
-            <Text
-              style={[
-                styles.exerciseNameClickable,
-                isActive && {
-                  opacity: 0.95,
-                  shadowColor: "#000",
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.15,
-                  shadowRadius: 8,
+            {detail?.name ?? "Loading..."}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.exerciseMenuButton}
+          disabled={isDraggingList}
+          onPress={() => {
+            Alert.alert(
+              detail?.name || "Exercise",
+              "What would you like to do?",
+              [
+                { text: "Cancel", style: "cancel" },
+                {
+                  text: "Delete Exercise",
+                  style: "destructive",
+                  onPress: () => removeExercise(index),
                 },
-              ]}
-            >
-              {detail?.name ?? "Loading..."}
-            </Text>
-          </TouchableOpacity>
+              ]
+            );
+          }}
+        >
+          <Ionicons name="ellipsis-horizontal" size={20} color="#8E8E93" />
+        </TouchableOpacity>
+      </View>
+
+      {!isCompact && (
+        <>
+          {item.sets.length > 0 && (
+            <View style={styles.setsContainer}>
+              <SetHeader
+                exerciseKind={detail?.exercise_kind || "Barbell"}
+                showCompleteColumn
+              />
+
+              <View style={{ marginHorizontal: -20 }}>
+                {item.sets.map((set, setIndex) => (
+                  <SwipeToDeleteRow
+                    key={setIndex}
+                    onDelete={() => removeSet(index, setIndex)}
+                  >
+                    <SetRowInput
+                      previousSetData={previousSetsForExercise?.[setIndex]}
+                      exerciseId={item.exercise_id}
+                      set={set}
+                      setIndex={setIndex}
+                      exerciseKind={detail?.exercise_kind || "Barbell"}
+                      onUpdateSet={fields => updateSet(index, setIndex, fields)}
+                      showCompleteButton
+                    />
+                  </SwipeToDeleteRow>
+                ))}
+              </View>
+            </View>
+          )}
 
           <TouchableOpacity
-            style={styles.exerciseMenuButton}
-            disabled={isDraggingList}
-            onPress={() => {
-              Alert.alert(
-                detail?.name || "Exercise",
-                "What would you like to do?",
-                [
-                  { text: "Cancel", style: "cancel" },
-                  {
-                    text: "Delete Exercise",
-                    style: "destructive",
-                    onPress: () => removeExercise(index),
-                  },
-                ]
-              );
-            }}
+            style={styles.addSetButton}
+            onPress={() => addSet(index)}
           >
-            <Ionicons name="ellipsis-horizontal" size={20} color="#8E8E93" />
+            <Ionicons name="add" size={20} color="" />
+            <Text style={styles.addSetText}>Add Set</Text>
           </TouchableOpacity>
-        </View>
-
-        {!isCompact && (
-          <>
-            {item.sets.length > 0 && (
-              <View style={styles.setsContainer}>
-                <SetHeader
-                  exerciseKind={detail?.exercise_kind || "Barbell"}
-                  showCompleteColumn
-                />
-
-                <View style={{ marginHorizontal: -20 }}>
-                  {item.sets.map((set, setIndex) => (
-                    <SwipeToDeleteRow
-                      key={setIndex}
-                      onDelete={getDelete(index, setIndex)}
-                    >
-                      <SetRowInput
-                        previousSetData={previousSetsForExercise?.[setIndex]}
-                        exerciseId={item.exercise_id}
-                        set={set}
-                        setIndex={setIndex}
-                        exerciseKind={detail?.exercise_kind || "Barbell"}
-                        onUpdateSet={getSetUpdater(index, setIndex)}
-                        showCompleteButton
-                      />
-                    </SwipeToDeleteRow>
-                  ))}
-                </View>
-              </View>
-            )}
-
-            <TouchableOpacity
-              style={styles.addSetButton}
-              onPress={() => addSet(index)}
-            >
-              <Ionicons name="add" size={20} color="" />
-              <Text style={styles.addSetText}>Add Set</Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
-    );
-  },
-  // Custom compare: if the `item` reference didn’t change, skip re-render.
-  // Your updateSet/addSet replace only one exercise object; others keep the same reference.
-  (prev, next) =>
-    prev.item === next.item &&
-    prev.isDraggingList === next.isDraggingList &&
-    prev.isActive === next.isActive &&
-    prev.detail === next.detail &&
-    prev.previousSetsForExercise === next.previousSetsForExercise
-);
+        </>
+      )}
+    </View>
+  );
+});
