@@ -1,5 +1,6 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { storageKey } from "../env";
 
 const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || "";
 
@@ -139,7 +140,7 @@ api.interceptors.request.use(async config => {
   Metrics.markInflight(k, reqId, start);
 
   // ❗ KEEP CURRENT BEHAVIOR — AsyncStorage read per request
-  const userData = await AsyncStorage.getItem("user");
+  const userData = await AsyncStorage.getItem(storageKey("user"));
   if (userData) {
     try {
       const user = JSON.parse(userData) as { token?: string };
@@ -238,7 +239,7 @@ api.interceptors.response.use(
   }
 );
 
-export default api; 
+export default api;
 
 type WsHandlers = {
   onOpen?: () => void;
@@ -259,7 +260,7 @@ function httpToWs(base: string) {
 }
 
 async function getToken(): Promise<string | null> {
-  const raw = await AsyncStorage.getItem("user");
+  const raw = await AsyncStorage.getItem(storageKey("user"));
   if (!raw) return null;
   try {
     const u = JSON.parse(raw) as { token?: string };
