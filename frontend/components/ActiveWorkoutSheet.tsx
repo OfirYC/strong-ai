@@ -11,6 +11,7 @@ import {
   Alert,
   Animated,
   Dimensions,
+  Easing,
   PanResponder,
   StyleSheet,
   Text,
@@ -185,23 +186,27 @@ export default function ActiveWorkoutSheet({
   );
 
   const maxExpandedHeight = SCREEN_HEIGHT - insets.top - 85 - insets.bottom;
+  const collapsedTranslateY = maxExpandedHeight - COLLAPSED_HEIGHT;
+  const translateY = useRef(new Animated.Value(collapsedTranslateY)).current;
 
   const animatedHeight = useRef(new Animated.Value(COLLAPSED_HEIGHT)).current;
 
   const animateTo = useCallback(
     (nextExpanded: boolean) => {
-      Animated.spring(animatedHeight, {
-        toValue: nextExpanded ? maxExpandedHeight : COLLAPSED_HEIGHT,
-        useNativeDriver: false,
-        friction: 10,
-      }).start();
+      Animated.timing(translateY, {
+        toValue: nextExpanded ? 0 : collapsedTranslateY,
+        duration: 320, // try 280–360
+        easing: Easing.bezier(0.2, 0.0, 0.0, 1.0),
+        useNativeDriver: true,
+      }).start(() => {
+        // Your original side effects
+        isExpandedRef.current = nextExpanded;
+        if (!nextExpanded) scrollY.setValue(0);
+      });
 
       isExpandedRef.current = nextExpanded;
-
-      // Reset scroll-driven fades when collapsing
-      if (!nextExpanded) scrollY.setValue(0);
     },
-    [animatedHeight, maxExpandedHeight, scrollY]
+    [translateY, collapsedTranslateY, scrollY]
   );
 
   // Mount behavior: always paint collapsed first, then animate to store state
@@ -643,7 +648,15 @@ export default function ActiveWorkoutSheet({
 
   return (
     <>
-      <Animated.View style={[styles.container, { height: animatedHeight }]}>
+      <Animated.View
+        style={[
+          styles.container,
+          {
+            height: maxExpandedHeight,
+            transform: [{ translateY }],
+          },
+        ]}
+      >
         <View {...panResponder.panHandlers}>
           <TouchableOpacity
             style={styles.collapsedHeader}
@@ -712,9 +725,14 @@ export default function ActiveWorkoutSheet({
           </TouchableOpacity>
         </View>
 
-        {isExpanded && (
+        {
           <View style={styles.expandedContent}>
             <DraggableFlatList
+              initialNumToRender={6}
+              windowSize={7}
+              maxToRenderPerBatch={6}
+              updateCellsBatchingPeriod={16}
+              removeClippedSubviews
               ref={listRef as any}
               data={exercises || []}
               contentContainerStyle={{
@@ -723,7 +741,9 @@ export default function ActiveWorkoutSheet({
                 paddingHorizontal: isDraggingList ? 0 : 20,
               }}
               keyExtractor={item => `${item.exercise_id}-${item.order}`}
-              onScrollOffsetChange={offset => scrollY.setValue(offset)}
+              onScrollOffsetChange={offset => {
+                scrollY.setValue(offset);
+              }}
               scrollEventThrottle={16}
               ListHeaderComponentStyle={{ paddingLeft: 0 }}
               ListHeaderComponent={
@@ -890,7 +910,7 @@ export default function ActiveWorkoutSheet({
               }}
             />
           </View>
-        )}
+        }
       </Animated.View>
 
       <ExercisePickerModal
@@ -960,6 +980,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    paddingVertical: 10,
   },
   collapsedLeft: {
     flexDirection: "row",
