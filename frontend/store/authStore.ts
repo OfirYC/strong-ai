@@ -4,6 +4,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { User } from "../types";
 import { wsClient } from "../utils/api";
 import { storageKey } from "../env";
+import api from "../utils/api"; // Import the api client
 
 interface AuthState {
   user: User | null;
@@ -16,11 +17,11 @@ interface AuthState {
 // IMPORTANT: env-namespaced key so Expo Go local/prod don't collide
 const USER_KEY = storageKey("user");
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>(set => ({
   user: null,
   isLoading: true,
 
-  setUser: async (user) => {
+  setUser: async user => {
     try {
       if (user) {
         await AsyncStorage.setItem(USER_KEY, JSON.stringify(user));
@@ -57,9 +58,26 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   loadUser: async () => {
     try {
-      const userData = await AsyncStorage.getItem(USER_KEY);
+      let userData = await AsyncStorage.getItem(USER_KEY);
       if (userData) {
+        // Refresh token on app boot to ensure it's valid and has a fresh expiry
+        const tempUser: User = JSON.parse(userData);
+        if (tempUser?.token) {
+          try {
+            const res = await api.post("/auth/refresh");
+            if (res?.data?.token) {
+              tempUser.token = res.data.token;
+              await AsyncStorage.setItem(USER_KEY, JSON.stringify(tempUser));
+              userData = JSON.stringify(tempUser);
+            }
+          } catch (error) {
+            console.error("Failed to refresh token on load:", error);
+            // If refresh fails, we can still proceed with the old token (might still be valid)
+          }
+        }
+
         const user: User = JSON.parse(userData);
+
         set({ user, isLoading: false });
 
         // Start WS on boot if token already stored
@@ -72,6 +90,20 @@ export const useAuthStore = create<AuthState>((set) => ({
     } catch (error) {
       console.error("Failed to load user:", error);
       set({ isLoading: false });
+    }
+  },
+
+  // After successful login (or sign-in), call backend refresh and save refreshed token:
+  refreshUserToken: async (user: User) => {
+    try {
+      const res = await api.post("/auth/refresh"); // sends Authorization header via api client
+      if (res?.data?.token) {
+        user.token = res.data.token;
+        await AsyncStorage.setItem(USER_KEY, JSON.stringify(user));
+        set({ user });
+      }
+    } catch (error) {
+      console.error("Failed to refresh token:", error);
     }
   },
 }));

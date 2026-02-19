@@ -12,8 +12,27 @@ from typing import List, Optional, Dict, Set, Any
 from datetime import datetime, timedelta
 from bson import ObjectId
 from constants import EXERCISE_KIND_RULES  # add this
-import json 
+import json
+import time
+import secrets
+import requests
+import jwt  # PyJWT
 from observable_db import ObservableDB
+
+# Cache for Apple's JWKS (public keys)
+_APPLE_JWKS = None
+_APPLE_JWKS_FETCHED_AT = 0
+
+def fetch_apple_jwks():
+    """Fetch Apple's JWKS and cache for 24 hours."""
+    global _APPLE_JWKS, _APPLE_JWKS_FETCHED_AT
+    if _APPLE_JWKS and (time.time() - _APPLE_JWKS_FETCHED_AT) < 60 * 60 * 24:
+        return _APPLE_JWKS
+    resp = requests.get("https://appleid.apple.com/auth/keys", timeout=5)
+    resp.raise_for_status()
+    _APPLE_JWKS = resp.json()
+    _APPLE_JWKS_FETCHED_AT = time.time()
+    return _APPLE_JWKS
 
 from models import (
     User, UserCreate, UserLogin, UserResponse, UserProfile, ProfileUpdate, UserContext, ProfileInsights,
@@ -138,6 +157,94 @@ async def login(credentials: UserLogin):
     
     return UserResponse(id=user_id, email=user_doc["email"], token=token)
 
+@api_router.post("/auth/refresh")
+async def refresh_token(current_user: str = Depends(get_current_user)):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    # current_user is already the user_id string
+    user_id = current_user
+
+    # Optional but recommended: fetch email for response consistency
+    user_doc = await db.users.find_one({"_id": ObjectId(user_id)})
+    if not user_doc:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    # Create new access token
+    new_token = create_access_token({"user_id": user_id})
+
+    return {
+        "id": user_id,
+        "email": user_doc.get("email"),
+        "token": new_token
+    }
+    
+@api_router.post("/auth/apple")
+async def apple_signin(payload: dict):
+    """
+    Verify Apple's identity token (JWT) using Apple's JWKS,
+    find or create a user (store `apple_sub` on user document),
+    and return our app access token.
+    Expects payload: { apple_token: str, client_id?: str, email?: str }
+    """
+
+    apple_token = payload.get("apple_token") or payload.get("identity_token")
+    if not apple_token:
+        raise HTTPException(status_code=400, detail="apple_token (identity token) is required")
+
+    expected_aud = os.environ.get("APPLE_CLIENT_ID") or payload.get("client_id")
+    if not expected_aud:
+        raise HTTPException(status_code=500, detail="Server missing APPLE_CLIENT_ID env")
+
+    try:
+        jwks = fetch_apple_jwks()
+        unverified_header = jwt.get_unverified_header(apple_token)
+        kid = unverified_header.get("kid")
+        if not kid:
+            raise ValueError("Missing kid in token header")
+        jwk = next((k for k in jwks.get("keys", []) if k.get("kid") == kid), None)
+        if not jwk:
+            raise ValueError("No matching Apple JWK found")
+
+        public_key = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(jwk))
+        decoded = jwt.decode(
+            apple_token,
+            public_key,
+            algorithms=["RS256"],
+            audience=expected_aud,
+            issuer="https://appleid.apple.com",
+        )
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Invalid Apple identity token: {str(e)}")
+
+    apple_sub = decoded.get("sub")
+    email_from_token = decoded.get("email")
+    email = email_from_token or payload.get("email")
+
+    user_doc = None
+    if apple_sub:
+        user_doc = await db.users.find_one({"apple_sub": apple_sub})
+    if not user_doc and email:
+        user_doc = await db.users.find_one({"email": email})
+
+    if not user_doc:
+        random_pw = secrets.token_urlsafe(32)
+        password_hash = get_password_hash(random_pw)
+        new_user = {
+            "email": email,
+            "password_hash": password_hash,
+            "apple_sub": apple_sub,
+            "created_at": datetime.utcnow(),
+        }
+        result = await db.users.insert_one(new_user)
+        user_id = str(result.inserted_id)
+    else:
+        user_id = str(user_doc["_id"])
+        if apple_sub and not user_doc.get("apple_sub"):
+            await db.users.update_one({"_id": ObjectId(user_doc["_id"])}, {"$set": {"apple_sub": apple_sub}})
+
+    token = create_access_token({"user_id": user_id})
+    return {"id": user_id, "email": email, "token": token}
 
 # ============= Web Socket =============
 ws_manager = WSManager()

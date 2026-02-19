@@ -15,6 +15,7 @@ import Input from "../../components/Input";
 import Button from "../../components/Button";
 import api from "../../utils/api";
 import { useAuthStore } from "../../store/authStore";
+import * as AppleAuthentication from "expo-apple-authentication";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -38,6 +39,27 @@ export default function LoginScreen() {
       Alert.alert("Error", error.response?.data?.detail || "Login failed");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      const appleToken = credential.identityToken;
+      const email = credential.email; // may be undefined after first sign-in
+      const payload: any = { apple_token: appleToken };
+      if (email) payload.email = email;
+
+      const res = await api.post("/auth/apple", payload);
+      await setUser(res.data); // use your auth store's setUser()
+      router.replace("/(tabs)/workout");
+    } catch (err) {
+      console.error("Apple sign-in failed", err);
     }
   };
 
@@ -74,22 +96,45 @@ export default function LoginScreen() {
               placeholder="Enter your password"
             />
 
-            <Button
-              title="Log In"
-              onPress={handleLogin}
-              loading={loading}
-              style={styles.button}
-            />
+            {/** A vertical stack for the login button and a seperatoer then the social logins like apple login */}
+
+            <View style={styles.authStack}>
+              {/* Primary Login */}
+              <Button
+                title="Log In"
+                onPress={handleLogin}
+                loading={loading}
+                style={styles.button}
+              />
+
+              {/* Separator */}
+              <View style={styles.separatorContainer}>
+                <View style={styles.separatorLine} />
+                <Text style={styles.separatorText}>OR</Text>
+                <View style={styles.separatorLine} />
+              </View>
+
+              {/* Social Auth Stack */}
+              <View style={styles.socialStack}>
+                <AppleAuthentication.AppleAuthenticationButton
+                  buttonType={
+                    AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN
+                  }
+                  buttonStyle={
+                    AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                  }
+                  cornerRadius={8}
+                  style={styles.socialButton}
+                  onPress={handleAppleSignIn}
+                />
+              </View>
+            </View>
 
             <TouchableOpacity
               onPress={() => router.push("/(auth)/register")}
               style={styles.linkContainer}
             >
               <Text style={styles.linkText}>
-                <Text>
-                  {process.env.EXPO_PUBLIC_BACKEND_URL ??
-                    "BACKEND URL IS UNDEFINED"}
-                </Text>
                 Don't have an account?{" "}
                 <Text style={styles.linkTextBold}>Sign Up</Text>
               </Text>
@@ -145,5 +190,41 @@ const styles = StyleSheet.create({
   linkTextBold: {
     color: "#007AFF",
     fontWeight: "600",
+  },
+  authStack: {
+    width: "100%",
+    gap: 16, // RN 0.71+ — if older, replace with marginBottoms
+  },
+
+  separatorContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+
+  separatorLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#E0E0E0",
+  },
+
+  separatorText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#888",
+  },
+
+  appleButton: {
+    width: "100%",
+    height: 44,
+  },
+  socialStack: {
+    width: "100%",
+    gap: 12,
+  },
+
+  socialButton: {
+    width: "100%",
+    height: 44,
   },
 });

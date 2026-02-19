@@ -1,16 +1,17 @@
 {
   "expo": {
     "name": "Stronger",
-    "slug": "frontend",
+    "slug": "stronger",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "frontend",
+    "scheme": "stronger",
     "userInterfaceStyle": "automatic",
 
     "ios": {
       "bundleIdentifier": "com.ofirsmol.strongai",
       "icon": "./assets/images/icon.png",
+      "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSSupportsLiveActivities": true
@@ -60,6 +61,7 @@
       "expo-asset",
       "expo-font",
       "expo-web-browser",
+      "expo-apple-authentication",
       "./plugins/withLiveActivity"
     ],
 
