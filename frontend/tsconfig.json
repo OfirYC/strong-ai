@@ -3,15 +3,11 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
-      "@/*": [
-        "./*"
-      ]
+      "@/*": ["./*"],
+      "@expo/ui": ["./node_modules/@expo/ui/build/index.d.ts"],
+      "expo-widgets": ["./node_modules/expo-widgets/build/index.d.ts"]
     }
   },
-  "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    ".expo/types/**/*.ts",
-    "expo-env.d.ts"
-  ]
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts", "plugins/withLiveActivity.js"],
+  "exclude": ["node_modules"]
 }

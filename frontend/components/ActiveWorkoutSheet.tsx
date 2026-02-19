@@ -42,6 +42,13 @@ import ExerciseDetailModal from "./ExerciseDetailModal";
 import ExercisePickerModal from "./ExercisePickerModal";
 import SetRowInput, { SetHeader } from "./SetRowInput";
 import SwipeToDeleteRow from "./SwipeToDeleteRow";
+import {
+  startWorkoutLiveActivity,
+  stopWorkoutLiveActivity,
+  updateWorkoutLiveActivity,
+  WorkoutLiveModel,
+} from "../utils/liveActivity";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 interface WorkoutSummaryData {
   name: string;
@@ -87,7 +94,7 @@ export default function ActiveWorkoutSheet({
     updateWorkout,
     updateWorkoutName,
     updateWorkoutNotes,
-    endWorkout,
+    endWorkout: _endWorkout,
     workoutStartTime,
   } = useWorkoutStore();
 
@@ -145,7 +152,7 @@ export default function ActiveWorkoutSheet({
 
   const [showMenu, setShowMenu] = useState(false);
   const [showDescription, setShowDescription] = useState(
-    !!activeWorkout?.notes
+    !!activeWorkout?.notes,
   );
 
   const elapsedSecondsRef = useRef(0);
@@ -154,7 +161,7 @@ export default function ActiveWorkoutSheet({
   const [showCreateExercise, setShowCreateExercise] = useState(false);
   const [showExerciseDetail, setShowExerciseDetail] = useState(false);
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(
-    null
+    null,
   );
 
   const [isDraggingList, setIsDraggingList] = useState(false);
@@ -172,7 +179,7 @@ export default function ActiveWorkoutSheet({
         outputRange: [0, 1],
         extrapolate: "clamp",
       }),
-    [scrollY]
+    [scrollY],
   );
 
   const mainTimerOpacity = useMemo(
@@ -182,7 +189,7 @@ export default function ActiveWorkoutSheet({
         outputRange: [1, 0],
         extrapolate: "clamp",
       }),
-    [scrollY]
+    [scrollY],
   );
 
   const maxExpandedHeight = SCREEN_HEIGHT - insets.top - 85 - insets.bottom;
@@ -206,7 +213,7 @@ export default function ActiveWorkoutSheet({
 
       isExpandedRef.current = nextExpanded;
     },
-    [translateY, collapsedTranslateY, scrollY]
+    [translateY, collapsedTranslateY, scrollY],
   );
 
   // Mount behavior: always paint collapsed first, then animate to store state
@@ -249,7 +256,7 @@ export default function ActiveWorkoutSheet({
         }
       },
       onPanResponderRelease: () => {},
-    })
+    }),
   ).current;
 
   const expand = () => setIsExpanded(true);
@@ -257,7 +264,7 @@ export default function ActiveWorkoutSheet({
   const toggleExpand = () => setIsExpanded(!isExpanded);
 
   const listRef = useRef<typeof DraggableFlatList<WorkoutExercise> | null>(
-    null
+    null,
   );
   const itemRefs = useRef<Record<string, View | null>>({});
 
@@ -308,8 +315,15 @@ export default function ActiveWorkoutSheet({
       activeWorkout?.exercises?.map(e => ({
         id: e.exercise_id,
         sets: e.sets,
-      })) || []
+      })) || [],
     );
+
+  /* -------------------------------------------------------------------------- */
+  /*                              LIVE ACTIVITY                                 */
+  /* -------------------------------------------------------------------------- */
+  const endWorkout = useCallback(() => {
+    _endWorkout();
+  }, [_endWorkout]);
 
   const getDefaultRestTimer = () => 3 * 60;
 
@@ -331,7 +345,7 @@ export default function ActiveWorkoutSheet({
               : {
                   ...s,
                   rest_timer: s.rest_timer || getDefaultRestTimer(),
-                }
+                },
           );
 
     const newExercise: WorkoutExercise = {
@@ -373,15 +387,18 @@ export default function ActiveWorkoutSheet({
   const updateSet = (
     exerciseIndex: number,
     setIndex: number,
-    fields: Partial<WorkoutSet>
+    fields: Partial<WorkoutSet>,
   ) => {
+    const prevSet = exercises[exerciseIndex]?.sets?.[setIndex];
+    const wasCompleted = !!prevSet?.completed;
+
     const newExercises = [...exercises];
     const oldExercise = newExercises[exerciseIndex];
 
     newExercises[exerciseIndex] = {
       ...oldExercise,
       sets: oldExercise.sets.map((set, i) =>
-        i === setIndex ? { ...set, ...fields } : set
+        i === setIndex ? { ...set, ...fields } : set,
       ),
     };
 
@@ -412,12 +429,12 @@ export default function ActiveWorkoutSheet({
           style: "destructive",
           onPress: () => {
             const newExercises = exercises.filter(
-              (_, i) => i !== exerciseIndex
+              (_, i) => i !== exerciseIndex,
             );
             syncExercises(newExercises);
           },
         },
-      ]
+      ],
     );
   };
 
@@ -444,7 +461,7 @@ export default function ActiveWorkoutSheet({
             style: "destructive",
             onPress: () => saveWorkout(true),
           },
-        ]
+        ],
       );
     } else {
       saveWorkout(false);
@@ -495,7 +512,7 @@ export default function ActiveWorkoutSheet({
           const bestDistanceSet = sets.reduce(
             (best, set) =>
               (set.distance || 0) > (best.distance || 0) ? set : best,
-            sets[0] || ({} as any)
+            sets[0] || ({} as any),
           );
           if (bestDistanceSet?.distance)
             bestSet = `${bestDistanceSet.distance} km`;
@@ -510,17 +527,20 @@ export default function ActiveWorkoutSheet({
           const bestDurationSet = sets.reduce(
             (best, set) =>
               (set.duration || 0) > (best.duration || 0) ? set : best,
-            sets[0] || ({} as any)
+            sets[0] || ({} as any),
           );
           const mins = Math.floor((bestDurationSet?.duration || 0) / 60);
           const secs = (bestDurationSet?.duration || 0) % 60;
           bestSet = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
         } else {
-          const bestWeightSet = sets.reduce((best, set) => {
-            const volume = (set.weight || 0) * (set.reps || 0);
-            const bestVolume = (best.weight || 0) * (best.reps || 0);
-            return volume > bestVolume ? set : best;
-          }, sets[0] || ({} as any));
+          const bestWeightSet = sets.reduce(
+            (best, set) => {
+              const volume = (set.weight || 0) * (set.reps || 0);
+              const bestVolume = (best.weight || 0) * (best.reps || 0);
+              return volume > bestVolume ? set : best;
+            },
+            sets[0] || ({} as any),
+          );
 
           if (bestWeightSet?.weight) {
             bestSet = `${bestWeightSet.weight} kg × ${bestWeightSet.reps || 0}`;
@@ -560,7 +580,7 @@ export default function ActiveWorkoutSheet({
       console.error("Save error:", error.response?.data || error);
       Alert.alert(
         "Error",
-        error.response?.data?.detail || "Failed to save workout"
+        error.response?.data?.detail || "Failed to save workout",
       );
     } finally {
       setSaving(false);
@@ -605,14 +625,14 @@ export default function ActiveWorkoutSheet({
               } catch (error) {
                 console.error(
                   "Failed to update planned workout status:",
-                  error
+                  error,
                 );
               }
               endWorkout();
               collapse();
             },
           },
-        ]
+        ],
       );
     } else {
       Alert.alert(
@@ -634,7 +654,7 @@ export default function ActiveWorkoutSheet({
               collapse();
             },
           },
-        ]
+        ],
       );
     }
   };
@@ -643,6 +663,14 @@ export default function ActiveWorkoutSheet({
     const reordered = data.map((ex, index) => ({ ...ex, order: index }));
     syncExercises(reordered);
   };
+
+  const { stopNow, getActivityId } = useWorkoutLiveActivity({
+    activeWorkoutId: activeWorkout?.id || null,
+    workoutStartTime: workoutStartTime || null,
+    exercises: activeWorkout?.exercises || [],
+    exercisesById,
+    workoutName: activeWorkout?.name || "",
+  });
 
   if (!activeWorkout) return null;
 
@@ -782,7 +810,7 @@ export default function ActiveWorkoutSheet({
                     />
                     <Text style={styles.dateText}>
                       {new Date(
-                        workoutStartTime || Date.now()
+                        workoutStartTime || Date.now(),
                       ).toLocaleDateString("en-US", {
                         day: "numeric",
                         month: "long",
@@ -912,7 +940,6 @@ export default function ActiveWorkoutSheet({
           </View>
         }
       </Animated.View>
-
       <ExercisePickerModal
         visible={showExercisePicker}
         onClose={() => setShowExercisePicker(false)}
@@ -922,7 +949,6 @@ export default function ActiveWorkoutSheet({
           setTimeout(() => setShowCreateExercise(true), 300);
         }}
       />
-
       <CreateExerciseModal
         visible={showCreateExercise}
         onClose={() => setShowCreateExercise(false)}
@@ -931,7 +957,6 @@ export default function ActiveWorkoutSheet({
           setShowCreateExercise(false);
         }}
       />
-
       <ExerciseDetailModal
         visible={showExerciseDetail}
         exercise={selectedExercise}
@@ -1210,8 +1235,8 @@ const WorkoutElapsedTimerText = React.memo(function WorkoutElapsedTimerText({
       typeof startTime === "string"
         ? new Date(startTime).getTime()
         : typeof startTime === "number"
-        ? startTime
-        : new Date(startTime).getTime();
+          ? startTime
+          : new Date(startTime).getTime();
 
     const tick = () => {
       const elapsed = Math.max(0, Math.floor((Date.now() - startMs) / 1000));
@@ -1249,7 +1274,7 @@ type ExerciseRowProps = {
   updateSet: (
     exerciseIndex: number,
     setIndex: number,
-    fields: Partial<WorkoutSet>
+    fields: Partial<WorkoutSet>,
   ) => void;
   addSet: (exerciseIndex: number) => void;
 
@@ -1365,7 +1390,7 @@ const ExerciseRow = React.memo(function ExerciseRow({
                   style: "destructive",
                   onPress: () => removeExercise(index),
                 },
-              ]
+              ],
             );
           }}
         >
@@ -1415,3 +1440,389 @@ const ExerciseRow = React.memo(function ExerciseRow({
     </View>
   );
 });
+
+export type ExercisesById = Record<string, Exercise>;
+
+export type UseWorkoutLiveActivityArgs = {
+  activeWorkoutId: string | null;
+
+  workoutName?: string;
+
+  workoutStartTime: number | string | Date | null | undefined;
+
+  exercises: WorkoutExercise[];
+  exercisesById: ExercisesById;
+
+  minIntervalMs?: number; // throttle interval (default 2000)
+};
+
+export type UseWorkoutLiveActivityReturn = {
+  stopNow: () => void;
+  getActivityId: () => string | null;
+};
+
+export function useWorkoutLiveActivity(
+  args: UseWorkoutLiveActivityArgs,
+): UseWorkoutLiveActivityReturn {
+  const {
+    activeWorkoutId,
+    workoutName,
+    workoutStartTime,
+    exercises,
+    exercisesById,
+    minIntervalMs = 2000,
+  } = args;
+
+  const STORAGE_KEY = "live_activity_id_v1";
+
+  const liveActivityIdRef = useRef<string | null>(null);
+  const hasHydratedRef = useRef(false);
+  const restartingRef = useRef(false);
+
+  const lastUpdateAtRef = useRef<number>(0);
+  const updateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const restKeyRef = useRef<string | null>(null);
+  const restEndAtRef = useRef<number | null>(null);
+  const restStartAtRef = useRef<number | null>(null);
+  const restTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const prevExercisesRef = useRef<WorkoutExercise[]>(exercises);
+
+  /* ------------------------------------------------------------- */
+  /*                        Start Time                             */
+  /* ------------------------------------------------------------- */
+
+  const getStartedAtMs = useCallback((): number => {
+    if (!workoutStartTime) return Date.now();
+    if (typeof workoutStartTime === "number") return workoutStartTime;
+    if (typeof workoutStartTime === "string")
+      return new Date(workoutStartTime).getTime();
+    return workoutStartTime instanceof Date
+      ? workoutStartTime.getTime()
+      : Date.now();
+  }, [workoutStartTime]);
+
+  /* ------------------------------------------------------------- */
+  /*                   Derived Workout State                       */
+  /* ------------------------------------------------------------- */
+
+  const derived = useMemo(() => {
+    let totalSets = 0;
+    let completedSets = 0;
+
+    let currentExerciseId: string | undefined;
+    let currentSetIndex: number | undefined;
+
+    for (const ex of exercises) {
+      totalSets += ex.sets.length;
+
+      for (let i = 0; i < ex.sets.length; i++) {
+        const set = ex.sets[i];
+
+        if (set.completed) {
+          completedSets++;
+        } else if (!currentExerciseId) {
+          currentExerciseId = ex.exercise_id;
+          currentSetIndex = i;
+        }
+      }
+    }
+
+    return {
+      totalSets,
+      completedSets,
+      currentExerciseId,
+      currentSetIndex,
+    };
+  }, [exercises]);
+
+  /* ------------------------------------------------------------- */
+  /*                       Model Builder                           */
+  /* ------------------------------------------------------------- */
+
+  const buildModel = useCallback((): WorkoutLiveModel => {
+    const { totalSets, completedSets, currentExerciseId, currentSetIndex } =
+      derived;
+
+    let currentExerciseName: string | undefined;
+    let currentWeight: number | undefined;
+    let currentReps: number | undefined;
+    let currentDurationSeconds: number | undefined;
+    let currentDistanceKm: number | undefined;
+
+    if (currentExerciseId && typeof currentSetIndex === "number") {
+      const ex = exercises.find(e => e.exercise_id === currentExerciseId);
+      const set = ex?.sets[currentSetIndex];
+
+      const detail = exercisesById[currentExerciseId];
+      const fields = getExerciseFields(detail?.exercise_kind);
+
+      currentExerciseName = detail?.name;
+
+      if (fields.includes("weight")) currentWeight = set?.weight;
+      if (fields.includes("reps")) currentReps = set?.reps;
+      if (fields.includes("duration")) currentDurationSeconds = set?.duration;
+      if (fields.includes("distance")) currentDistanceKm = set?.distance;
+    }
+
+    return {
+      workoutName: workoutName || "Workout",
+      timerStartDateInMilliseconds: getStartedAtMs(),
+      workoutStartTimeMs: getStartedAtMs(),
+      exerciseCount: exercises.length,
+      totalSets,
+      completedSets,
+      currentExerciseName,
+      currentSet:
+        typeof currentSetIndex === "number"
+          ? currentSetIndex + 1 // convert 0-based index → human 1-based
+          : undefined,
+      restEndAtMs: restEndAtRef.current ?? undefined,
+      restStartedAtMs: restStartAtRef.current ?? undefined,
+      currentWeight,
+      currentReps,
+      currentDurationSeconds,
+      currentDistanceKm,
+    };
+  }, [derived, exercises, exercisesById, workoutName, getStartedAtMs]);
+
+  /* ------------------------------------------------------------- */
+  /*                       Throttled Update                        */
+  /* ------------------------------------------------------------- */
+
+  const sendUpdate = useCallback(
+    (immediate: boolean = false) => {
+      const id = liveActivityIdRef.current;
+      if (!id) return;
+
+      const run = () => {
+        lastUpdateAtRef.current = Date.now();
+        updateWorkoutLiveActivity(id, buildModel()).catch(async e => {
+          if (restartingRef.current) return;
+          restartingRef.current = true;
+
+          const ACTIVITY_NOT_FOUND_ERROR_CODE = "ERR_ACTIVITY_NOT_FOUND";
+          if (
+            e instanceof Error &&
+            (e as any).code === ACTIVITY_NOT_FOUND_ERROR_CODE
+          ) {
+            console.log(
+              "Found dismissed live activity, clearing ID and starting a new one if workout is active",
+            );
+            await AsyncStorage.removeItem(STORAGE_KEY);
+
+            if (activeWorkoutId) {
+              const newId = await startWorkoutLiveActivity(buildModel());
+              if (newId) {
+                liveActivityIdRef.current = newId;
+                await AsyncStorage.setItem(STORAGE_KEY, newId);
+              }
+            }
+          }
+
+          restartingRef.current = false;
+        });
+      };
+
+      if (immediate) {
+        if (updateTimeoutRef.current) {
+          clearTimeout(updateTimeoutRef.current);
+          updateTimeoutRef.current = null;
+        }
+        run();
+        return;
+      }
+
+      const now = Date.now();
+      const elapsed = now - lastUpdateAtRef.current;
+      const wait = Math.max(0, minIntervalMs - elapsed);
+
+      if (updateTimeoutRef.current) return;
+
+      updateTimeoutRef.current = setTimeout(() => {
+        updateTimeoutRef.current = null;
+        run();
+      }, wait);
+    },
+    [buildModel, minIntervalMs],
+  );
+
+  /* ------------------------------------------------------------- */
+  /*                     Hydrate persisted ID                      */
+  /* ------------------------------------------------------------- */
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      const storedId = await AsyncStorage.getItem(STORAGE_KEY);
+      if (cancelled) return;
+
+      if (storedId) {
+        liveActivityIdRef.current = storedId;
+      }
+
+      hasHydratedRef.current = true;
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /* ------------------------------------------------------------- */
+  /*                Start / Stop Reconciliation                    */
+  /* ------------------------------------------------------------- */
+
+  useEffect(() => {
+    if (!hasHydratedRef.current) return;
+
+    let cancelled = false;
+
+    (async () => {
+      // START
+      if (activeWorkoutId && !liveActivityIdRef.current) {
+        const id = await startWorkoutLiveActivity(buildModel());
+        if (cancelled) return;
+        if (id) {
+          liveActivityIdRef.current = id;
+          await AsyncStorage.setItem(STORAGE_KEY, id);
+        }
+
+        return;
+      }
+
+      // STOP
+      if (!activeWorkoutId && liveActivityIdRef.current) {
+        const id = liveActivityIdRef.current;
+
+        await stopWorkoutLiveActivity(id).catch(() => {});
+        liveActivityIdRef.current = null;
+        await AsyncStorage.removeItem(STORAGE_KEY);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeWorkoutId, buildModel]);
+
+  /* ------------------------------------------------------------- */
+  /*                Exercise Diff + Rest Handling                  */
+  /* ------------------------------------------------------------- */
+
+  useEffect(() => {
+    if (!liveActivityIdRef.current) {
+      prevExercisesRef.current = exercises;
+      return;
+    }
+
+    const prev = prevExercisesRef.current;
+    prevExercisesRef.current = exercises;
+
+    let triggeredRestKey: string | null = null;
+    let triggeredRestSeconds: number | null = null;
+    let sawUncomplete = false;
+
+    for (let exIdx = 0; exIdx < exercises.length; exIdx++) {
+      const nextEx = exercises[exIdx];
+      const prevEx = prev.find(e => e.exercise_id === nextEx.exercise_id);
+
+      const nextSets = nextEx?.sets ?? [];
+      const prevSets = prevEx?.sets ?? [];
+
+      const minLen = Math.min(nextSets.length, prevSets.length);
+
+      for (let i = 0; i < minLen; i++) {
+        const was = !!prevSets[i]?.completed;
+        const now = !!nextSets[i]?.completed;
+
+        const key = `${nextEx.exercise_id}:${i}`;
+
+        if (was && !now && restKeyRef.current === key) {
+          sawUncomplete = true;
+        }
+
+        if (!was && now && triggeredRestKey == null) {
+          triggeredRestKey = key;
+          triggeredRestSeconds = nextSets[i]?.rest_timer ?? 0;
+        }
+      }
+    }
+
+    if (sawUncomplete) {
+      if (restTimeoutRef.current) clearTimeout(restTimeoutRef.current);
+      restTimeoutRef.current = null;
+      restKeyRef.current = null;
+      restEndAtRef.current = null;
+      restStartAtRef.current = null;
+      sendUpdate(true);
+      return;
+    }
+
+    if (triggeredRestKey && triggeredRestSeconds && triggeredRestSeconds > 0) {
+      if (restTimeoutRef.current) clearTimeout(restTimeoutRef.current);
+
+      const now = Date.now();
+      restKeyRef.current = triggeredRestKey;
+      restStartAtRef.current = now;
+      restEndAtRef.current = now + triggeredRestSeconds * 1000;
+
+      sendUpdate(true);
+
+      restTimeoutRef.current = setTimeout(() => {
+        restTimeoutRef.current = null;
+        restKeyRef.current = null;
+        restEndAtRef.current = null;
+        restStartAtRef.current = null;
+        sendUpdate(true);
+      }, triggeredRestSeconds * 1000);
+
+      return;
+    }
+
+    sendUpdate(false);
+  }, [exercises, sendUpdate]);
+
+  /* ------------------------------------------------------------- */
+  /*                     Metadata Updates                          */
+  /* ------------------------------------------------------------- */
+
+  useEffect(() => {
+    if (!liveActivityIdRef.current) return;
+    sendUpdate(true);
+  }, [workoutName, sendUpdate]);
+
+  /* ------------------------------------------------------------- */
+  /*                          Cleanup                              */
+  /* ------------------------------------------------------------- */
+
+  useEffect(() => {
+    return () => {
+      if (updateTimeoutRef.current) clearTimeout(updateTimeoutRef.current);
+      if (restTimeoutRef.current) clearTimeout(restTimeoutRef.current);
+    };
+  }, []);
+
+  const stopNow = useCallback(async () => {
+    const id = liveActivityIdRef.current;
+    if (!id) return;
+
+    if (updateTimeoutRef.current) clearTimeout(updateTimeoutRef.current);
+    if (restTimeoutRef.current) clearTimeout(restTimeoutRef.current);
+
+    restKeyRef.current = null;
+    restEndAtRef.current = null;
+    restStartAtRef.current = null;
+
+    await stopWorkoutLiveActivity(id).catch(() => {});
+    liveActivityIdRef.current = null;
+    await AsyncStorage.removeItem(STORAGE_KEY);
+  }, []);
+
+  return {
+    stopNow,
+    getActivityId: () => liveActivityIdRef.current,
+  };
+}

@@ -1,6 +1,5 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import MaskedView from "@react-native-masked-view/masked-view";
-import { Audio } from "expo-av";
 import * as Haptics from "expo-haptics";
 import React, {
   JSX,
@@ -106,7 +105,7 @@ function registerRestTimer(key: TimerKey, stopper: TimerStopper) {
 function activateRestTimer(key: TimerKey) {
   if (restTimerRegistry.activeKey && restTimerRegistry.activeKey !== key) {
     const prevStopper = restTimerRegistry.listeners.get(
-      restTimerRegistry.activeKey
+      restTimerRegistry.activeKey,
     );
     if (prevStopper) {
       prevStopper();
@@ -121,7 +120,7 @@ function activateRestTimer(key: TimerKey) {
  */
 function formatPreviousToText(
   data: PreviousSetData | null,
-  exerciseKind: ExerciseKind
+  exerciseKind: ExerciseKind,
 ): string {
   if (!data) return "--";
 
@@ -196,7 +195,7 @@ function SetRowInput({
 
   const runShakeAnimation = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(
-      () => {}
+      () => {},
     );
 
     rowShake.setValue(0);
@@ -252,7 +251,7 @@ function SetRowInput({
 
   const previousText = useMemo(
     () => formatPreviousToText(previousData, exerciseKind),
-    [previousData, exerciseKind]
+    [previousData, exerciseKind],
   );
   const handleApplyPrevious = () => {
     if (!previousData || isSameAsPrevious) {
@@ -295,7 +294,7 @@ function SetRowInput({
     if (nextCompleted) {
       // Positive “success” feedback when completing a set
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
-        () => {}
+        () => {},
       );
       runCompleteSuccessAnimation();
     } else {
@@ -393,7 +392,7 @@ function SetRowInput({
                 isCompleted && styles.durationInputCompleted,
               ]}
               enableMilliseconds={MS_ENABLED_EXERCISE_KINDS.includes(
-                exerciseKind
+                exerciseKind,
               )}
             />
           </View>
@@ -831,32 +830,6 @@ const styles = StyleSheet.create({
 /* -------------------------------------------------------------------------- */
 /* REST TIMER ROW                                                             */
 /* -------------------------------------------------------------------------- */
-let bellSoundSingleton: Audio.Sound | null = null;
-let bellSoundPromise: Promise<Audio.Sound> | null = null;
-
-async function getBellSound(): Promise<Audio.Sound> {
-  if (bellSoundSingleton) return bellSoundSingleton;
-  if (bellSoundPromise) return bellSoundPromise;
-
-  bellSoundPromise = (async () => {
-    const { sound } = await Audio.Sound.createAsync(
-      require("../assets/second_bell.mp3")
-    );
-    bellSoundSingleton = sound;
-    return sound;
-  })();
-
-  return bellSoundPromise;
-}
-
-async function playBellOnce() {
-  try {
-    const sound = await getBellSound();
-    await sound.replayAsync();
-  } catch {
-    // silent failure
-  }
-}
 
 function RestTimerRow({
   timerKey,
@@ -876,7 +849,7 @@ function RestTimerRow({
     () => {
       if (isSetCompleted && hasTimer) return "done";
       return "display";
-    }
+    },
   );
 
   const [remaining, setRemaining] = useState<number>(() => {
@@ -927,15 +900,14 @@ function RestTimerRow({
         setRemaining(0);
 
         if (!silent) {
-          playBellOnce(); // fire-and-forget is fine
           setShowModal(true);
           Haptics.notificationAsync(
-            Haptics.NotificationFeedbackType.Success
+            Haptics.NotificationFeedbackType.Success,
           ).catch(() => {});
         }
       }
     },
-    [clear, progress]
+    [clear, progress],
   );
 
   // Natural finish (used by tick + animation completion)
@@ -969,7 +941,7 @@ function RestTimerRow({
         }
       });
     },
-    [handleFinishNatural, progress]
+    [handleFinishNatural, progress],
   );
 
   const start = useCallback(() => {
@@ -1090,7 +1062,7 @@ function RestTimerRow({
         setMode(isSetCompleted ? "done" : "display");
       }
     },
-    [isSetCompleted]
+    [isSetCompleted],
   );
 
   const handleDurationChange = (sec: number | null) => {

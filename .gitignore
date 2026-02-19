@@ -177,3 +177,6 @@ android-sdk/ -e
 .metro-cache/
 /.metro-cache
 ./frontend/.metro-cache/
+
+frontend/ios
+frontend/android
