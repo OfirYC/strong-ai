@@ -33,6 +33,7 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isAtBottom, setIsAtBottom] = useState(true);
   const scrollViewRef = useRef<ScrollView>(null);
 
   // Auto-scroll to bottom when messages change
@@ -56,6 +57,10 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
   }, [visible, messages.length]);
   const sendingRef = useRef(false);
 
+  const scrollToBottom = () => {
+    scrollViewRef.current?.scrollToEnd({ animated: true });
+  };
+
   const sendMessage = async () => {
     const trimmed = inputText.trim();
     if (!trimmed || sendingRef.current) return;
@@ -76,7 +81,7 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
       const response = await api.post(
         "/ai/chat",
         { messages: updatedMessages },
-        { timeout: 320000 }
+        { timeout: 320000 },
       );
 
       setMessages(response.data.messages);
@@ -166,11 +171,24 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
         </View>
 
         {/* Messages */}
+
         <ScrollView
           ref={scrollViewRef}
           style={styles.messagesContainer}
           contentContainerStyle={styles.messagesContent}
           showsVerticalScrollIndicator={false}
+          scrollEventThrottle={16}
+          onScroll={event => {
+            const { layoutMeasurement, contentOffset, contentSize } =
+              event.nativeEvent;
+
+            const paddingToBottom = 20;
+            const isBottom =
+              layoutMeasurement.height + contentOffset.y >=
+              contentSize.height - paddingToBottom;
+
+            setIsAtBottom(isBottom);
+          }}
         >
           {messages.map(renderMessage)}
           {loading && (
@@ -181,6 +199,15 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
           )}
         </ScrollView>
 
+        {!isAtBottom && (
+          <TouchableOpacity
+            style={styles.scrollToBottomButton}
+            onPress={scrollToBottom}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="arrow-down" size={20} color="#FFFFFF" />
+          </TouchableOpacity>
+        )}
         {/* Input */}
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -363,6 +390,22 @@ const styles = StyleSheet.create({
   sendButtonDisabled: {
     backgroundColor: "#E5E5EA",
   },
+  scrollToBottomButton: {
+    position: "absolute",
+    right: 20,
+    bottom: 100, // sits above input
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#007AFF",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 6,
+    elevation: 6,
+  },
 });
 
 const markdownStyles = {
@@ -453,5 +496,21 @@ const markdownStyles = {
     backgroundColor: "#E5E5EA",
     height: 1,
     marginVertical: 12,
+  },
+  scrollToBottomButton: {
+    position: "absolute",
+    right: 20,
+    bottom: 100, // sits above input
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#007AFF",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 6,
+    elevation: 6,
   },
 };
