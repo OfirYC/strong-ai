@@ -68,7 +68,6 @@ class AIRunner:
                     if getattr(delta, "content", None):
                         token = delta.content
                         assistant_content += token
-                        print(f"Emitting assistant token for job {job_id}: {token}")
                         await emitter.emit(job_id, "assistant_token", {"token": token})
 
                     # tool calls (streamed)
