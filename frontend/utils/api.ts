@@ -200,7 +200,7 @@ api.interceptors.response.use(
         bytes != null ? `bytes~${bytes}` : null,
       ]
         .filter(Boolean)
-        .join(" | ")
+        .join(" | "),
     );
 
     return res;
@@ -232,11 +232,11 @@ api.interceptors.response.use(
         `err=${err?.message}`,
       ]
         .filter(Boolean)
-        .join(" | ")
+        .join(" | "),
     );
 
     return Promise.reject(err);
-  }
+  },
 );
 
 export default api;
@@ -249,7 +249,7 @@ type WsHandlers = {
 };
 
 type WsClient = {
-  start: () => void;
+  start: (path?: string) => void;
   stop: () => void;
   setHandlers: (h: WsHandlers) => void; // <-- keep this
   isConnected: () => boolean;
@@ -270,89 +270,166 @@ async function getToken(): Promise<string | null> {
   }
 }
 
-export function createWsClient(baseHttpUrl: string): WsClient {
+export function createWsClient(
+  baseHttpUrl: string,
+): WsClient & { reconnect: () => void } {
   let ws: WebSocket | null = null;
   let handlers: WsHandlers = {};
   let started = false;
+  let currentPath = "/ws";
 
-  // basic reconnect (optional but minimal)
   let retry = 0;
   let reconnectTimer: any = null;
+  let connecting = false;
 
-  const connect = async () => {
+  function httpToWs(base: string) {
+    return base.replace(/^http/, "ws").replace(/\/$/, "");
+  }
+
+  async function connect() {
+    if (!started) return;
+    if (connecting) return;
+
+    connecting = true;
+
     const token = await getToken();
-    if (!token) return;
+    if (!token) {
+      connecting = false;
+      return;
+    }
 
-    const wsUrl = `${httpToWs(baseHttpUrl)}/ws?token=${encodeURIComponent(
-      token
-    )}`;
+    const wsUrl =
+      `${httpToWs(baseHttpUrl)}${currentPath}` +
+      `?token=${encodeURIComponent(token)}`;
 
-    // RN WebSocket DOES NOT support headers. Query param is the standard workaround.
-    ws = new WebSocket(wsUrl);
+    const socket = new WebSocket(wsUrl);
+    ws = socket;
 
-    ws.onopen = () => {
+    socket.onopen = () => {
       retry = 0;
+      connecting = false;
       handlers.onOpen?.();
     };
 
-    ws.onclose = (e: any) => {
+    socket.onclose = (e: any) => {
       handlers.onClose?.({ code: e?.code, reason: e?.reason });
       ws = null;
+      connecting = false;
 
       if (!started) return;
-      const delay = Math.min(8000, 500 * Math.pow(2, retry));
-      retry += 1;
-      reconnectTimer = setTimeout(() => void connect(), delay);
+
+      scheduleReconnect();
     };
 
-    ws.onerror = (e: any) => {
+    socket.onerror = (e: any) => {
       handlers.onError?.(e);
     };
 
-    ws.onmessage = (msg: any) => {
-      let parsed: any = null;
+    socket.onmessage = (msg: any) => {
       try {
-        parsed = JSON.parse(msg.data);
+        const parsed = JSON.parse(msg.data);
+        handlers.onMessage?.(parsed);
       } catch {
-        return;
+        // ignore malformed
       }
-      handlers.onMessage?.(parsed);
     };
-  };
+  }
+
+  function scheduleReconnect() {
+    if (!started) return;
+    if (reconnectTimer) return;
+
+    const delay = Math.min(8000, 500 * Math.pow(2, retry));
+    retry++;
+
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      connect();
+    }, delay);
+  }
+
+  function cleanupTimer() {
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+  }
 
   return {
     setHandlers(h) {
       handlers = h || {};
     },
 
-    start() {
+    start(path: string = "/ws") {
       if (started) return;
+
       started = true;
       retry = 0;
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-      void connect();
+      currentPath = path;
+
+      cleanupTimer();
+      connect();
     },
 
     stop() {
       started = false;
       retry = 0;
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-      reconnectTimer = null;
+      cleanupTimer();
 
       if (ws) {
         try {
           ws.close();
         } catch {}
       }
+
       ws = null;
     },
 
+    reconnect() {
+      console.log("WebSocket manual reconnect triggered");
+      if (!started) return;
+      console.log("WebSocket reconnect: checking current state...");
+
+      // If already open → do nothing
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        console.log("WebSocket already connected, no need to reconnect");
+        return;
+      }
+
+      // If currently connecting → do nothing
+      if (ws && ws.readyState === WebSocket.CONNECTING) {
+        console.log(
+          "WebSocket currently connecting, waiting for it to finish...",
+        );
+        return;
+      }
+
+      cleanupTimer();
+
+      console.log("WebSocket reconnect: Cleaned Up Timer...");
+      retry = 0;
+
+      if (ws) {
+        try {
+          console.log("WebSocket reconnect: Closing existing socket...");
+          ws.close();
+        } catch {
+          console.log("WebSocket reconnect: Error closing socket, ignoring...");
+        }
+        ws = null;
+      }
+
+      console.log("WebSocket reconnect: Starting new connection...");
+      connect();
+      console.log("WebSocket reconnect: Connect called...");
+    },
+
     isConnected() {
-      return !!ws && ws.readyState === WebSocket.OPEN;
+      return ws?.readyState === WebSocket.OPEN;
     },
   };
 }
 
 export const wsClient = createWsClient(
-  process.env.EXPO_PUBLIC_BACKEND_URL || "http://localhost:8000"
+  process.env.EXPO_PUBLIC_BACKEND_URL || "http://localhost:8000",
 );

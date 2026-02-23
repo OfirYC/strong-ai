@@ -1,0 +1,49 @@
+from typing import Dict, List
+
+from .base import BaseTool
+from .profile import ProfileGetContext, ProfileUpdateInsights
+from .exercise import ExerciseGetAll, ExerciseCreateBatch, ExerciseCreateSingle
+from .template import TemplateGetAll, TemplateCreate, TemplateUpdate
+from .schedule import ScheduleGet, ScheduleAddWorkout, ScheduleUpdateWorkout, ScheduleDeleteWorkout
+from .history import WorkoutHistoryGetAll, WorkoutHistoryGetByExercise
+
+# All tools in order
+ALL_TOOLS: List[BaseTool] = [
+    ProfileGetContext(),
+    ProfileUpdateInsights(),
+    ExerciseGetAll(),
+    ExerciseCreateBatch(),
+    ExerciseCreateSingle(),
+    TemplateGetAll(),
+    TemplateCreate(),
+    TemplateUpdate(),
+    ScheduleGet(),
+    ScheduleAddWorkout(),
+    ScheduleUpdateWorkout(),
+    ScheduleDeleteWorkout(),
+    WorkoutHistoryGetAll(),
+    WorkoutHistoryGetByExercise(),
+]
+
+# name -> tool instance
+TOOL_REGISTRY: Dict[str, BaseTool] = {tool.name: tool for tool in ALL_TOOLS}
+
+# OpenAI-compatible schema list (pass directly to `tools=` param)
+OPENAI_TOOLS: List[dict] = [tool.openai_schema for tool in ALL_TOOLS]
+
+
+async def execute_tool(tool_name: str, arguments: dict, db, user_id: str) -> str:
+    """Dispatch a tool call by name."""
+    import json
+
+    tool = TOOL_REGISTRY.get(tool_name)
+    if not tool:
+        return json.dumps({"error": f"Unknown tool: {tool_name}"})
+
+    ctx = {"db": db, "user_id": user_id}
+    try:
+        return await tool.execute(arguments, ctx)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).exception(f"Tool execution error: {tool_name}")
+        return json.dumps({"error": str(e)})
