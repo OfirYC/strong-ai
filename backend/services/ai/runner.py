@@ -161,8 +161,7 @@ class AIRunner:
                     print(
                         f"{datetime.utcnow().isoformat()} - Finished executing tool {tool_name} in job {job_id}"
                     )
-                    # DEBUG: slow down tool execution so FE can render "pending"
-                    await asyncio.sleep(5)
+                
                     try:
                         tool_result = await execute_tool(
                             tool_name, parsed_args, self.db, user_id
