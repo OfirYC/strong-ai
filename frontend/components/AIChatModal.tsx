@@ -25,6 +25,7 @@ import Markdown from "react-native-markdown-display";
 import api, { wsClient } from "../utils/api";
 import { Animated, Easing } from "react-native";
 import { AppState } from "react-native";
+import AnimatedMarkdown from "./AnimatedMarkdown";
 
 type ToolStepStatus = "pending" | "done" | "error";
 interface ToolStep {
@@ -553,6 +554,8 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
 
   const renderMessage = (message: ChatMessage, index: number) => {
     const isUser = message.role === "user";
+    const isStreaming =
+      index === assistantIndexRef.current && sendingRef.current;
 
     return (
       <View
@@ -589,7 +592,11 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
                     <PulseDot />
                   </View>
                 ) : (
-                  <Markdown style={markdownStyles}>{message.content}</Markdown>
+                  <AnimatedMarkdown
+                    content={message.content || ""}
+                    isStreaming={isStreaming}
+                    markdownStyles={markdownStyles}
+                  />
                 )}
               </View>
             )}
