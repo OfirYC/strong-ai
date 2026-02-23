@@ -19,12 +19,14 @@ jobs:
           node-version: 18
 
       - name: Install deps
+        working-directory: frontend
         run: npm install
 
       - name: Install EAS
         run: npm install -g eas-cli
 
       - name: Run EAS Update
+        working-directory: frontend
         run: eas update --branch production --environment production --non-interactive
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
