@@ -213,6 +213,14 @@ class AIRunner:
 
         except Exception as e:
             await emitter.emit(job_id, "error", {"message": str(e)})
+            # add an error message to the conversation
+            await add_message(
+                self.db,
+                user_id=user_id,
+                conversation_id=input_payload.get("conversation_id"),
+                role="assistant",
+                content=f"Error: {str(e)}",
+            )
             await mark_failed(self.db, job_id)
 
         return job_id
