@@ -4,7 +4,12 @@ from .base import BaseTool
 from .profile import ProfileGetContext, ProfileUpdateInsights
 from .exercise import ExerciseGetAll, ExerciseCreateBatch, ExerciseCreateSingle
 from .template import TemplateGetAll, TemplateCreate, TemplateUpdate
-from .schedule import ScheduleGet, ScheduleAddWorkout, ScheduleUpdateWorkout, ScheduleDeleteWorkout
+from .schedule import (
+    ScheduleGet,
+    ScheduleAddWorkout,
+    ScheduleUpdateWorkout,
+    ScheduleDeleteWorkout,
+)
 from .history import WorkoutHistoryGetAll, WorkoutHistoryGetByExercise
 
 # All tools in order
@@ -46,4 +51,4 @@ async def execute_tool(tool_name: str, arguments: dict, db, user_id: str) -> str
     except Exception as e:
         import logging
         logging.getLogger(__name__).exception(f"Tool execution error: {tool_name}")
-        return json.dumps({"error": str(e)})
+        raise e

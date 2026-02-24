@@ -419,11 +419,34 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
           return;
         }
         /* ---------------- Completion ---------------- */
+        /* ---------------- Completion / Error ---------------- */
         if (data.type === "done" || data.type === "error") {
           const idx = assistantIndexRef.current;
+
           if (idx !== null) {
-            // finalize any pending step as done on normal completion
-            if (data.type === "done") markAllPendingDone(idx);
+            if (data.type === "error") {
+              const errorMessage =
+                data?.payload?.message ||
+                data?.payload?.raw ||
+                "Something went wrong.";
+
+              setMessages(prev => {
+                const copy = [...prev];
+                if (!copy[idx]) return prev;
+
+                copy[idx] = {
+                  ...copy[idx],
+                  content: `⚠️ Whoops - I've hit an error. Error:\n\n ${errorMessage}`,
+                  hasStartedStreaming: true,
+                };
+
+                return copy;
+              });
+            }
+
+            if (data.type === "done") {
+              markAllPendingDone(idx);
+            }
           }
 
           sendingRef.current = false;
