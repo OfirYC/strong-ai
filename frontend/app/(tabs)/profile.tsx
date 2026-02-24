@@ -1,24 +1,34 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { useAuthStore } from '../../store/authStore';
-import Button from '../../components/Button';
+import React from "react";
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { useAuthStore } from "../../store/authStore";
+import Button from "../../components/Button";
+import * as Updates from "expo-updates";
+import Constants from "expo-constants";
+const isDev = __DEV__;
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, logout } = useAuthStore();
+  const updateInfo = {
+    updateId: Updates.updateId,
+    runtimeVersion: Updates.runtimeVersion,
+    channel: Updates.channel,
+    isEmbeddedLaunch: Updates.isEmbeddedLaunch,
+    createdAt: Updates.createdAt,
+  };
 
   const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert("Logout", "Are you sure you want to logout?", [
+      { text: "Cancel", style: "cancel" },
       {
-        text: 'Logout',
-        style: 'destructive',
+        text: "Logout",
+        style: "destructive",
         onPress: async () => {
           await logout();
-          router.replace('/(auth)/login');
+          router.replace("/(auth)/login");
         },
       },
     ]);
@@ -39,9 +49,9 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.section}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => router.push('/profile-settings')}
+            onPress={() => router.push("/profile-settings")}
           >
             <View style={styles.menuItemLeft}>
               <Ionicons name="person-outline" size={24} color="#007AFF" />
@@ -67,6 +77,15 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
+        <View style={styles.section}>
+          <Text>Is Dev: {isDev ? "Yes" : "No"}</Text>
+          <Text>Update ID: {Updates.updateId ?? "N/A"}</Text>
+          <Text>Channel: {Updates.channel ?? "N/A"}</Text>
+          <Text>Runtime: {Updates.runtimeVersion ?? "N/A"}</Text>
+          <Text>
+            Embedded Launch: {Updates.isEmbeddedLaunch ? "Yes" : "No"}
+          </Text>
+        </View>
         <Button
           title="Logout"
           onPress={handleLogout}
@@ -81,7 +100,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F7',
+    backgroundColor: "#F5F5F7",
   },
   header: {
     paddingHorizontal: 20,
@@ -90,8 +109,8 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 32,
-    fontWeight: 'bold',
-    color: '#1C1C1E',
+    fontWeight: "bold",
+    color: "#1C1C1E",
   },
   content: {
     flex: 1,
@@ -99,48 +118,48 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   profileCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 16,
     padding: 24,
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 24,
   },
   avatarContainer: {
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: '#F5F5F7',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "#F5F5F7",
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: 16,
   },
   email: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#1C1C1E',
+    fontWeight: "600",
+    color: "#1C1C1E",
   },
   section: {
     marginBottom: 24,
   },
   menuItem: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 12,
     padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 12,
   },
   menuItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   menuItemText: {
     fontSize: 16,
-    color: '#1C1C1E',
+    color: "#1C1C1E",
     marginLeft: 16,
   },
   logoutButton: {
-    marginTop: 'auto',
+    marginTop: "auto",
   },
 });
