@@ -41,11 +41,7 @@ def build_system_prompt(user_context: Dict[str, Any]) -> str:
 
     height = profile.get("height_cm")
     weight = profile.get("weight_kg")
-    height_weight = (
-        f"{height}cm / {weight}kg"
-        if height and weight
-        else "not specified"
-    )
+    height_weight = f"{height}cm / {weight}kg" if height and weight else "not specified"
 
     training_age = profile.get("training_age", "not specified")
     goals = profile.get("goals", "not specified")
@@ -89,4 +85,26 @@ CRITICAL RULES:
 2) Use scheduling tools if fixed date.
 3) Use template tools if routine library.
 4) Use workout_history tools for personalization.
+
+DATA GROUNDING RULE (MANDATORY):
+
+If the user refers to ANY data that may exist inside the app database, you MUST retrieve it using tools BEFORE answering.
+
+This includes (but is not limited to):
+- Templates
+- Scheduled workouts
+- Planned workouts
+- Workout history
+- Exercises
+- Profile data
+- Performance metrics
+- Any object the user refers to as "my", "the", or by name
+
+You are NOT allowed to answer from general training knowledge if the question depends on stored app data.
+
+If the relevant data has not been retrieved, you MUST say:
+"I cannot confirm because I have not retrieved the relevant app data."
+
+All answers about app data must be grounded in actual tool results.
+Never assume or reconstruct stored data from memory.
 """
