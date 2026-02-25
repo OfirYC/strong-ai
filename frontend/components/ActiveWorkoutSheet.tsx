@@ -49,6 +49,7 @@ import {
   WorkoutLiveModel,
 } from "../utils/liveActivity";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { IOS_PANEL_EASING } from "../utils/animation";
 
 interface WorkoutSummaryData {
   name: string;
@@ -203,7 +204,7 @@ export default function ActiveWorkoutSheet({
       Animated.timing(translateY, {
         toValue: nextExpanded ? 0 : collapsedTranslateY,
         duration: 320, // try 280–360
-        easing: Easing.bezier(0.2, 0.0, 0.0, 1.0),
+        easing: IOS_PANEL_EASING,
         useNativeDriver: true,
       }).start(() => {
         // Your original side effects

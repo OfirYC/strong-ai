@@ -271,7 +271,8 @@ async function getToken(): Promise<string | null> {
 }
 
 export function createWsClient(
-  baseHttpUrl: string,
+  baseHttpUrl: string = process.env.EXPO_PUBLIC_BACKEND_URL ||
+    "http://localhost:8000",
 ): WsClient & { reconnect: () => void } {
   let ws: WebSocket | null = null;
   let handlers: WsHandlers = {};
@@ -430,6 +431,3 @@ export function createWsClient(
   };
 }
 
-export const wsClient = createWsClient(
-  process.env.EXPO_PUBLIC_BACKEND_URL || "http://localhost:8000",
-);

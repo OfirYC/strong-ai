@@ -1,5 +1,5 @@
 // realtime/registerRealtime.ts
-import { wsClient } from "../utils/api";
+import { createWsClient } from "../utils/api";
 import type { WsEvent, DbChangeEvent } from "../types/ws";
 
 // Import your stores (examples; adjust to your actual APIs)
@@ -12,11 +12,11 @@ import {
   usePlannedWorkoutsStoreInternal,
 } from "../store/plannedWorkoutsStore";
 import { useWorkoutsStoreInternal } from "../store/workoutsStore";
-// import { useTemplates } from "../store/templatesStore";
-// import { usePlannedWorkouts } from "../store/plannedWorkoutsStore";
-// import { useWorkouts } from "../store/workoutsStore";
+import { Conversation, useConversationsStoreInternal } from "../store/convesationsStore";
 // import { useUserStore } from "../store/userStore";
 // import { usePrRecords } from "../store/prRecordsStore";
+
+export const dbWsClient = createWsClient();
 
 function handleDbChange(e: DbChangeEvent) {
   const { entity, action, id, payload } = e;
@@ -80,6 +80,17 @@ function handleDbChange(e: DbChangeEvent) {
     //   else if (hasPayload) usePrRecords.getState().upsert(payload);
     //   else usePrRecords.getState().refetchById?.(id);
     //   return;
+    case "conversation":  
+      if (action === "delete") {
+        useConversationsStoreInternal.getState().remove(id);
+      } else if (hasPayload) {
+        useConversationsStoreInternal
+          .getState()
+          .upsert(payload as unknown as Conversation);
+      } else {
+        useConversationsStoreInternal.getState().refetchById?.(id);
+      }
+      return;
     default:
       console.warn(`[WS] Unknown entity type in db_change event: ${entity}`);
       return;
@@ -87,7 +98,7 @@ function handleDbChange(e: DbChangeEvent) {
 }
 
 export function registerRealtime() {
-  wsClient.setHandlers({
+  dbWsClient.setHandlers({
     onOpen: () => console.log("[WS] connected"),
     onClose: e => console.log("[WS] closed", e),
     onError: e => console.log("[WS] error", e),
@@ -95,15 +106,15 @@ export function registerRealtime() {
       console.log(
         "[WS] message",
         evt.type,
-        evt.type === "db_change" ? evt.entity : ""
+        evt.type === "db_change" ? evt.entity : "",
       );
       if (evt.type === "db_change") handleDbChange(evt);
     },
   });
 
   // Start immediately; it will no-op if no token exists
-  void wsClient.start();
+  void dbWsClient.start();
 
   // Return cleanup if you want it
-  return () => wsClient.stop();
+  return () => dbWsClient.stop();
 }

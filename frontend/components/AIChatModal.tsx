@@ -1,31 +1,33 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import { Clipboard, StyleSheet } from "react-native";
+import { Feather, Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  View,
-  Text,
-  Modal,
-  TouchableOpacity,
-  TextInput,
-  ScrollView,
+  Animated,
+  AppState,
+  Clipboard,
+  Dimensions,
+  Easing,
   KeyboardAvoidingView,
+  Modal,
   Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import Markdown from "react-native-markdown-display";
-import api, { wsClient } from "../utils/api";
-import { Animated, Easing } from "react-native";
-import { AppState } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAuthStore } from "../store/authStore";
+import { useConversationsStoreInternal } from "../store/convesationsStore";
+import { IOS_PANEL_EASING } from "../utils/animation";
+import api, { createWsClient } from "../utils/api";
 import AnimatedMarkdown from "./AnimatedMarkdown";
+
+const SCREEN_WIDTH = Dimensions.get("window").width;
+const DRAWER_WIDTH = Math.min(SCREEN_WIDTH * 0.8, 360);
+const aiWsClient = createWsClient();
 
 type ToolStepStatus = "pending" | "done" | "error";
 interface ToolStep {
@@ -130,10 +132,161 @@ const getToolDoneLabel = (tool: string) =>
     .replace(/ing\b/i, "ed");
 
 export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
+  const user = useAuthStore(s => s.user);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState("");
   const [isAtBottom, setIsAtBottom] = useState(true);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const conversations = useConversationsStoreInternal(s => s.conversations);
+  const fetchConversations = useConversationsStoreInternal(s => s.fetchAll);
+  useEffect(() => {
+    if (!visible) return;
+    fetchConversations();
+  }, [visible]);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const drawerTranslateX = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
+  const screenTranslateX = useRef(new Animated.Value(0)).current;
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
+  const openDrawer = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    setDrawerOpen(true);
+
+    Animated.parallel([
+      Animated.timing(drawerTranslateX, {
+        toValue: 0,
+        duration: 300,
+        easing: IOS_PANEL_EASING,
+        useNativeDriver: true,
+      }),
+      Animated.timing(screenTranslateX, {
+        toValue: DRAWER_WIDTH,
+        duration: 300,
+        easing: IOS_PANEL_EASING,
+        useNativeDriver: true,
+      }),
+      Animated.timing(overlayOpacity, {
+        toValue: 1,
+        duration: 200,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+  const closeDrawer = () => {
+    Animated.parallel([
+      Animated.timing(drawerTranslateX, {
+        toValue: -DRAWER_WIDTH,
+        duration: DRAWER_WIDTH,
+        easing: IOS_PANEL_EASING,
+        useNativeDriver: true,
+      }),
+      Animated.timing(screenTranslateX, {
+        toValue: 0,
+        duration: 280,
+        easing: IOS_PANEL_EASING,
+        useNativeDriver: true,
+      }),
+      Animated.timing(overlayOpacity, {
+        toValue: 0,
+        duration: 180,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setDrawerOpen(false);
+    });
+  };
+
+  const openConversation = async (id: string) => {
+    console.log("Opening convo bruh");
+    try {
+      // Stop any current WS
+      try {
+        aiWsClient.stop();
+      } catch {}
+
+      sendingRef.current = false;
+      assistantIndexRef.current = null;
+      jobIdRef.current = null;
+
+      setConversationId(id);
+      setMessages([]);
+
+      // 1️⃣ Load existing messages
+      const res = await api.get(`/ai/conversations/${id}/messages`);
+      const msgs: ChatMessage[] = res?.data?.messages || [];
+
+      const visibleMsgs = msgs.map(m =>
+        m.content ? m : { ...m, hidden: true },
+      );
+
+      setMessages(visibleMsgs);
+
+      // 2️⃣ Ask backend if there's an active job
+      const jobRes = await api.get(`/ai/conversations/${id}/active-job`);
+
+      const activeJob = jobRes?.data?.job;
+
+      if (activeJob?.status === "running") {
+        console.log(`[Resume] Job still running. Polling until completion...`);
+
+        sendingRef.current = true;
+
+        // Optional: show temporary placeholder
+        setMessages(prev => [
+          ...prev,
+          {
+            role: "assistant",
+            content: "⏳ Generating response...",
+            hasStartedStreaming: true,
+          },
+        ]);
+
+        waitForJobCompletion(id).then(() => {
+          sendingRef.current = false;
+        });
+
+        return;
+      }
+    } catch (e) {
+      console.log("[openConversation error]", e);
+      setMessages(seedMessages);
+    }
+  };
+
+  const waitForJobCompletion = async (conversationId: string) => {
+    let finished = false;
+
+    while (!finished) {
+      await new Promise(res => setTimeout(res, 1000));
+
+      const jobRes = await api.get(
+        `/ai/conversations/${conversationId}/active-job`,
+      );
+
+      const job = jobRes?.data?.job;
+
+      if (!job || job.status !== "running") {
+        finished = true;
+      }
+    }
+
+    await loadConversationMessages();
+  };
+
+  const startNewConversation = () => {
+    try {
+      aiWsClient.stop();
+    } catch {}
+
+    sendingRef.current = false;
+    assistantIndexRef.current = null;
+    jobIdRef.current = null;
+
+    setConversationId(null);
+    setMessages(seedMessages);
+  };
 
   const scrollViewRef = useRef<ScrollView>(null);
   const insets = useSafeAreaInsets();
@@ -194,6 +347,7 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
     if (!visible) return;
 
     // Only seed once per open if empty
+
     if (messagesRef.current.length === 0) {
       if (!conversationId) {
         setMessages(seedMessages);
@@ -202,7 +356,7 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
 
       loadConversationMessages();
     }
-  }, [visible]);
+  }, [visible, conversationId]);
 
   /* -------------------------------------------------- */
   /* Cleanup on close */
@@ -227,7 +381,7 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
           );
           jobIdRef.current = activeJob._id;
           attachWsHandlers(activeJob._id);
-          wsClient.reconnect();
+          aiWsClient.reconnect();
         } else {
           console.log(
             `No active job for conversation ${conversationId} on app resume, fetching latest messages...`,
@@ -247,8 +401,8 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
 
     // stop WS + reset in-flight refs
     try {
-      wsClient.setHandlers({});
-      wsClient.stop();
+      aiWsClient.setHandlers({});
+      aiWsClient.stop();
     } catch {}
 
     sendingRef.current = false;
@@ -275,7 +429,7 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
     });
   };
   const attachWsHandlers = (jobId: string) => {
-    wsClient.setHandlers({
+    aiWsClient.setHandlers({
       onMessage: (data: any) => {
         if (!data?.type) return;
 
@@ -466,7 +620,7 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
           assistantIndexRef.current = null;
 
           try {
-            wsClient.stop();
+            aiWsClient.stop();
           } catch {}
 
           return;
@@ -478,7 +632,7 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
         sendingRef.current = false;
         assistantIndexRef.current = null;
         try {
-          wsClient.stop();
+          aiWsClient.stop();
         } catch {}
       },
 
@@ -503,8 +657,24 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
     sendingRef.current = true;
 
     const userMessage: ChatMessage = { role: "user", content: trimmed };
-
     const baseLength = messagesRef.current.length;
+
+    const isNewConversation = !conversationId;
+    const tempId = isNewConversation ? `temp_${Date.now()}` : null;
+
+    if (tempId) {
+      // upsert minimal convo immediately (optimistic)
+      useConversationsStoreInternal.getState().upsert({
+        id: tempId,
+        title: trimmed.slice(0, 48) || "New Chat",
+        user_id: user?.id!,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+
+      setConversationId(tempId);
+    }
+
     const assistantIndex = baseLength + 1; // user will be appended first
 
     assistantIndexRef.current = assistantIndex;
@@ -529,6 +699,22 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
       const conversationIdFromRes = res?.data?.conversation_id;
       if (conversationIdFromRes) {
         setConversationId(conversationIdFromRes);
+
+        if (tempId && tempId !== conversationIdFromRes) {
+          const store = useConversationsStoreInternal.getState();
+
+          const existing = store.conversations.find(c => c.id === tempId);
+          if (existing) {
+            store.remove(tempId);
+
+            store.upsert({
+              ...existing,
+              id: conversationIdFromRes,
+              updated_at: new Date().toISOString(),
+              last_message_at: new Date().toISOString(),
+            });
+          }
+        }
       }
 
       if (!jobId) {
@@ -540,12 +726,12 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
       attachWsHandlers(jobId);
 
       // Start WS
-      wsClient.start(`/ws/ai/jobs/${jobId}`);
+      aiWsClient.start(`/ws/ai/jobs/${jobId}`);
 
-      // Optional keepalive (only if your wsClient supports it)
+      // Optional keepalive (only if your aiWsClient supports it)
       // If your server loop is `await websocket.receive_text()`, sending pings helps.
       // @ts-ignore
-      if (typeof wsClient.send === "function") {
+      if (typeof aiWsClient.send === "function") {
         const interval = setInterval(() => {
           // stop sending if modal closed or new job started
           if (!visible || jobIdRef.current !== jobId) {
@@ -554,7 +740,7 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
           }
           try {
             // @ts-ignore
-            wsClient.send("ping");
+            aiWsClient.send("ping");
           } catch {}
         }, 15000);
       }
@@ -579,7 +765,7 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
       });
 
       try {
-        wsClient.stop();
+        aiWsClient.stop();
       } catch {}
     }
   };
@@ -866,7 +1052,77 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
 
   return (
     <Modal visible={visible} animationType="slide">
-      <View style={styles.container}>
+      <Animated.View
+        style={[
+          styles.drawer,
+          {
+            transform: [{ translateX: drawerTranslateX }],
+          },
+        ]}
+      >
+        <View style={styles.drawerContent}>
+          {/* New Chat */}
+          <TouchableOpacity
+            style={styles.newChatButton}
+            onPress={() => {
+              startNewConversation();
+              closeDrawer();
+            }}
+          >
+            <Ionicons name="sparkles" size={18} color="#FFFFFF" />
+            <Text style={styles.newChatText}>New Chat</Text>
+          </TouchableOpacity>
+
+          <View style={styles.drawerDivider} />
+
+          <Text style={styles.drawerSectionTitle}>Chats</Text>
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {conversations.map(conv => (
+              <Pressable
+                key={conv.id}
+                style={({ pressed }) => [
+                  styles.drawerItem,
+                  pressed && { backgroundColor: "#F2F2F7" },
+                ]}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  openConversation(conv.id);
+                  closeDrawer();
+                }}
+              >
+                <Text
+                  style={[
+                    styles.drawerItemText,
+                    conversationId === conv.id && { color: "#007AFF" },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {conv.title || "Conversation"}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      </Animated.View>
+      <Animated.View
+        pointerEvents={drawerOpen ? "auto" : "none"}
+        style={[
+          styles.drawerOverlay,
+          {
+            opacity: overlayOpacity,
+          },
+        ]}
+      >
+        <Pressable style={{ flex: 1 }} onPress={closeDrawer} />
+      </Animated.View>
+
+      <Animated.View
+        style={[
+          styles.container,
+          { transform: [{ translateX: screenTranslateX }] },
+        ]}
+      >
         <View
           style={[
             styles.header,
@@ -874,9 +1130,22 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
           ]}
         >
           <View style={styles.headerLeft}>
-            <View style={styles.headerIcon}>
-              <Ionicons name="fitness" size={24} color="#007AFF" />
-            </View>
+            <TouchableOpacity
+              onPress={openDrawer}
+              style={styles.hamburgerButton}
+            >
+              <View style={styles.hamburgerWrap}>
+                <View
+                  style={[
+                    styles.hamburgerLine,
+                    {
+                      width: "80%", // 👈 shorter middle line (matches iOS look)
+                    },
+                  ]}
+                />
+                <View style={[styles.hamburgerLine, styles.hamburgerMiddle]} />
+              </View>
+            </TouchableOpacity>
             <View>
               <Text style={styles.headerTitle}>AI Coach</Text>
               <Text style={styles.headerSubtitle}>
@@ -885,9 +1154,22 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
             </View>
           </View>
 
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Ionicons name="close" size={28} color="#1C1C1E" />
-          </TouchableOpacity>
+          <View style={styles.headerRight}>
+            <TouchableOpacity
+              onPress={() => {
+                Haptics.selectionAsync();
+                startNewConversation();
+              }}
+              style={styles.headerIconButton}
+            >
+              <Feather name="edit" size={22} color="black" />
+              {/* <Ionicons name="create-outline" size={22} color="#1C1C1E" /> */}
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={onClose} style={styles.headerIconButton}>
+              <Ionicons name="close" size={26} color="#1C1C1E" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <ScrollView
@@ -970,7 +1252,7 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
             </View>
           </View>
         </KeyboardAvoidingView>
-      </View>
+      </Animated.View>
     </Modal>
   );
 }
@@ -1343,6 +1625,113 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 2,
     elevation: 2,
+  },
+  hamburgerButton: {
+    padding: 6,
+    marginRight: 12,
+  },
+
+  drawerOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.14)",
+    zIndex: 999,
+  },
+
+  drawer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    bottom: 0,
+    width: DRAWER_WIDTH,
+    backgroundColor: "#FFFFFF",
+    zIndex: 1000,
+  },
+
+  drawerContent: {
+    flex: 1,
+    paddingTop: 60,
+    paddingHorizontal: 16,
+  },
+  drawerItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+  },
+
+  drawerItemActive: {
+    backgroundColor: "#EEF4FF",
+  },
+
+  drawerItemText: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: "#1C1C1E",
+    letterSpacing: -0.2,
+  },
+
+  drawerDivider: {
+    height: 1,
+    backgroundColor: "#E5E5EA",
+    marginVertical: 16,
+  },
+
+  drawerSectionTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#8E8E93",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginBottom: 12,
+  },
+  hamburgerWrap: {
+    width: 22,
+    height: 16,
+    gap: 5,
+  },
+
+  hamburgerLine: {
+    height: 2,
+    borderRadius: 2,
+    backgroundColor: "#1C1C1E",
+  },
+
+  hamburgerMiddle: {
+    width: "60%", // 👈 shorter middle line (matches iOS look)
+  },
+  newChatButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#007AFF",
+    paddingVertical: 14,
+    borderRadius: 16,
+    marginBottom: 24,
+  },
+
+  newChatText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  headerIconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
 const markdownStyles = {

@@ -2,9 +2,9 @@
 import { create } from "zustand";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { User } from "../types";
-import { wsClient } from "../utils/api";
 import { storageKey } from "../env";
 import api from "../utils/api"; // Import the api client
+import { dbWsClient } from "../realtime/registerRealtime";
 
 interface AuthState {
   user: User | null;
@@ -28,13 +28,13 @@ export const useAuthStore = create<AuthState>(set => ({
 
         // Start WS on login if token exists
         if (user.token) {
-          wsClient.start();
+          dbWsClient.start();
         }
       } else {
         await AsyncStorage.removeItem(USER_KEY);
 
         // Stop WS on logout/clear
-        wsClient.stop();
+        dbWsClient.stop();
       }
 
       set({ user });
@@ -52,7 +52,7 @@ export const useAuthStore = create<AuthState>(set => ({
       console.error("Failed to remove user:", error);
     }
 
-    wsClient.stop();
+    dbWsClient.stop();
     set({ user: null });
   },
 
@@ -82,7 +82,7 @@ export const useAuthStore = create<AuthState>(set => ({
 
         // Start WS on boot if token already stored
         if (user?.token) {
-          wsClient.start();
+          dbWsClient.start();
         }
       } else {
         set({ isLoading: false });

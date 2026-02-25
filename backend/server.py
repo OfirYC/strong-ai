@@ -10,6 +10,7 @@ from services.ai.store import (
     list_messages,
     touch_conversation,
 )
+from services.ai.chat_name import rename_conversation
 from services.ai.ws_ready import get_or_create_event, mark_ws_ready, cleanup
 import os
 import logging
@@ -69,6 +70,7 @@ from models import (
     PlannedWorkout,
     PlannedWorkoutCreate,
     PlannedWorkoutUpdate,
+    Conversation,
 )
 from services.ai.profile_insights import generate_profile_insights
 from auth import (
@@ -324,7 +326,9 @@ async def ai_job_ws(websocket: WebSocket, job_id: str):
 
     print(f"WebSocket connecting for job {job_id}")
     await ws_manager.connect_job(job_id, websocket)
-    print(f"WebSocket connected for job {job_id}, waiting for runner to signal ready...")
+    print(
+        f"WebSocket connected for job {job_id}, waiting for runner to signal ready..."
+    )
 
     # ✅ tell the runner "WS is connected, start streaming"
     mark_ws_ready(job_id)
@@ -341,6 +345,31 @@ async def ai_job_ws(websocket: WebSocket, job_id: str):
         print(f"WebSocket error for job {job_id}")
         await ws_manager.disconnect_job(job_id, websocket)
         await websocket.close(code=1011)
+
+
+@api_router.get("/ai/conversations")
+async def get_conversations(user_id=Depends(get_current_user)):
+    conversations = (
+        await db.conversations.find({"user_id": ObjectId(user_id)})
+        .sort("created_at", 1)
+        .to_list(length=None)
+    )
+    return {
+        "conversations": [
+            Conversation(
+                id=str(c["_id"]),
+                user_id=str(c["user_id"]),
+                title=c["title"],
+                created_at=c["created_at"],
+                updated_at=c["updated_at"],
+                last_message_at=c["last_message_at"],
+                active_job_id=(
+                    str(c["active_job_id"]) if c.get("active_job_id") else None
+                ),
+            )
+            for c in conversations
+        ]
+    }
 
 
 @api_router.get("/ai/conversations/{conversation_id}/active-job")
@@ -363,10 +392,11 @@ async def get_active_job(conversation_id: str, user_id=Depends(get_current_user)
 @api_router.post("/ai/chat/start")
 async def start_ai_chat(payload: dict, user_id=Depends(get_current_user)):
     conversation_id = payload.get("conversation_id")
-
+    is_new_conversation = False
     if not conversation_id:
         conversation_id = await create_conversation(db, user_id)
         payload["conversation_id"] = conversation_id
+        is_new_conversation = True
 
     # validate ownership
     convo = await db.conversations.find_one(
@@ -378,6 +408,16 @@ async def start_ai_chat(payload: dict, user_id=Depends(get_current_user)):
     # persist ONLY the newest user message (last one)
     user_message = payload.get("user_message")
     if user_message and user_message.get("role") == "user":
+        # Name the conversation on initiation
+        if is_new_conversation:
+            asyncio.create_task(
+                rename_conversation(
+                    get_db(user_id),
+                    conversation_id,
+                    user_message.get("content", ""),
+                )
+            )
+
         await add_message(
             db, user_id, conversation_id, "user", user_message.get("content", "")
         )

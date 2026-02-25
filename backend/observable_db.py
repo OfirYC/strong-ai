@@ -10,26 +10,46 @@ from bson import ObjectId
 # Entity config (paste)
 # -----------------------
 
+
 @dataclass(frozen=True)
 class EntityConfig:
     entity: str
-    owner_field: Optional[str]  # field on doc that identifies owner user_id; None => use wrapper user_id
-    scope: str                  # "user" | "mixed"
+    owner_field: Optional[
+        str
+    ]  # field on doc that identifies owner user_id; None => use wrapper user_id
+    scope: str  # "user" | "mixed"
     emit: bool = True
 
 
 ENTITY_CONFIG: Dict[str, EntityConfig] = {
     # AUTH / PROFILE
     "users": EntityConfig(entity="user", owner_field="_id", scope="user", emit=True),
-    "profiles": EntityConfig(entity="profile", owner_field="user_id", scope="user", emit=True),
-    "profile_insights": EntityConfig(entity="profile_insights", owner_field="user_id", scope="user", emit=True),
-
+    "profiles": EntityConfig(
+        entity="profile", owner_field="user_id", scope="user", emit=True
+    ),
+    "profile_insights": EntityConfig(
+        entity="profile_insights", owner_field="user_id", scope="user", emit=True
+    ),
     # CORE
-    "exercises": EntityConfig(entity="exercise", owner_field="user_id", scope="mixed", emit=True),
-    "templates": EntityConfig(entity="template", owner_field="user_id", scope="user", emit=True),
-    "planned_workouts": EntityConfig(entity="planned_workout", owner_field="user_id", scope="user", emit=True),
-    "workouts": EntityConfig(entity="workout_session", owner_field="user_id", scope="user", emit=True),
-    "prs": EntityConfig(entity="pr_record", owner_field="user_id", scope="user", emit=True),
+    "exercises": EntityConfig(
+        entity="exercise", owner_field="user_id", scope="mixed", emit=True
+    ),
+    "templates": EntityConfig(
+        entity="template", owner_field="user_id", scope="user", emit=True
+    ),
+    "planned_workouts": EntityConfig(
+        entity="planned_workout", owner_field="user_id", scope="user", emit=True
+    ),
+    "workouts": EntityConfig(
+        entity="workout_session", owner_field="user_id", scope="user", emit=True
+    ),
+    "prs": EntityConfig(
+        entity="pr_record", owner_field="user_id", scope="user", emit=True
+    ),
+    # AI
+    "conversations": EntityConfig(
+        entity="conversation", owner_field="user_id", scope="user", emit=True
+    ),
 }
 
 
@@ -44,6 +64,7 @@ def _to_str_id(v: Any) -> Optional[str]:
 # -----------------------
 # Observable wrappers
 # -----------------------
+
 
 class ObservableCollection:
     """
@@ -82,7 +103,9 @@ class ObservableCollection:
     async def insert_one(self, doc: dict):
         res = await self._col.insert_one(doc)
         full = await self._col.find_one({"_id": res.inserted_id})
-        await self._emit_upsert(full, fallback_user_id=self._user_id, inserted_id=res.inserted_id)
+        await self._emit_upsert(
+            full, fallback_user_id=self._user_id, inserted_id=res.inserted_id
+        )
         return res
 
     async def update_one(self, *args, **kwargs):
@@ -115,7 +138,9 @@ class ObservableCollection:
         return res
 
     # ---------- helpers ----------
-    async def _emit_upsert(self, doc: Optional[dict], *, fallback_user_id: str, inserted_id: Any = None):
+    async def _emit_upsert(
+        self, doc: Optional[dict], *, fallback_user_id: str, inserted_id: Any = None
+    ):
         if not self._cfg.emit:
             return
         if not doc:
@@ -134,7 +159,9 @@ class ObservableCollection:
             )
             return
 
-        recipient_user_id = self._resolve_recipient_user_id(doc, fallback_user_id=fallback_user_id)
+        recipient_user_id = self._resolve_recipient_user_id(
+            doc, fallback_user_id=fallback_user_id
+        )
         if recipient_user_id is None:
             # mixed/global doc and you don't want to broadcast to everyone
             return
@@ -156,7 +183,9 @@ class ObservableCollection:
         if not doc:
             return
 
-        recipient_user_id = self._resolve_recipient_user_id(doc, fallback_user_id=fallback_user_id)
+        recipient_user_id = self._resolve_recipient_user_id(
+            doc, fallback_user_id=fallback_user_id
+        )
         if recipient_user_id is None:
             return
 
@@ -170,7 +199,9 @@ class ObservableCollection:
             },
         )
 
-    def _resolve_recipient_user_id(self, doc: dict, *, fallback_user_id: str) -> Optional[str]:
+    def _resolve_recipient_user_id(
+        self, doc: dict, *, fallback_user_id: str
+    ) -> Optional[str]:
         """
         Decide who should receive the WS event.
         - scope=user: always one user
@@ -225,6 +256,8 @@ class ObservableDB:
         self.planned_workouts = self._wrap("planned_workouts")
         self.workouts = self._wrap("workouts")
         self.prs = self._wrap("prs")
+
+        self.conversations = self._wrap("conversations")
 
     def _wrap(self, collection_name: str) -> ObservableCollection:
         cfg = ENTITY_CONFIG.get(collection_name)
