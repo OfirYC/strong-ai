@@ -64,20 +64,26 @@ interface AIChatModalProps {
 /* -------------------------------------------------- */
 /* Tool Labels */
 /* -------------------------------------------------- */
-
 const TOOL_LABELS: Record<string, string> = {
   profile__get_context: "Reviewing your profile...",
   profile__update_insights: "Updating your profile insights...",
-  exercise__get_all: "Looking up exercises...",
+
+  exercise__search: "Searching exercises...",
+  exercise__get_by_ids: "Loading exercise details...",
   exercise__create_batch: "Creating new exercises...",
-  exercise__create_single: "Creating exercise...",
+
   template__get_all: "Checking your templates...",
+  template__get_by_id: "Loading template details...",
   template__create: "Building your workout plan...",
-  template__update: "Updating your template...",
+  template__insert_exercises: "Updating workout structure...",
+  template__remove_by_order: "Removing workout block...",
+  template__update: "Rebuilding your workout template...",
+
   schedule__get: "Checking your schedule...",
   schedule__add_workout: "Scheduling workout...",
   schedule__update_workout: "Updating scheduled workout...",
   schedule__delete_workout: "Removing scheduled workout...",
+
   workout_history__get_all: "Analyzing recent workouts...",
   workout_history__get_by_exercise: "Checking your performance history...",
 };
@@ -85,16 +91,23 @@ const TOOL_LABELS: Record<string, string> = {
 const TOOL_DONE_LABELS: Record<string, string> = {
   profile__get_context: "Reviewed your profile",
   profile__update_insights: "Updated your profile insights",
-  exercise__get_all: "Found exercises",
+
+  exercise__search: "Found matching exercises",
+  exercise__get_by_ids: "Loaded exercise details",
   exercise__create_batch: "Created exercises",
-  exercise__create_single: "Created exercise",
+
   template__get_all: "Checked your templates",
+  template__get_by_id: "Loaded template details",
   template__create: "Built your workout plan",
-  template__update: "Updated your template",
+  template__insert_exercises: "Updated workout structure",
+  template__remove_by_order: "Removed workout block",
+  template__update: "Rebuilt workout template",
+
   schedule__get: "Checked your schedule",
   schedule__add_workout: "Scheduled workout",
   schedule__update_workout: "Updated scheduled workout",
   schedule__delete_workout: "Removed scheduled workout",
+
   workout_history__get_all: "Analyzed recent workouts",
   workout_history__get_by_exercise: "Checked your performance history",
 };

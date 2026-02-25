@@ -12,7 +12,9 @@ logger = logging.getLogger(__name__)
 
 EXERCISE_KIND_ENUM: List[str] = list(EXERCISE_KIND_RULES.keys())
 DEFAULT_EXERCISE_KIND = (
-    "Machine/Other" if "Machine/Other" in EXERCISE_KIND_RULES else (EXERCISE_KIND_ENUM[0] if EXERCISE_KIND_ENUM else "Machine/Other")
+    "Machine/Other"
+    if "Machine/Other" in EXERCISE_KIND_RULES
+    else (EXERCISE_KIND_ENUM[0] if EXERCISE_KIND_ENUM else "Machine/Other")
 )
 
 # Shared set-field parameters used in both template and schedule tools
@@ -46,8 +48,14 @@ _EXERCISES_ITEMS_SCHEMA = {
         },
         "reps": {"type": "integer", "description": "Optional default reps per set."},
         "weight": {"type": "number", "description": "Optional default weight in kg."},
-        "duration": {"type": "number", "description": "Optional default duration in seconds."},
-        "distance": {"type": "number", "description": "Optional default distance in km."},
+        "duration": {
+            "type": "number",
+            "description": "Optional default duration in seconds.",
+        },
+        "distance": {
+            "type": "number",
+            "description": "Optional default distance in km.",
+        },
         "notes": {"type": "string"},
     },
     "required": ["exercise_id", "sets"],
@@ -58,7 +66,10 @@ _EXERCISES_ITEMS_SCHEMA = {
 # Helpers (shared with schedule tools)
 # ---------------------------------------------------------------------------
 
-async def get_exercise_kind_map(exercise_ids: List[str], db, user_id: str) -> Dict[str, str]:
+
+async def get_exercise_kind_map(
+    exercise_ids: List[str], db, user_id: str
+) -> Dict[str, str]:
     valid_oids = [ObjectId(eid) for eid in exercise_ids if ObjectId.is_valid(eid)]
     kind_map: Dict[str, str] = {}
     if not valid_oids:
@@ -66,7 +77,11 @@ async def get_exercise_kind_map(exercise_ids: List[str], db, user_id: str) -> Di
 
     query = {
         "_id": {"$in": valid_oids},
-        "$or": [{"user_id": {"$exists": False}}, {"user_id": None}, {"user_id": user_id}],
+        "$or": [
+            {"user_id": {"$exists": False}},
+            {"user_id": None},
+            {"user_id": user_id},
+        ],
     }
     docs = await db.exercises.find(query).to_list(len(valid_oids))
     for d in docs:
@@ -97,7 +112,9 @@ def normalize_set_fields_by_kind(
     if "distance" in allowed and distance is not None:
         out["distance"] = float(distance)
 
-    is_time_or_distance_only = (("duration" in allowed) or ("distance" in allowed)) and ("reps" not in allowed)
+    is_time_or_distance_only = (
+        ("duration" in allowed) or ("distance" in allowed)
+    ) and ("reps" not in allowed)
     if is_time_or_distance_only and ("duration" not in out and "distance" not in out):
         out["duration"] = 600.0 if "distance" in allowed else 30.0
 
@@ -180,15 +197,21 @@ async def build_template_exercises_from_compact(
 
 def _default_sets(kind: str) -> List[Dict[str, Any]]:
     rule_fields = set((EXERCISE_KIND_RULES.get(kind) or {}).get("fields", []) or [])
-    is_time_or_distance_only = (("duration" in rule_fields) or ("distance" in rule_fields)) and ("reps" not in rule_fields)
+    is_time_or_distance_only = (
+        ("duration" in rule_fields) or ("distance" in rule_fields)
+    ) and ("reps" not in rule_fields)
     num_sets = 1 if is_time_or_distance_only else 3
     base_fields = normalize_set_fields_by_kind(kind, None, None, None, None)
-    return [{"set_type": "normal", "rest_timer": None, **base_fields} for _ in range(num_sets)]
+    return [
+        {"set_type": "normal", "rest_timer": None, **base_fields}
+        for _ in range(num_sets)
+    ]
 
 
 # ---------------------------------------------------------------------------
 # Tool classes
 # ---------------------------------------------------------------------------
+
 
 class TemplateGetAll(BaseTool):
     name = "template__get_all"
@@ -208,7 +231,11 @@ class TemplateGetAll(BaseTool):
                     "name": t.get("name"),
                     "notes": t.get("notes"),
                     "exercise_count": len(t.get("exercises", [])),
-                    "exercise_ids": [e.get("exercise_id") for e in t.get("exercises", []) if e.get("exercise_id")],
+                    "exercise_ids": [
+                        e.get("exercise_id")
+                        for e in t.get("exercises", [])
+                        if e.get("exercise_id")
+                    ],
                 }
             )
         return json.dumps(result)
@@ -247,7 +274,9 @@ class TemplateCreate(BaseTool):
         if not name or not exercises:
             return json.dumps({"error": "name and exercises are required"})
 
-        template_exercises = await build_template_exercises_from_compact(exercises, db, user_id)
+        template_exercises = await build_template_exercises_from_compact(
+            exercises, db, user_id
+        )
         if not template_exercises:
             return json.dumps({"error": "No valid exercises provided"})
 
@@ -260,14 +289,22 @@ class TemplateCreate(BaseTool):
             "updated_at": datetime.utcnow(),
         }
         insert_res = await db.templates.insert_one(template_doc)
-        return json.dumps({"success": True, "template_id": str(insert_res.inserted_id), "message": "Template created"})
+        return json.dumps(
+            {
+                "success": True,
+                "template_id": str(insert_res.inserted_id),
+                "message": "Template created",
+            }
+        )
 
 
 class TemplateUpdate(BaseTool):
     name = "template__update"
     description = (
-        "Update a TEMPLATE (affects all future schedules using it). "
-        "Only use if user explicitly wants to change the template itself."
+        "FULLY REPLACE a template's exercise structure. "
+        "Use ONLY if user explicitly wants to completely rebuild or redesign the template. "
+        "Do NOT use for small changes like adding or removing exercises."
+        "Use if want to change name or notes"
     )
     parameters = {
         "type": "object",
@@ -299,12 +336,194 @@ class TemplateUpdate(BaseTool):
         if args.get("notes") is not None:
             update_fields["notes"] = args["notes"]
         if args.get("exercises"):
-            update_fields["exercises"] = await build_template_exercises_from_compact(args["exercises"], db, user_id)
+            update_fields["exercises"] = await build_template_exercises_from_compact(
+                args["exercises"], db, user_id
+            )
 
         if len(update_fields) == 1:
             return json.dumps({"error": "No fields to update"})
 
-        res = await db.templates.update_one({"_id": oid, "user_id": user_id}, {"$set": update_fields})
+        res = await db.templates.update_one(
+            {"_id": oid, "user_id": user_id}, {"$set": update_fields}
+        )
         if res.matched_count == 0:
             return json.dumps({"error": "Template not found"})
         return json.dumps({"success": True, "message": "Template updated"})
+
+
+class TemplateGetById(BaseTool):
+    name = "template__get_by_id"
+    description = (
+        "Fetch full details of a specific template including exercises and sets."
+    )
+
+    parameters = {
+        "type": "object",
+        "properties": {"template_id": {"type": "string"}},
+        "required": ["template_id"],
+    }
+
+    async def execute(self, args: Dict[str, Any], ctx: Dict[str, Any]) -> str:
+        db = ctx["db"]
+        user_id = ctx["user_id"]
+
+        template_id = args.get("template_id")
+        if not template_id or not ObjectId.is_valid(template_id):
+            return json.dumps({"error": "Valid template_id required"})
+
+        doc = await db.templates.find_one(
+            {"_id": ObjectId(template_id), "user_id": user_id}
+        )
+
+        if not doc:
+            return json.dumps({"error": "Template not found"})
+
+        return json.dumps(
+            {
+                "id": str(doc["_id"]),
+                "name": doc.get("name"),
+                "notes": doc.get("notes"),
+                "exercises": doc.get("exercises", []),
+            }
+        )
+
+
+class TemplateInsertExercises(BaseTool):
+    name = "template__insert_exercises"
+    description = (
+        "Insert exercises into a template at a specific position. "
+        "Use insert_at to control placement. 0 = beginning. "
+        "If insert_at exceeds length, exercises are appended at end."
+    )
+
+    parameters = {
+        "type": "object",
+        "properties": {
+            "template_id": {"type": "string"},
+            "insert_at": {
+                "type": "integer",
+                "description": "Index to insert exercises at (0-based).",
+            },
+            "exercises": {
+                "type": "array",
+                "items": _EXERCISES_ITEMS_SCHEMA,
+            },
+        },
+        "required": ["template_id", "insert_at", "exercises"],
+    }
+
+    async def execute(self, args: Dict[str, Any], ctx: Dict[str, Any]) -> str:
+        db = ctx["db"]
+        user_id = ctx["user_id"]
+
+        template_id = args.get("template_id")
+        if not template_id or not ObjectId.is_valid(template_id):
+            return json.dumps({"error": "Valid template_id required"})
+
+        insert_at = args.get("insert_at")
+        if insert_at is None or not isinstance(insert_at, int) or insert_at < 0:
+            return json.dumps({"error": "Valid insert_at index required"})
+
+        new_exercises = args.get("exercises", [])
+        if not new_exercises:
+            return json.dumps({"error": "No exercises provided"})
+
+        oid = ObjectId(template_id)
+
+        doc = await db.templates.find_one({"_id": oid, "user_id": user_id})
+        if not doc:
+            return json.dumps({"error": "Template not found"})
+
+        existing = doc.get("exercises", [])
+
+        built = await build_template_exercises_from_compact(new_exercises, db, user_id)
+
+        # Clamp insert position
+        insert_at = min(insert_at, len(existing))
+
+        updated = existing[:insert_at] + built + existing[insert_at:]
+
+        # Recalculate order safely
+        for i, ex in enumerate(updated):
+            ex["order"] = i
+
+        await db.templates.update_one(
+            {"_id": oid},
+            {
+                "$set": {
+                    "exercises": updated,
+                    "updated_at": datetime.utcnow(),
+                }
+            },
+        )
+
+        return json.dumps(
+            {
+                "success": True,
+                "message": f"Inserted {len(built)} exercises at position {insert_at}",
+            }
+        )
+
+
+class TemplateRemoveExercisesByIndex(BaseTool):
+    name = "template__remove_exercises_by_index"
+    description = (
+        "Remove exercises from a template using their order index. "
+        "Use template__get_by_id first to inspect order values."
+    )
+
+    parameters = {
+        "type": "object",
+        "properties": {
+            "template_id": {"type": "string"},
+            "orders": {
+                "type": "array",
+                "items": {"type": "integer"},
+                "description": "Order indices to remove",
+            },
+        },
+        "required": ["template_id", "orders"],
+    }
+
+    async def execute(self, args: Dict[str, Any], ctx: Dict[str, Any]) -> str:
+        db = ctx["db"]
+        user_id = ctx["user_id"]
+
+        template_id = args.get("template_id")
+        if not template_id or not ObjectId.is_valid(template_id):
+            return json.dumps({"error": "Valid template_id required"})
+
+        orders_to_remove = set(args.get("orders", []))
+        if not orders_to_remove:
+            return json.dumps({"error": "No order indices provided"})
+
+        oid = ObjectId(template_id)
+
+        doc = await db.templates.find_one({"_id": oid, "user_id": user_id})
+        if not doc:
+            return json.dumps({"error": "Template not found"})
+
+        existing = doc.get("exercises", [])
+
+        filtered = [ex for ex in existing if ex.get("order") not in orders_to_remove]
+
+        # Recalculate order
+        for i, ex in enumerate(filtered):
+            ex["order"] = i
+
+        await db.templates.update_one(
+            {"_id": oid},
+            {
+                "$set": {
+                    "exercises": filtered,
+                    "updated_at": datetime.utcnow(),
+                }
+            },
+        )
+
+        return json.dumps(
+            {
+                "success": True,
+                "message": f"Removed {len(existing) - len(filtered)} exercises",
+            }
+        )

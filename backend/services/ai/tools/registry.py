@@ -2,8 +2,8 @@ from typing import Dict, List
 
 from .base import BaseTool
 from .profile import ProfileGetContext, ProfileUpdateInsights
-from .exercise import ExerciseGetAll, ExerciseCreateBatch, ExerciseCreateSingle
-from .template import TemplateGetAll, TemplateCreate, TemplateUpdate
+from .exercise import ExerciseCreateBatch, ExerciseGetByIds, ExerciseSearch
+from .template import TemplateGetAll, TemplateCreate, TemplateUpdate, TemplateGetById, TemplateInsertExercises, TemplateRemoveExercisesByIndex
 from .schedule import (
     ScheduleGet,
     ScheduleAddWorkout,
@@ -16,12 +16,15 @@ from .history import WorkoutHistoryGetAll, WorkoutHistoryGetByExercise
 ALL_TOOLS: List[BaseTool] = [
     ProfileGetContext(),
     ProfileUpdateInsights(),
-    ExerciseGetAll(),
+    ExerciseSearch(),
     ExerciseCreateBatch(),
-    ExerciseCreateSingle(),
+    ExerciseGetByIds(),
     TemplateGetAll(),
+    TemplateGetById(),
     TemplateCreate(),
     TemplateUpdate(),
+    TemplateInsertExercises(),
+    TemplateRemoveExercisesByIndex(),
     ScheduleGet(),
     ScheduleAddWorkout(),
     ScheduleUpdateWorkout(),
@@ -50,5 +53,6 @@ async def execute_tool(tool_name: str, arguments: dict, db, user_id: str) -> str
         return await tool.execute(arguments, ctx)
     except Exception as e:
         import logging
+
         logging.getLogger(__name__).exception(f"Tool execution error: {tool_name}")
         raise e
