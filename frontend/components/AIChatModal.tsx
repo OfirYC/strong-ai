@@ -4,11 +4,13 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
   AppState,
+  AppStateStatus,
   Clipboard,
   Dimensions,
-  Easing,
   KeyboardAvoidingView,
   Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Platform,
   Pressable,
   ScrollView,
@@ -24,11 +26,15 @@ import { useConversationsStoreInternal } from "../store/convesationsStore";
 import { IOS_PANEL_EASING } from "../utils/animation";
 import api, { createWsClient } from "../utils/api";
 import AnimatedMarkdown from "./AnimatedMarkdown";
+import { PulseDot } from "./PulseDot";
 
-const SCREEN_WIDTH = Dimensions.get("window").width;
-const DRAWER_WIDTH = Math.min(SCREEN_WIDTH * 0.8, 360);
-const aiWsClient = createWsClient();
-
+/* =======================================================
+   Types 
+   ======================================================= */
+type ToolMeta = {
+  label: string;
+  done: string;
+};
 type ToolStepStatus = "pending" | "done" | "error";
 interface ToolStep {
   id: string;
@@ -63,55 +69,84 @@ interface AIChatModalProps {
   onClose: () => void;
 }
 
-/* -------------------------------------------------- */
-/* Tool Labels */
-/* -------------------------------------------------- */
-const TOOL_LABELS: Record<string, string> = {
-  profile__get_context: "Reviewing your profile...",
-  profile__update_insights: "Updating your profile insights...",
+/* =======================================================
+   Constants 
+   ======================================================= */
+const aiWsClient = createWsClient();
 
-  exercise__search: "Searching exercises...",
-  exercise__get_by_ids: "Loading exercise details...",
-  exercise__create_batch: "Creating new exercises...",
+const TOOL_META: Record<string, ToolMeta> = {
+  profile__get_context: {
+    label: "Reviewing your profile...",
+    done: "Reviewed your profile",
+  },
+  profile__update_insights: {
+    label: "Updating your profile insights...",
+    done: "Updated your profile insights",
+  },
 
-  template__get_all: "Checking your templates...",
-  template__get_by_id: "Loading template details...",
-  template__create: "Building your workout plan...",
-  template__insert_exercises: "Updating workout structure...",
-  template__remove_by_order: "Removing workout block...",
-  template__update: "Rebuilding your workout template...",
+  exercise__search: {
+    label: "Searching exercises...",
+    done: "Found matching exercises",
+  },
+  exercise__get_by_ids: {
+    label: "Loading exercise details...",
+    done: "Loaded exercise details",
+  },
+  exercise__create_batch: {
+    label: "Creating new exercises...",
+    done: "Created exercises",
+  },
 
-  schedule__get: "Checking your schedule...",
-  schedule__add_workout: "Scheduling workout...",
-  schedule__update_workout: "Updating scheduled workout...",
-  schedule__delete_workout: "Removing scheduled workout...",
+  template__get_all: {
+    label: "Checking your templates...",
+    done: "Checked your templates",
+  },
+  template__get_by_id: {
+    label: "Loading template details...",
+    done: "Loaded template details",
+  },
+  template__create: {
+    label: "Building your workout plan...",
+    done: "Built your workout plan",
+  },
+  template__insert_exercises: {
+    label: "Updating workout structure...",
+    done: "Updated workout structure",
+  },
+  template__remove_by_order: {
+    label: "Removing workout block...",
+    done: "Removed workout block",
+  },
+  template__update: {
+    label: "Rebuilding your workout template...",
+    done: "Rebuilt workout template",
+  },
 
-  workout_history__get_all: "Analyzing recent workouts...",
-  workout_history__get_by_exercise: "Checking your performance history...",
-};
+  schedule__get: {
+    label: "Checking your schedule...",
+    done: "Checked your schedule",
+  },
+  schedule__add_workout: {
+    label: "Scheduling workout...",
+    done: "Scheduled workout",
+  },
+  schedule__update_workout: {
+    label: "Updating scheduled workout...",
+    done: "Updated scheduled workout",
+  },
+  schedule__delete_workout: {
+    label: "Removing scheduled workout...",
+    done: "Removed scheduled workout",
+  },
 
-const TOOL_DONE_LABELS: Record<string, string> = {
-  profile__get_context: "Reviewed your profile",
-  profile__update_insights: "Updated your profile insights",
-
-  exercise__search: "Found matching exercises",
-  exercise__get_by_ids: "Loaded exercise details",
-  exercise__create_batch: "Created exercises",
-
-  template__get_all: "Checked your templates",
-  template__get_by_id: "Loaded template details",
-  template__create: "Built your workout plan",
-  template__insert_exercises: "Updated workout structure",
-  template__remove_by_order: "Removed workout block",
-  template__update: "Rebuilt workout template",
-
-  schedule__get: "Checked your schedule",
-  schedule__add_workout: "Scheduled workout",
-  schedule__update_workout: "Updated scheduled workout",
-  schedule__delete_workout: "Removed scheduled workout",
-
-  workout_history__get_all: "Analyzed recent workouts",
-  workout_history__get_by_exercise: "Checked your performance history",
+  workout_history__get_all: {
+    label: "Analyzing recent workouts...",
+    done: "Analyzed recent workouts",
+  },
+  workout_history__get_by_exercise: {
+    label: "Checking your performance history...",
+    done: "Checked your performance history",
+  },
 };
 
 const seedMessages: ChatMessage[] = [
@@ -121,35 +156,526 @@ const seedMessages: ChatMessage[] = [
   },
 ];
 
+/* -------------------------------------------------- */
+/* Helpers
+/* -------------------------------------------------- */
 const getToolLabel = (tool: string) =>
-  TOOL_LABELS[tool] || tool || "Working...";
+  TOOL_META[tool]?.label || tool || "Working...";
 
-const getToolDoneLabel = (tool: string) =>
-  TOOL_DONE_LABELS[tool] ||
-  // fallback: remove trailing "..." and try to make it past tense-ish
-  getToolLabel(tool)
+const getToolDoneLabel = (tool: string) => {
+  const meta = TOOL_META[tool];
+  if (meta?.done) return meta.done;
+
+  // fallback if not explicitly defined
+  return getToolLabel(tool)
     .replace(/\.\.\.$/, "")
     .replace(/ing\b/i, "ed");
+};
 
 export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
+  /**
+   * User
+   */
   const user = useAuthStore(s => s.user);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [inputText, setInputText] = useState("");
-  const [isAtBottom, setIsAtBottom] = useState(true);
-  const [conversationId, setConversationId] = useState<string | null>(null);
-  const conversations = useConversationsStoreInternal(s => s.conversations);
+
+  /**
+   * Controller States
+   */
+  const runtime = useChatRuntime();
+  const {
+    conversationId,
+    messages,
+    setMessages,
+    messagesRef,
+    sendingRef,
+    assistantIndexRef,
+  } = runtime;
+
+  /**
+   * Websocket Controller
+   */
+  const ws = useWsController(runtime);
+
+  /**
+   * Conversation Controller
+   */
+  const { loadConversationMessages, startNewConversation, openConversation } =
+    useConversationController({
+      visible,
+      runtime,
+      ws,
+    });
+
+  /**
+   * Chat Composer
+   */
+  const {
+    sendMessage,
+    input: { setInputText, inputText },
+  } = useChatComposer({
+    visible,
+    user,
+    runtime,
+    ws,
+  });
+
+  /**
+   * Drawer Animation
+   */
+  const {
+    drawerOpen,
+    drawerTranslateX,
+    screenTranslateX,
+    overlayOpacity,
+    openDrawer,
+    closeDrawer,
+  } = useDrawerController();
+
+  /**
+   * Auto Scroll
+   */
+  const { scrollToBottom, onScroll, isAtBottom, scrollBtnAnim, scrollViewRef } =
+    useAutoScroll(visible, messages);
+
+  const insets = useSafeAreaInsets();
+
+  /**
+   * Multi-Conversations
+   */
   const fetchConversations = useConversationsStoreInternal(s => s.fetchAll);
+  const conversations = useConversationsStoreInternal(s => s.conversations);
+
   useEffect(() => {
     if (!visible) return;
     fetchConversations();
   }, [visible]);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  /* -------------------------------------------------- */
+  /* UI */
+  /* -------------------------------------------------- */
+  const renderMessage = (message: ChatMessage, index: number) => {
+    const isUser = message.role === "user";
+    const isStreaming =
+      index === assistantIndexRef.current && sendingRef.current;
+
+    return (
+      <View
+        key={index}
+        style={[
+          // @ts-ignore - you said you’ll add styles back
+          styles.messageBubble,
+          isUser ? styles.userBubble : styles.assistantBubble,
+        ]}
+      >
+        <TouchableOpacity
+          onLongPress={() => Clipboard.setString(message.content || "")}
+          activeOpacity={1}
+        >
+          <View
+            style={[
+              styles.messageContent,
+              isUser ? styles.userContent : styles.assistantContent,
+            ]}
+          >
+            {isUser ? (
+              <Text style={styles.userText}>{message.content}</Text>
+            ) : (
+              <View>
+                {/* Show tool chain until tokens begin */}
+                {!message.hasStartedStreaming &&
+                  (message.toolSteps?.length ?? 0) > 0 && (
+                    <ToolChain steps={message.toolSteps!} />
+                  )}
+
+                {/* If assistant is "pending" (empty content), show pulse circle */}
+                {!message.content ? (
+                  <View style={styles.pendingWrap}>
+                    <PulseDot />
+                  </View>
+                ) : (
+                  <AnimatedMarkdown
+                    content={message.content || ""}
+                    isStreaming={isStreaming}
+                  />
+                )}
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide">
+      <Animated.View
+        style={[
+          styles.drawer,
+          {
+            transform: [{ translateX: drawerTranslateX }],
+          },
+        ]}
+      >
+        <View style={styles.drawerContent}>
+          {/* New Chat */}
+          <TouchableOpacity
+            style={styles.newChatButton}
+            onPress={() => {
+              startNewConversation();
+              closeDrawer();
+            }}
+          >
+            <Ionicons name="sparkles" size={18} color="#FFFFFF" />
+            <Text style={styles.newChatText}>New Chat</Text>
+          </TouchableOpacity>
+
+          <View style={styles.drawerDivider} />
+
+          <Text style={styles.drawerSectionTitle}>Chats</Text>
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {conversations.map(conv => (
+              <Pressable
+                key={conv.id}
+                style={({ pressed }) => [
+                  styles.drawerItem,
+                  pressed && { backgroundColor: "#F2F2F7" },
+                ]}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  openConversation(conv.id);
+                  closeDrawer();
+                }}
+              >
+                <Text
+                  style={[
+                    styles.drawerItemText,
+                    conversationId === conv.id && { color: "#007AFF" },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {conv.title || "Conversation"}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      </Animated.View>
+      <Animated.View
+        pointerEvents={drawerOpen ? "auto" : "none"}
+        style={[
+          styles.drawerOverlay,
+          {
+            opacity: overlayOpacity,
+          },
+        ]}
+      >
+        <Pressable style={{ flex: 1 }} onPress={closeDrawer} />
+      </Animated.View>
+
+      <Animated.View
+        style={[
+          styles.container,
+          { transform: [{ translateX: screenTranslateX }] },
+        ]}
+      >
+        <View
+          style={[
+            styles.header,
+            { paddingTop: insets.top + 16, paddingBottom: 16 },
+          ]}
+        >
+          <View style={styles.headerLeft}>
+            <TouchableOpacity
+              onPress={openDrawer}
+              style={styles.hamburgerButton}
+            >
+              <View style={styles.hamburgerWrap}>
+                <View
+                  style={[
+                    styles.hamburgerLine,
+                    {
+                      width: "80%", // 👈 shorter middle line (matches iOS look)
+                    },
+                  ]}
+                />
+                <View style={[styles.hamburgerLine, styles.hamburgerMiddle]} />
+              </View>
+            </TouchableOpacity>
+            <View>
+              <Text style={styles.headerTitle}>AI Coach</Text>
+              <Text style={styles.headerSubtitle}>
+                Your strength & conditioning assistant
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.headerRight}>
+            <TouchableOpacity
+              onPress={() => {
+                Haptics.selectionAsync();
+                startNewConversation();
+              }}
+              style={styles.headerIconButton}
+            >
+              <Feather name="edit" size={22} color="black" />
+              {/* <Ionicons name="create-outline" size={22} color="#1C1C1E" /> */}
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={onClose} style={styles.headerIconButton}>
+              <Ionicons name="close" size={26} color="#1C1C1E" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <ScrollView
+          ref={scrollViewRef}
+          style={styles.messagesContainer}
+          contentContainerStyle={styles.messagesContent}
+          showsVerticalScrollIndicator={false}
+          scrollEventThrottle={16}
+          onScroll={onScroll}
+        >
+          {messages
+            .filter(m => !m.hidden && m.role !== "tool")
+            .map(renderMessage)}
+        </ScrollView>
+        <Animated.View
+          pointerEvents={isAtBottom ? "none" : "auto"}
+          style={[
+            styles.scrollToBottomWrapper,
+            {
+              opacity: scrollBtnAnim,
+              transform: [
+                { translateX: -22 },
+                {
+                  translateY: scrollBtnAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [10, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <TouchableOpacity
+            style={styles.scrollToBottomButton}
+            onPress={scrollToBottom}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="arrow-down" size={24} color="#007AFF" />
+          </TouchableOpacity>
+        </Animated.View>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <View
+            style={[
+              styles.inputContainer,
+              { paddingBottom: insets.bottom + 16 },
+            ]}
+          >
+            <View style={styles.inputPill}>
+              <TextInput
+                style={styles.input}
+                value={inputText}
+                onChangeText={setInputText}
+                placeholder="Ask me anything..."
+                placeholderTextColor="#999"
+                multiline
+                editable={!sendingRef.current}
+              />
+
+              <TouchableOpacity
+                style={[
+                  styles.sendButton,
+                  (!inputText.trim() || sendingRef.current) &&
+                    styles.sendButtonDisabled,
+                ]}
+                onPress={sendMessage}
+                disabled={!inputText.trim() || sendingRef.current}
+              >
+                <Ionicons name="arrow-up" size={18} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Animated.View>
+    </Modal>
+  );
+}
+
+/* -------------------------------------------------- */
+/* Components  */
+/* -------------------------------------------------- */
+const ToolChain = ({ steps }: { steps: ToolStep[] }) => {
+  if (!steps.length) return null;
+
+  const pendingIndex = steps.findIndex(s => s.status === "pending");
+  const activeIndex = pendingIndex === -1 ? steps.length - 1 : pendingIndex;
+
+  const iconFor = (s: ToolStep) => {
+    if (s.status === "done") return "checkmark-circle" as const;
+    if (s.status === "error") return "close-circle" as const;
+    return "time" as const; // pending
+  };
+
+  const iconColorFor = (s: ToolStep) => {
+    if (s.status === "done") return "#34C759";
+    if (s.status === "error") return "#FF3B30";
+    return "#007AFF";
+  };
+
+  return (
+    <View style={styles.toolCard}>
+      <View style={styles.toolCardHeader}>
+        <View style={styles.toolCardHeaderLeft}>
+          <View style={styles.toolBadge}>
+            <Ionicons name="sparkles" size={14} color="#007AFF" />
+          </View>
+          <Text style={styles.toolCardTitle}>Working in the background</Text>
+        </View>
+
+        <View style={styles.toolCardRight}>
+          <View style={styles.toolProgressPills}>
+            <Text style={styles.toolProgressText}>
+              {Math.min(activeIndex + 1, steps.length)}/{steps.length}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.toolList}>
+        {steps.map((s, i) => {
+          const isActive = s.status === "pending" && i === activeIndex;
+          const text =
+            s.status === "done"
+              ? s.doneLabel || s.label
+              : s.status === "error"
+                ? s.errorLabel || s.label
+                : s.label;
+
+          return (
+            <View key={s.id} style={styles.toolItemRow}>
+              {/* left gutter: timeline */}
+              <View style={styles.toolGutter}>
+                <View
+                  style={[styles.toolLineTop, i === 0 && styles.toolLineHidden]}
+                />
+                <View style={styles.toolDotWrap}>
+                  {s.status === "pending" ? (
+                    <View style={styles.toolDotPulseOuter}>
+                      <View style={styles.toolDotPulseInner} />
+                    </View>
+                  ) : (
+                    <Ionicons
+                      name={iconFor(s)}
+                      size={18}
+                      color={iconColorFor(s)}
+                    />
+                  )}
+                </View>
+                <View
+                  style={[
+                    styles.toolLineBottom,
+                    i === steps.length - 1 && styles.toolLineHidden,
+                  ]}
+                />
+              </View>
+
+              {/* content */}
+              <View style={styles.toolItemContent}>
+                <View style={styles.toolItemTopRow}>
+                  <Text
+                    style={[
+                      styles.toolItemText,
+                      s.status === "done" && styles.toolItemTextDone,
+                      s.status === "error" && styles.toolItemTextError,
+                      isActive && styles.toolItemTextActive,
+                    ]}
+                    numberOfLines={2}
+                  >
+                    {text}
+                  </Text>
+
+                  {s.status === "pending" && (
+                    <View style={styles.toolChip}>
+                      <Text style={styles.toolChipText}>Running</Text>
+                    </View>
+                  )}
+
+                  {s.status === "done" && (
+                    <View style={[styles.toolChip, styles.toolChipDone]}>
+                      <Text
+                        style={[styles.toolChipText, styles.toolChipTextDone]}
+                      >
+                        Done
+                      </Text>
+                    </View>
+                  )}
+
+                  {s.status === "error" && (
+                    <View style={[styles.toolChip, styles.toolChipError]}>
+                      <Text
+                        style={[styles.toolChipText, styles.toolChipTextError]}
+                      >
+                        Failed
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* subtle divider */}
+                {i !== steps.length - 1 && <View style={styles.toolDivider} />}
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+};
+
+/* -------------------------------------------------- */
+/* Runtime Owner: state + refs (single source of truth) */
+/* -------------------------------------------------- */
+function useChatRuntime() {
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const messagesRef = useRef<ChatMessage[]>([]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  const sendingRef = useRef(false);
+  const assistantIndexRef = useRef<number | null>(null);
+  const jobIdRef = useRef<string | null>(null);
+
+  return {
+    conversationId,
+    setConversationId,
+    messages,
+    setMessages,
+    messagesRef,
+    sendingRef,
+    assistantIndexRef,
+    jobIdRef,
+  };
+}
+
+/* -------------------------------------------------- */
+/* Drawer Controller: Controls Chats Drawer Animation
+/* -------------------------------------------------- */
+const SCREEN_WIDTH = Dimensions.get("window").width;
+const DRAWER_WIDTH = Math.min(SCREEN_WIDTH * 0.8, 360);
+
+function useDrawerController() {
   const drawerTranslateX = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
   const screenTranslateX = useRef(new Animated.Value(0)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
-  const openDrawer = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
+  const openDrawer = useCallback(() => {
     setDrawerOpen(true);
 
     Animated.parallel([
@@ -168,16 +694,16 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
       Animated.timing(overlayOpacity, {
         toValue: 1,
         duration: 200,
-        easing: Easing.linear,
         useNativeDriver: true,
       }),
     ]).start();
-  };
-  const closeDrawer = () => {
+  }, []);
+
+  const closeDrawer = useCallback(() => {
     Animated.parallel([
       Animated.timing(drawerTranslateX, {
         toValue: -DRAWER_WIDTH,
-        duration: DRAWER_WIDTH,
+        duration: 280,
         easing: IOS_PANEL_EASING,
         useNativeDriver: true,
       }),
@@ -190,16 +716,118 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
       Animated.timing(overlayOpacity, {
         toValue: 0,
         duration: 180,
-        easing: Easing.linear,
         useNativeDriver: true,
       }),
-    ]).start(() => {
-      setDrawerOpen(false);
-    });
+    ]).start(() => setDrawerOpen(false));
+  }, []);
+
+  return {
+    drawerOpen,
+    drawerTranslateX,
+    screenTranslateX,
+    overlayOpacity,
+    openDrawer,
+    closeDrawer,
+  };
+}
+
+/* -------------------------------------------------- */
+/* Scroll Controller: Controls Chats Scroll Animation
+/* -------------------------------------------------- */
+
+function useAutoScroll(visible: boolean, messages: ChatMessage[]) {
+  const [isAtBottom, setIsAtBottom] = useState(true);
+
+  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollBtnAnim = useRef(new Animated.Value(0)).current;
+
+  const scrollToBottom = () => {
+    scrollViewRef.current?.scrollToEnd({ animated: true });
   };
 
+  const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    const paddingToBottom = 20;
+    const isBottom =
+      layoutMeasurement.height + contentOffset.y >=
+      contentSize.height - paddingToBottom;
+    setIsAtBottom(isBottom);
+  };
+
+  useEffect(() => {
+    Animated.timing(scrollBtnAnim, {
+      toValue: isAtBottom ? 0 : 1,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [isAtBottom]);
+
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+
+    // auto scroll on new messages
+    scrollViewRef.current?.scrollToEnd({ animated: true });
+  }, [visible, messages.length]);
+
+  return { scrollToBottom, onScroll, isAtBottom, scrollBtnAnim, scrollViewRef };
+}
+
+/* -------------------------------------------------- */
+/* Conversation Controller: open/load/resume/new */
+/* -------------------------------------------------- */
+function useConversationController({
+  visible,
+  runtime,
+  ws,
+}: {
+  visible: boolean;
+  runtime: ReturnType<typeof useChatRuntime>;
+  ws: ReturnType<typeof useWsController>;
+}) {
+  const {
+    conversationId,
+    setConversationId,
+    setMessages,
+    messagesRef,
+    sendingRef,
+    assistantIndexRef,
+    jobIdRef,
+  } = runtime;
+
+  const loadConversationMessages = useCallback(async () => {
+    if (!conversationId) return;
+    try {
+      const res = await api.get(`/ai/conversations/${conversationId}/messages`);
+      const msgs: ChatMessage[] = res?.data?.messages || [];
+      setMessages(msgs.map(m => (m.content ? m : { ...m, hidden: true })));
+    } catch (e) {
+      setMessages(seedMessages);
+      console.log("[fetch messages error]", e);
+    }
+  }, [conversationId]);
+
+  const waitForJobCompletion = async (conversationId: string) => {
+    let finished = false;
+
+    while (!finished) {
+      await new Promise(res => setTimeout(res, 1000));
+
+      const jobRes = await api.get(
+        `/ai/conversations/${conversationId}/active-job`,
+      );
+
+      const job = jobRes?.data?.job;
+
+      if (!job || job.status !== "running") {
+        finished = true;
+      }
+    }
+
+    await loadConversationMessages();
+  };
   const openConversation = async (id: string) => {
-    console.log("Opening convo bruh");
     try {
       // Stop any current WS
       try {
@@ -254,27 +882,6 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
       setMessages(seedMessages);
     }
   };
-
-  const waitForJobCompletion = async (conversationId: string) => {
-    let finished = false;
-
-    while (!finished) {
-      await new Promise(res => setTimeout(res, 1000));
-
-      const jobRes = await api.get(
-        `/ai/conversations/${conversationId}/active-job`,
-      );
-
-      const job = jobRes?.data?.job;
-
-      if (!job || job.status !== "running") {
-        finished = true;
-      }
-    }
-
-    await loadConversationMessages();
-  };
-
   const startNewConversation = () => {
     try {
       aiWsClient.stop();
@@ -288,84 +895,33 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
     setMessages(seedMessages);
   };
 
-  const scrollViewRef = useRef<ScrollView>(null);
-  const insets = useSafeAreaInsets();
-
-  // Important: avoid stale closures
-  const messagesRef = useRef<ChatMessage[]>([]);
-  useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
-
-  const sendingRef = useRef(false);
-  const assistantIndexRef = useRef<number | null>(null);
-  const jobIdRef = useRef<string | null>(null);
-
-  /* -------------------------------------------------- */
-  /* Auto Scroll */
-  /* -------------------------------------------------- */
-  const scrollToBottom = () => {
-    scrollViewRef.current?.scrollToEnd({ animated: true });
-  };
-
-  const scrollBtnAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(scrollBtnAnim, {
-      toValue: isAtBottom ? 0 : 1,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  }, [isAtBottom]);
-
-  useEffect(() => {
-    if (!visible) {
-      return;
-    }
-
-    // auto scroll on new messages
-    scrollViewRef.current?.scrollToEnd({ animated: true });
-  }, [visible, messages.length]);
-
-  /* -------------------------------------------------- */
-  /* Welcome Message */
-  /* -------------------------------------------------- */
-
-  const loadConversationMessages = useCallback(async () => {
-    if (!conversationId) return;
-    try {
-      const res = await api.get(`/ai/conversations/${conversationId}/messages`);
-      const msgs: ChatMessage[] = res?.data?.messages || [];
-      setMessages(msgs.map(m => (m.content ? m : { ...m, hidden: true })));
-    } catch (e) {
-      setMessages(seedMessages);
-      console.log("[fetch messages error]", e);
-    }
-  }, [conversationId]);
-
+  // Seed behavior (preserved)
   useEffect(() => {
     if (!visible) return;
-
-    // Only seed once per open if empty
 
     if (messagesRef.current.length === 0) {
       if (!conversationId) {
         setMessages(seedMessages);
         return;
       }
-
       loadConversationMessages();
     }
-  }, [visible, conversationId]);
+  }, [
+    visible,
+    conversationId,
+    loadConversationMessages,
+    messagesRef,
+    setMessages,
+  ]);
 
-  /* -------------------------------------------------- */
-  /* Cleanup on close */
-  /* -------------------------------------------------- */
-
+  // Reconnect/Refetch On App Foregrounding
   useEffect(() => {
     if (!conversationId) return;
-    const sub = AppState.addEventListener("change", async state => {
-      if (state === "active") {
+    const sub = AppState.addEventListener(
+      "change",
+      async (state: AppStateStatus) => {
+        if (state != "active") return;
+
         if (!conversationId) return;
 
         const jobRes = await api.get(
@@ -376,22 +932,14 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
 
         // if there's an active job, re-attach WS handlers and restart WS to get real-time updates
         if (activeJob?.status === "running") {
-          console.log(
-            `Resuming WS for active job ${activeJob._id} on conversation ${conversationId}`,
-          );
-          jobIdRef.current = activeJob._id;
-          attachWsHandlers(activeJob._id);
-          aiWsClient.reconnect();
+          ws.reconnectToJob(activeJob._id);
         } else {
-          console.log(
-            `No active job for conversation ${conversationId} on app resume, fetching latest messages...`,
-          );
           // fetch latest convo state
           await loadConversationMessages();
           sendingRef.current = false;
         }
-      }
-    });
+      },
+    );
 
     return () => sub.remove();
   }, [conversationId]);
@@ -410,9 +958,20 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
     jobIdRef.current = null;
   }, [visible]);
 
-  /* -------------------------------------------------- */
-  /* WS Handlers */
-  /* -------------------------------------------------- */
+  return {
+    loadConversationMessages,
+    waitForJobCompletion,
+    openConversation,
+    startNewConversation,
+  };
+}
+
+/* -------------------------------------------------- */
+/* WS Controller: owns WS lifecycle + handlers */
+/* -------------------------------------------------- */
+function useWsController(runtime: ReturnType<typeof useChatRuntime>) {
+  const { setMessages, assistantIndexRef, sendingRef, jobIdRef } = runtime;
+
   const markAllPendingDone = (idx: number) => {
     setMessages(prev => {
       const copy = [...prev];
@@ -646,34 +1205,108 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
     });
   };
 
-  /* -------------------------------------------------- */
-  /* Send Message */
-  /* -------------------------------------------------- */
+  const reconnectToJob = (jobId: string) => {
+    jobIdRef.current = jobId;
+    attachWsHandlers(jobId);
+    aiWsClient.reconnect();
+  };
+
+  return { markAllPendingDone, reconnectToJob, attachWsHandlers };
+}
+
+/* -------------------------------------------------- */
+/* Composer: send message (preserves try/catch + ws start) */
+/* -------------------------------------------------- */
+function useChatComposer({
+  visible,
+  user,
+  runtime,
+  ws,
+}: {
+  visible: boolean;
+  user: any;
+  runtime: ReturnType<typeof useChatRuntime>;
+  ws: ReturnType<typeof useWsController>;
+}) {
+  const {
+    conversationId,
+    setConversationId,
+    setMessages,
+    messagesRef,
+    sendingRef,
+    assistantIndexRef,
+    jobIdRef,
+  } = runtime;
+
+  // Input text of user message input
+  const [inputText, setInputText] = useState("");
+
+  // If new conversation, create a temporary optimistic conversation in memory for the convos list.
+  const tryCreateAndSetTempOptimisticConversation = useCallback(
+    (isNewConversation: boolean, userMessage: string) => {
+      const tempId = isNewConversation ? `temp_${Date.now()}` : null;
+
+      if (tempId) {
+        // upsert minimal convo immediately (optimistic)
+        useConversationsStoreInternal.getState().upsert({
+          id: tempId,
+          title: userMessage.slice(0, 48) || "New Chat",
+          user_id: user?.id!,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+      }
+
+      setConversationId(tempId);
+
+      return tempId;
+    },
+    [],
+  );
+
+  // Once a conversation was created in DB, we replace the temporary optimistic copy with it
+  const tryReplaceTempOptimisticConversation = useCallback(
+    (tempId: string | null, realConversationId: string) => {
+      // It was an existing conversation so no optimistic version to replace
+      if (!tempId) return;
+
+      // Just for safety
+      if (tempId == realConversationId) return;
+
+      const store = useConversationsStoreInternal.getState();
+
+      const existing = store.conversations.find(c => c.id === tempId);
+      if (existing) {
+        store.remove(tempId);
+
+        store.upsert({
+          ...existing,
+          id: realConversationId,
+          updated_at: new Date().toISOString(),
+          last_message_at: new Date().toISOString(),
+        });
+      }
+    },
+    [],
+  );
 
   const sendMessage = async () => {
     const trimmed = inputText.trim();
+
     if (!trimmed || sendingRef.current) return;
+
+    // Clear the input text (TODO: Why sometimes dosent clear?)
     setInputText("");
+
     sendingRef.current = true;
 
     const userMessage: ChatMessage = { role: "user", content: trimmed };
     const baseLength = messagesRef.current.length;
 
-    const isNewConversation = !conversationId;
-    const tempId = isNewConversation ? `temp_${Date.now()}` : null;
-
-    if (tempId) {
-      // upsert minimal convo immediately (optimistic)
-      useConversationsStoreInternal.getState().upsert({
-        id: tempId,
-        title: trimmed.slice(0, 48) || "New Chat",
-        user_id: user?.id!,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
-
-      setConversationId(tempId);
-    }
+    const tempId = tryCreateAndSetTempOptimisticConversation(
+      !conversationId,
+      trimmed,
+    );
 
     const assistantIndex = baseLength + 1; // user will be appended first
 
@@ -697,24 +1330,10 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
       });
       const jobId = res?.data?.job_id;
       const conversationIdFromRes = res?.data?.conversation_id;
+
       if (conversationIdFromRes) {
         setConversationId(conversationIdFromRes);
-
-        if (tempId && tempId !== conversationIdFromRes) {
-          const store = useConversationsStoreInternal.getState();
-
-          const existing = store.conversations.find(c => c.id === tempId);
-          if (existing) {
-            store.remove(tempId);
-
-            store.upsert({
-              ...existing,
-              id: conversationIdFromRes,
-              updated_at: new Date().toISOString(),
-              last_message_at: new Date().toISOString(),
-            });
-          }
-        }
+        tryReplaceTempOptimisticConversation(tempId, conversationIdFromRes);
       }
 
       if (!jobId) {
@@ -723,7 +1342,7 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
 
       jobIdRef.current = jobId;
 
-      attachWsHandlers(jobId);
+      ws.attachWsHandlers(jobId);
 
       // Start WS
       aiWsClient.start(`/ws/ai/jobs/${jobId}`);
@@ -770,495 +1389,11 @@ export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
     }
   };
 
-  /* -------------------------------------------------- */
-  /* Render Message */
-  /* -------------------------------------------------- */
-
-  const renderMessage = (message: ChatMessage, index: number) => {
-    const isUser = message.role === "user";
-    const isStreaming =
-      index === assistantIndexRef.current && sendingRef.current;
-
-    return (
-      <View
-        key={index}
-        style={[
-          // @ts-ignore - you said you’ll add styles back
-          styles.messageBubble,
-          isUser ? styles.userBubble : styles.assistantBubble,
-        ]}
-      >
-        <TouchableOpacity
-          onLongPress={() => Clipboard.setString(message.content || "")}
-          activeOpacity={1}
-        >
-          <View
-            style={[
-              styles.messageContent,
-              isUser ? styles.userContent : styles.assistantContent,
-            ]}
-          >
-            {isUser ? (
-              <Text style={styles.userText}>{message.content}</Text>
-            ) : (
-              <View>
-                {/* Show tool chain until tokens begin */}
-                {!message.hasStartedStreaming &&
-                  (message.toolSteps?.length ?? 0) > 0 && (
-                    <ToolChain steps={message.toolSteps!} />
-                  )}
-
-                {/* If assistant is "pending" (empty content), show pulse circle */}
-                {!message.content ? (
-                  <View style={styles.pendingWrap}>
-                    <PulseDot />
-                  </View>
-                ) : (
-                  <AnimatedMarkdown
-                    content={message.content || ""}
-                    isStreaming={isStreaming}
-                    markdownStyles={markdownStyles}
-                  />
-                )}
-              </View>
-            )}
-          </View>
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
-  /* -------------------------------------------------- */
-  /* UI */
-  /* -------------------------------------------------- */
-  const PulseDot = () => {
-    const scale = useRef(new Animated.Value(0.85)).current;
-    const ringScale = useRef(new Animated.Value(0.7)).current;
-    const ringOpacity = useRef(new Animated.Value(0.0)).current;
-
-    useEffect(() => {
-      const loop = Animated.loop(
-        Animated.parallel([
-          Animated.sequence([
-            Animated.timing(scale, {
-              toValue: 1.0,
-              duration: 650,
-              easing: Easing.out(Easing.quad),
-              useNativeDriver: true,
-            }),
-            Animated.timing(scale, {
-              toValue: 0.85,
-              duration: 650,
-              easing: Easing.in(Easing.quad),
-              useNativeDriver: true,
-            }),
-          ]),
-          Animated.sequence([
-            Animated.parallel([
-              Animated.timing(ringScale, {
-                toValue: 1.8,
-                duration: 1300,
-                easing: Easing.out(Easing.quad),
-                useNativeDriver: true,
-              }),
-              Animated.sequence([
-                Animated.timing(ringOpacity, {
-                  toValue: 0.28,
-                  duration: 120,
-                  easing: Easing.out(Easing.quad),
-                  useNativeDriver: true,
-                }),
-                Animated.timing(ringOpacity, {
-                  toValue: 0.0,
-                  duration: 1180,
-                  easing: Easing.in(Easing.quad),
-                  useNativeDriver: true,
-                }),
-              ]),
-            ]),
-            // reset ring scale for the next loop
-            Animated.timing(ringScale, {
-              toValue: 0.7,
-              duration: 0,
-              useNativeDriver: true,
-            }),
-          ]),
-        ]),
-      );
-
-      loop.start();
-      return () => loop.stop();
-    }, [scale, ringScale, ringOpacity]);
-
-    return (
-      <View style={styles.pulseWrap}>
-        {/* Expanding ring */}
-        <Animated.View
-          style={[
-            styles.pulseRing,
-            {
-              opacity: ringOpacity,
-              transform: [{ scale: ringScale }],
-            },
-          ]}
-        />
-        {/* Solid dot */}
-        <Animated.View
-          style={[
-            styles.pulseCore,
-            {
-              transform: [{ scale }],
-            },
-          ]}
-        />
-      </View>
-    );
-  };
-  const ToolChain = ({ steps }: { steps: ToolStep[] }) => {
-    if (!steps.length) return null;
-
-    const pendingIndex = steps.findIndex(s => s.status === "pending");
-    const activeIndex = pendingIndex === -1 ? steps.length - 1 : pendingIndex;
-
-    const iconFor = (s: ToolStep) => {
-      if (s.status === "done") return "checkmark-circle" as const;
-      if (s.status === "error") return "close-circle" as const;
-      return "time" as const; // pending
-    };
-
-    const iconColorFor = (s: ToolStep) => {
-      if (s.status === "done") return "#34C759";
-      if (s.status === "error") return "#FF3B30";
-      return "#007AFF";
-    };
-
-    return (
-      <View style={styles.toolCard}>
-        <View style={styles.toolCardHeader}>
-          <View style={styles.toolCardHeaderLeft}>
-            <View style={styles.toolBadge}>
-              <Ionicons name="sparkles" size={14} color="#007AFF" />
-            </View>
-            <Text style={styles.toolCardTitle}>Working in the background</Text>
-          </View>
-
-          <View style={styles.toolCardRight}>
-            <View style={styles.toolProgressPills}>
-              <Text style={styles.toolProgressText}>
-                {Math.min(activeIndex + 1, steps.length)}/{steps.length}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.toolList}>
-          {steps.map((s, i) => {
-            const isActive = s.status === "pending" && i === activeIndex;
-            const text =
-              s.status === "done"
-                ? s.doneLabel || s.label
-                : s.status === "error"
-                  ? s.errorLabel || s.label
-                  : s.label;
-
-            return (
-              <View key={s.id} style={styles.toolItemRow}>
-                {/* left gutter: timeline */}
-                <View style={styles.toolGutter}>
-                  <View
-                    style={[
-                      styles.toolLineTop,
-                      i === 0 && styles.toolLineHidden,
-                    ]}
-                  />
-                  <View style={styles.toolDotWrap}>
-                    {s.status === "pending" ? (
-                      <View style={styles.toolDotPulseOuter}>
-                        <View style={styles.toolDotPulseInner} />
-                      </View>
-                    ) : (
-                      <Ionicons
-                        name={iconFor(s)}
-                        size={18}
-                        color={iconColorFor(s)}
-                      />
-                    )}
-                  </View>
-                  <View
-                    style={[
-                      styles.toolLineBottom,
-                      i === steps.length - 1 && styles.toolLineHidden,
-                    ]}
-                  />
-                </View>
-
-                {/* content */}
-                <View style={styles.toolItemContent}>
-                  <View style={styles.toolItemTopRow}>
-                    <Text
-                      style={[
-                        styles.toolItemText,
-                        s.status === "done" && styles.toolItemTextDone,
-                        s.status === "error" && styles.toolItemTextError,
-                        isActive && styles.toolItemTextActive,
-                      ]}
-                      numberOfLines={2}
-                    >
-                      {text}
-                    </Text>
-
-                    {s.status === "pending" && (
-                      <View style={styles.toolChip}>
-                        <Text style={styles.toolChipText}>Running</Text>
-                      </View>
-                    )}
-
-                    {s.status === "done" && (
-                      <View style={[styles.toolChip, styles.toolChipDone]}>
-                        <Text
-                          style={[styles.toolChipText, styles.toolChipTextDone]}
-                        >
-                          Done
-                        </Text>
-                      </View>
-                    )}
-
-                    {s.status === "error" && (
-                      <View style={[styles.toolChip, styles.toolChipError]}>
-                        <Text
-                          style={[
-                            styles.toolChipText,
-                            styles.toolChipTextError,
-                          ]}
-                        >
-                          Failed
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-
-                  {/* subtle divider */}
-                  {i !== steps.length - 1 && (
-                    <View style={styles.toolDivider} />
-                  )}
-                </View>
-              </View>
-            );
-          })}
-        </View>
-      </View>
-    );
-  };
-
-  return (
-    <Modal visible={visible} animationType="slide">
-      <Animated.View
-        style={[
-          styles.drawer,
-          {
-            transform: [{ translateX: drawerTranslateX }],
-          },
-        ]}
-      >
-        <View style={styles.drawerContent}>
-          {/* New Chat */}
-          <TouchableOpacity
-            style={styles.newChatButton}
-            onPress={() => {
-              startNewConversation();
-              closeDrawer();
-            }}
-          >
-            <Ionicons name="sparkles" size={18} color="#FFFFFF" />
-            <Text style={styles.newChatText}>New Chat</Text>
-          </TouchableOpacity>
-
-          <View style={styles.drawerDivider} />
-
-          <Text style={styles.drawerSectionTitle}>Chats</Text>
-
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {conversations.map(conv => (
-              <Pressable
-                key={conv.id}
-                style={({ pressed }) => [
-                  styles.drawerItem,
-                  pressed && { backgroundColor: "#F2F2F7" },
-                ]}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  openConversation(conv.id);
-                  closeDrawer();
-                }}
-              >
-                <Text
-                  style={[
-                    styles.drawerItemText,
-                    conversationId === conv.id && { color: "#007AFF" },
-                  ]}
-                  numberOfLines={1}
-                >
-                  {conv.title || "Conversation"}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        </View>
-      </Animated.View>
-      <Animated.View
-        pointerEvents={drawerOpen ? "auto" : "none"}
-        style={[
-          styles.drawerOverlay,
-          {
-            opacity: overlayOpacity,
-          },
-        ]}
-      >
-        <Pressable style={{ flex: 1 }} onPress={closeDrawer} />
-      </Animated.View>
-
-      <Animated.View
-        style={[
-          styles.container,
-          { transform: [{ translateX: screenTranslateX }] },
-        ]}
-      >
-        <View
-          style={[
-            styles.header,
-            { paddingTop: insets.top + 16, paddingBottom: 16 },
-          ]}
-        >
-          <View style={styles.headerLeft}>
-            <TouchableOpacity
-              onPress={openDrawer}
-              style={styles.hamburgerButton}
-            >
-              <View style={styles.hamburgerWrap}>
-                <View
-                  style={[
-                    styles.hamburgerLine,
-                    {
-                      width: "80%", // 👈 shorter middle line (matches iOS look)
-                    },
-                  ]}
-                />
-                <View style={[styles.hamburgerLine, styles.hamburgerMiddle]} />
-              </View>
-            </TouchableOpacity>
-            <View>
-              <Text style={styles.headerTitle}>AI Coach</Text>
-              <Text style={styles.headerSubtitle}>
-                Your strength & conditioning assistant
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.headerRight}>
-            <TouchableOpacity
-              onPress={() => {
-                Haptics.selectionAsync();
-                startNewConversation();
-              }}
-              style={styles.headerIconButton}
-            >
-              <Feather name="edit" size={22} color="black" />
-              {/* <Ionicons name="create-outline" size={22} color="#1C1C1E" /> */}
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={onClose} style={styles.headerIconButton}>
-              <Ionicons name="close" size={26} color="#1C1C1E" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <ScrollView
-          ref={scrollViewRef}
-          style={styles.messagesContainer}
-          contentContainerStyle={styles.messagesContent}
-          showsVerticalScrollIndicator={false}
-          scrollEventThrottle={16}
-          onScroll={event => {
-            const { layoutMeasurement, contentOffset, contentSize } =
-              event.nativeEvent;
-            const paddingToBottom = 20;
-            const isBottom =
-              layoutMeasurement.height + contentOffset.y >=
-              contentSize.height - paddingToBottom;
-            setIsAtBottom(isBottom);
-          }}
-        >
-          {messages
-            .filter(m => !m.hidden && m.role !== "tool")
-            .map(renderMessage)}
-        </ScrollView>
-        <Animated.View
-          pointerEvents={isAtBottom ? "none" : "auto"}
-          style={[
-            styles.scrollToBottomWrapper,
-            {
-              opacity: scrollBtnAnim,
-              transform: [
-                { translateX: -22 },
-                {
-                  translateY: scrollBtnAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [10, 0],
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          <TouchableOpacity
-            style={styles.scrollToBottomButton}
-            onPress={scrollToBottom}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="arrow-down" size={24} color="#007AFF" />
-          </TouchableOpacity>
-        </Animated.View>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-        >
-          <View
-            style={[
-              styles.inputContainer,
-              { paddingBottom: insets.bottom + 16 },
-            ]}
-          >
-            <View style={styles.inputPill}>
-              <TextInput
-                style={styles.input}
-                value={inputText}
-                onChangeText={setInputText}
-                placeholder="Ask me anything..."
-                placeholderTextColor="#999"
-                multiline
-                editable={!sendingRef.current}
-              />
-
-              <TouchableOpacity
-                style={[
-                  styles.sendButton,
-                  (!inputText.trim() || sendingRef.current) &&
-                    styles.sendButtonDisabled,
-                ]}
-                onPress={sendMessage}
-                disabled={!inputText.trim() || sendingRef.current}
-              >
-                <Ionicons name="arrow-up" size={18} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Animated.View>
-    </Modal>
-  );
+  return { sendMessage, input: { setInputText, inputText } };
 }
 
 /* -------------------------------------------------- */
-/* Styles (UNCHANGED) */
+/* Styles  */
 /* -------------------------------------------------- */
 
 const styles = StyleSheet.create({
@@ -1338,51 +1473,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#C7C7CC",
     opacity: 0.6,
   },
-  toolStatusContainer: {
-    alignSelf: "flex-start",
-    backgroundColor: "#E8F4FF",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
-    marginBottom: 12,
-  },
-  toolStatusText: {
-    color: "#007AFF",
-    fontSize: 14,
-  },
-  closeButton: { padding: 4 },
+
   headerLeft: { flexDirection: "row", alignItems: "center", flex: 1 },
-  headerIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#E8F4FF",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-  },
+
   headerTitle: { fontSize: 18, fontWeight: "700", color: "#1C1C1E" },
   headerSubtitle: { fontSize: 12, color: "#8E8E93", marginTop: 2 },
-  toolChainWrap: {
-    backgroundColor: "#F2F2F7",
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: "#E5E5EA",
-  },
-  toolRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 6,
-  },
-  toolIcon: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginRight: 10,
-  },
+
   toolIconPending: { backgroundColor: "#007AFF" },
   toolIconDone: { backgroundColor: "#34C759" },
   toolIconError: { backgroundColor: "#FF3B30" },
@@ -1394,14 +1490,7 @@ const styles = StyleSheet.create({
   pendingWrap: {
     paddingVertical: 8,
   },
-  pulseDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#007AFF",
-    opacity: 0.6,
-  },
-  toolPrefix: { width: 22, fontSize: 13 },
+
   toolCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
@@ -1568,44 +1657,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
     marginTop: 10,
   },
-  pulseWrap: {
-    width: 18,
-    height: 18,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pulseRing: {
-    position: "absolute",
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: "#007AFF",
-  },
-  pulseCore: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#007AFF",
-    opacity: 0.95,
-  },
 
-  inputWrapper: {
-    flex: 1,
-    position: "relative",
-    justifyContent: "center",
-  },
-
-  sendButtonInside: {
-    position: "absolute",
-    right: 6,
-    bottom: 6, // keeps it aligned nicely with multiline input
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "#007AFF",
-    alignItems: "center",
-    justifyContent: "center",
-  },
   scrollToBottomWrapper: {
     position: "absolute",
     left: "50%",
@@ -1662,10 +1714,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 12,
     borderRadius: 14,
-  },
-
-  drawerItemActive: {
-    backgroundColor: "#EEF4FF",
   },
 
   drawerItemText: {
@@ -1734,93 +1782,3 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 });
-const markdownStyles = {
-  body: {
-    color: "#1C1C1E",
-    fontSize: 16,
-    lineHeight: 22,
-  },
-  heading1: {
-    fontSize: 24,
-    fontWeight: "700" as const,
-    color: "#1C1C1E",
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  heading2: {
-    fontSize: 20,
-    fontWeight: "600" as const,
-    color: "#1C1C1E",
-    marginTop: 12,
-    marginBottom: 6,
-  },
-  heading3: {
-    fontSize: 18,
-    fontWeight: "600" as const,
-    color: "#1C1C1E",
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  strong: {
-    fontWeight: "700" as const,
-    color: "#1C1C1E",
-  },
-  em: {
-    fontStyle: "italic" as const,
-  },
-  code_inline: {
-    backgroundColor: "#F2F2F7",
-    color: "#007AFF",
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    borderRadius: 4,
-    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
-  },
-  code_block: {
-    backgroundColor: "#F2F2F7",
-    padding: 12,
-    borderRadius: 8,
-    marginVertical: 8,
-    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
-  },
-  fence: {
-    backgroundColor: "#F2F2F7",
-    padding: 12,
-    borderRadius: 8,
-    marginVertical: 8,
-    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
-  },
-  bullet_list: {
-    marginVertical: 8,
-  },
-  ordered_list: {
-    marginVertical: 8,
-  },
-  list_item: {
-    marginVertical: 4,
-  },
-  bullet_list_icon: {
-    color: "#007AFF",
-    fontSize: 16,
-  },
-  link: {
-    color: "#007AFF",
-    textDecorationLine: "underline" as const,
-  },
-  blockquote: {
-    backgroundColor: "#F2F2F7",
-    borderLeftWidth: 4,
-    borderLeftColor: "#007AFF",
-    paddingLeft: 12,
-    paddingVertical: 8,
-    marginVertical: 8,
-  },
-  paragraph: {
-    marginVertical: 4,
-  },
-  hr: {
-    backgroundColor: "#E5E5EA",
-    height: 1,
-    marginVertical: 12,
-  },
-};
