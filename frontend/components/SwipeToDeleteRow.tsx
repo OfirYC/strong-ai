@@ -1,65 +1,103 @@
-import React from "react";
-import { View, StyleSheet, Text, Animated } from "react-native";
-import { Swipeable } from "react-native-gesture-handler";
+import React, { useRef } from "react";
+import { View, StyleSheet, Text, ViewStyle, Dimensions } from "react-native";
+import Swipeable, {
+  SwipeableMethods,
+} from "react-native-gesture-handler/ReanimatedSwipeable";
+import Animated, {
+  useAnimatedStyle,
+  SharedValue,
+  useAnimatedReaction,
+  runOnJS,
+  withSpring,
+  interpolate,
+  Extrapolation,
+  interpolateColor,
+} from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 
-interface SwipeToDeleteRowProps {
-  children: React.ReactNode;
-  onDelete: () => void;
-}
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const DELETE_THRESHOLD = -SCREEN_WIDTH * 0.45;
 
 export default function SwipeToDeleteRow({
   children,
   onDelete,
-}: SwipeToDeleteRowProps) {
-  let swipeableRef: Swipeable | null = null;
+}: {
+  children: React.ReactNode;
+  onDelete: () => void;
+}) {
+  const swipeableRef = useRef<SwipeableMethods | null>(null);
+
+  const triggerHaptic = (style: Haptics.ImpactFeedbackStyle) => {
+    Haptics.impactAsync(style).catch(() => {});
+  };
 
   const renderRightActions = (
-    progress: Animated.AnimatedInterpolation<number>,
-    dragX: Animated.AnimatedInterpolation<number>
+    _progress: SharedValue<number>,
+    translation: SharedValue<number>,
   ) => {
-    const scale = dragX.interpolate({
-      inputRange: [-100, -50, 0],
-      outputRange: [1.2, 1, 0.8],
-      extrapolate: "clamp",
+    useAnimatedReaction(
+      () => translation.value,
+      (current, previous) => {
+        if (!previous) return;
+        if (current <= DELETE_THRESHOLD && previous > DELETE_THRESHOLD) {
+          runOnJS(triggerHaptic)(Haptics.ImpactFeedbackStyle.Heavy);
+        }
+      },
+    );
+
+    const animatedBackgroundStyle = useAnimatedStyle((): ViewStyle => {
+      const isPast = translation.value <= DELETE_THRESHOLD;
+      const bgColor = interpolateColor(
+        translation.value,
+        [DELETE_THRESHOLD, DELETE_THRESHOLD + 60], // transition window
+        ["#D32F2F", "#FF3B30"],
+      );
+      return {
+        backgroundColor: bgColor,
+        // FIX: Start with full width so it can never "split" or show a gap
+        width: SCREEN_WIDTH,
+        // FIX: This ensures the right edge of the red box stays pinned to the screen's right edge
+        // while the left edge follows the row.
+        transform: [{ translateX: SCREEN_WIDTH + translation.value }],
+        flexDirection: "row",
+        justifyContent: "flex-start", // Content stays on the left of this red block (near the row)
+        alignItems: "center",
+      } as ViewStyle;
     });
 
-    const opacity = dragX.interpolate({
-      inputRange: [-100, -50, 0],
-      outputRange: [1, 0.8, 0],
-      extrapolate: "clamp",
+    const animatedContentStyle = useAnimatedStyle((): ViewStyle => {
+      const isPast = translation.value <= DELETE_THRESHOLD;
+      const distance = Math.abs(translation.value);
+
+      return {
+        opacity: interpolate(distance, [20, 60], [0, 1], Extrapolation.CLAMP),
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+        paddingLeft: 20, // Distance from the row edge
+      } as ViewStyle;
     });
 
     return (
-      <View style={styles.deleteContainer}>
-        <Animated.View
-          style={[styles.deleteContent, { transform: [{ scale }] }]}
-        >
+      <Animated.View style={animatedBackgroundStyle}>
+        <Animated.View style={animatedContentStyle}>
           <Ionicons name="trash" size={22} color="white" />
-          <Animated.Text style={[styles.deleteText, { opacity }]}>
-            Delete
-          </Animated.Text>
+          <Text style={styles.deleteText}>Delete</Text>
         </Animated.View>
-      </View>
+      </Animated.View>
     );
-  };
-
-  const handleSwipeOpen = (direction: "left" | "right") => {
-    if (direction === "right") {
-      onDelete();
-      swipeableRef?.close();
-    }
   };
 
   return (
     <Swipeable
-      ref={ref => (swipeableRef = ref)}
+      ref={swipeableRef}
       renderRightActions={renderRightActions}
-      onSwipeableOpen={handleSwipeOpen}
-      rightThreshold={80}
+      onSwipeableOpen={onDelete}
+      rightThreshold={Math.abs(DELETE_THRESHOLD)}
+      // 0.4 = High sensitivity. Row moves ~2.5x faster than your finger.
+      friction={0.8}
       overshootRight={false}
-      friction={2}
-      containerStyle={styles.swipeContainer}
     >
       <View style={styles.content}>{children}</View>
     </Swipeable>
@@ -67,30 +105,12 @@ export default function SwipeToDeleteRow({
 }
 
 const styles = StyleSheet.create({
-  swipeContainer: {
-    borderRadius: 8,
-    overflow: "hidden",
-  },
-  deleteContainer: {
-    backgroundColor: "#FF3B30",
-    justifyContent: "center",
-    alignItems: "flex-end",
-    paddingRight: 20,
-    width: 100,
-    borderTopRightRadius: 8,
-    borderBottomRightRadius: 8,
-  },
-  deleteContent: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
   deleteText: {
     color: "white",
-    fontWeight: "600",
-    fontSize: 14,
-    marginLeft: 6,
+    fontWeight: "700",
+    fontSize: 17,
   },
   content: {
-    borderRadius: 8,
+    backgroundColor: "#FFFFFF",
   },
 });
