@@ -172,6 +172,10 @@ const getToolDoneLabel = (tool: string) => {
     .replace(/ing\b/i, "ed");
 };
 
+const isValidConversationId = (id: string | null) => {
+  return !!id && !id.startsWith("temp_");
+};
+
 export default function AIChatModal({ visible, onClose }: AIChatModalProps) {
   /**
    * User
@@ -797,7 +801,7 @@ function useConversationController({
   } = runtime;
 
   const loadConversationMessages = useCallback(async () => {
-    if (!conversationId) return;
+    if (!isValidConversationId(conversationId)) return;
     try {
       const res = await api.get(`/ai/conversations/${conversationId}/messages`);
       const msgs: ChatMessage[] = res?.data?.messages || [];
@@ -916,13 +920,13 @@ function useConversationController({
 
   // Reconnect/Refetch On App Foregrounding
   useEffect(() => {
-    if (!conversationId) return;
+    if (!isValidConversationId(conversationId)) return;
     const sub = AppState.addEventListener(
       "change",
       async (state: AppStateStatus) => {
         if (state != "active") return;
 
-        if (!conversationId) return;
+        if (!isValidConversationId(conversationId)) return;
 
         const jobRes = await api.get(
           `/ai/conversations/${conversationId}/active-job`,
@@ -1326,7 +1330,9 @@ function useChatComposer({
     try {
       const res = await api.post("/ai/chat/start", {
         user_message: userMessage,
-        conversation_id: conversationId,
+        conversation_id: isValidConversationId(conversationId)
+          ? conversationId
+          : null,
       });
       const jobId = res?.data?.job_id;
       const conversationIdFromRes = res?.data?.conversation_id;
