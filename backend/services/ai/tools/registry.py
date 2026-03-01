@@ -3,10 +3,18 @@ from typing import Dict, List
 from .base import BaseTool
 from .profile import ProfileGetContext, ProfileUpdateInsights
 from .exercise import ExerciseCreateBatch, ExerciseGetByIds, ExerciseSearch
-from .template import TemplateGetAll, TemplateCreate, TemplateUpdate, TemplateGetById, TemplateInsertExercises, TemplateRemoveExercisesByIndex
+from .template import (
+    TemplateGetAll,
+    TemplateCreate,
+    TemplateUpdate,
+    TemplateGetById,
+    TemplateInsertExercises,
+    TemplateRemoveExercisesByIndex,
+)
 from .schedule import (
     ScheduleGet,
     ScheduleAddWorkout,
+    SchedulePatchOccurrence,
     ScheduleUpdateWorkout,
     ScheduleDeleteWorkout,
 )
@@ -28,6 +36,7 @@ ALL_TOOLS: List[BaseTool] = [
     ScheduleGet(),
     ScheduleAddWorkout(),
     ScheduleUpdateWorkout(),
+    SchedulePatchOccurrence(),
     ScheduleDeleteWorkout(),
     WorkoutHistoryGetAll(),
     WorkoutHistoryGetByExercise(),

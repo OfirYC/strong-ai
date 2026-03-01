@@ -70,7 +70,7 @@ export default function WorkoutScreen() {
       _startWorkout(workout);
       setIsActiveWorkoutSheetExpanded(true);
     },
-    [_startWorkout]
+    [_startWorkout],
   );
 
   const { list: templatesList, loading: templatesLoading } = useTemplates();
@@ -191,7 +191,7 @@ export default function WorkoutScreen() {
               }
             },
           },
-        ]
+        ],
       );
       return;
     }
@@ -240,7 +240,7 @@ export default function WorkoutScreen() {
               }
             },
           },
-        ]
+        ],
       );
       return;
     }
@@ -261,14 +261,14 @@ export default function WorkoutScreen() {
   };
 
   const handleStartPlannedWorkout = async (
-    plannedWorkout: EnrichedPlannedWorkout
+    plannedWorkout: EnrichedPlannedWorkout,
   ) => {
     if (
       plannedWorkout.status === "completed" &&
       plannedWorkout.workout_session_id
     ) {
       router.push(
-        `/workout-detail?workoutId=${plannedWorkout.workout_session_id}`
+        `/workout-detail?workoutId=${plannedWorkout.workout_session_id}`,
       );
       return;
     }
@@ -305,7 +305,7 @@ export default function WorkoutScreen() {
                   setLoading(true);
                   await discardCurrentAndRun(async () => {
                     const workout = await getWorkoutById(
-                      plannedWorkout.workout_session_id!
+                      plannedWorkout.workout_session_id!,
                     );
                     if (workout) {
                       startWorkout(workout);
@@ -320,14 +320,14 @@ export default function WorkoutScreen() {
                 }
               },
             },
-          ]
+          ],
         );
         return;
       }
 
       try {
         const workout = await getWorkoutById(
-          plannedWorkout.workout_session_id!
+          plannedWorkout.workout_session_id!,
         );
         if (workout) {
           startWorkout(workout);
@@ -361,7 +361,7 @@ export default function WorkoutScreen() {
               }
             },
           },
-        ]
+        ],
       );
       return;
     }
@@ -370,7 +370,7 @@ export default function WorkoutScreen() {
   };
 
   const createPlannedWorkoutSession = async (
-    plannedWorkout: EnrichedPlannedWorkout
+    plannedWorkout: EnrichedPlannedWorkout,
   ) => {
     try {
       setLoading(true);
@@ -380,11 +380,11 @@ export default function WorkoutScreen() {
         name: plannedWorkout.name,
       };
 
-      if (plannedWorkout.template_id) {
-        payload.template_id = plannedWorkout.template_id;
-      } else if (plannedWorkout.inline_exercises?.length) {
+      if (plannedWorkout.inline_exercises?.length) {
         payload.exercises =
           plannedWorkout.inline_exercises satisfies WorkoutExercise[];
+      } else if (plannedWorkout.template_id) {
+        payload.template_id = plannedWorkout.template_id;
       }
 
       const response = await api.post("/workouts", payload);
@@ -477,8 +477,8 @@ export default function WorkoutScreen() {
         const status: StorePlannedWorkout["status"] = s.skipped
           ? "skipped"
           : s.ended_at
-          ? "completed"
-          : "in_progress";
+            ? "completed"
+            : "in_progress";
 
         // Pseudo planned workout card shape
 
@@ -499,7 +499,7 @@ export default function WorkoutScreen() {
     const planned = (todaysPlannedBase ?? [])
       .map(pw => {
         const actualSession = sessionsByPlannedAndDate.get(
-          `${pw.id}__${pw.date}`
+          `${pw.id}__${pw.date}`,
         );
 
         if (!actualSession) {
@@ -520,8 +520,8 @@ export default function WorkoutScreen() {
         ).ended_at
           ? "completed"
           : (actualSession as any).skipped
-          ? "skipped"
-          : "in_progress";
+            ? "skipped"
+            : "in_progress";
 
         return {
           ...(pw as EnrichedPlannedWorkout),
@@ -566,7 +566,7 @@ export default function WorkoutScreen() {
                 .sort(
                   (a, b) =>
                     (todaysWorkoutsOrder[a.status] ?? 99) -
-                    (todaysWorkoutsOrder[b.status] ?? 99)
+                    (todaysWorkoutsOrder[b.status] ?? 99),
                 )
                 .map(plannedWorkout => (
                   <TouchableOpacity
@@ -604,7 +604,7 @@ export default function WorkoutScreen() {
                               styles.statusText,
                               {
                                 color: getStatusBadgeStyle(
-                                  plannedWorkout.status
+                                  plannedWorkout.status,
                                 ).color,
                               },
                             ]}

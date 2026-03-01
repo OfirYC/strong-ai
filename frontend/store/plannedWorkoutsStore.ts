@@ -29,6 +29,10 @@ export interface PlannedWorkout {
 
   // Used by CalendarModal for inline planned workouts
   inline_exercises?: any[];
+
+  // For exceptions of recurrances
+  is_override?: boolean;
+  original_date?: string;
 }
 
 type PlannedWorkoutsStore = {
@@ -47,12 +51,12 @@ type PlannedWorkoutsStore = {
   // Cache-aware getters (like templatesStore)
   getByDate: (
     date: string,
-    opts?: { force?: boolean }
+    opts?: { force?: boolean },
   ) => Promise<PlannedWorkout[]>;
   getRange: (
     startDate: string,
     endDate: string,
-    opts?: { force?: boolean }
+    opts?: { force?: boolean },
   ) => Promise<Record<string, PlannedWorkout[]>>;
 
   getById: (id: string) => Promise<PlannedWorkout | undefined>;
@@ -67,7 +71,7 @@ type PlannedWorkoutsStore = {
   selectByDate: (date: string) => PlannedWorkout[];
   selectGroupedByDateInRange: (
     startDate: string,
-    endDate: string
+    endDate: string,
   ) => Record<string, PlannedWorkout[]>;
 };
 
@@ -89,16 +93,37 @@ function groupByDate(items: PlannedWorkout[]) {
   }
   return grouped;
 }
-
 function expandPlannedWorkoutsById(
   byId: Record<string, PlannedWorkout>,
   startDate: string,
-  endDate: string
+  endDate: string,
 ): PlannedWorkout[] {
   const out: PlannedWorkout[] = [];
-  const parents = Object.values(byId);
 
-  // ---------- date helpers (UTC, no DST bugs) ----------
+  const all = Object.values(byId);
+
+  // -----------------------------
+  // 1. Split into:
+  //    - recurring parents
+  //    - overrides
+  //    - normal one-offs
+  // -----------------------------
+  const recurringParents = all.filter(pw => pw.is_recurring && !pw.is_override);
+
+  const overrides = all.filter(pw => pw.is_override);
+
+  const oneOffs = all.filter(pw => !pw.is_recurring && !pw.is_override);
+
+  // Build override suppression map:
+  // key = `${parentId}:${original_date}`
+  const suppressed = new Set<string>();
+  for (const ov of overrides) {
+    if (ov.recurrence_parent_id && ov.original_date) {
+      suppressed.add(`${ov.recurrence_parent_id}:${ov.original_date}`);
+    }
+  }
+
+  // ---------- date helpers ----------
   const addDays = (d: string, days: number) => {
     const [y, m, dd] = d.split("-").map(Number);
     const t = Date.UTC(y, m - 1, dd);
@@ -109,23 +134,17 @@ function expandPlannedWorkoutsById(
     return `${yy}-${mm}-${ddd}`;
   };
 
-  // Python-style weekday: 0=Mon .. 6=Sun
   const weekdayPy = (d: string) => {
     const [y, m, dd] = d.split("-").map(Number);
     const js = new Date(Date.UTC(y, m - 1, dd)).getUTCDay(); // 0=Sun..6=Sat
-    return (js + 6) % 7;
+    return (js + 6) % 7; // 0=Mon..6=Sun
   };
-  // ----------------------------------------------------
+  // ----------------------------------
 
-  for (const pw of parents) {
-    // ---- NON-RECURRING ----
-    if (!pw.is_recurring) {
-      if (pw.date >= startDate && pw.date <= endDate) {
-        out.push(pw);
-      }
-      continue;
-    }
-
+  // -----------------------------
+  // 2. Expand recurring parents
+  // -----------------------------
+  for (const pw of recurringParents) {
     const parentId = pw.id;
     const recurrenceType = pw.recurrence_type;
     const recurrenceDays = pw.recurrence_days ?? [];
@@ -135,62 +154,73 @@ function expandPlannedWorkoutsById(
         ? pw.recurrence_end_date
         : endDate;
 
-    // generation cursor starts at max(rangeStart, pw.date)
     let cur = startDate;
 
-    // ---- DAILY ----
+    const pushInstance = (date: string) => {
+      const suppressionKey = `${parentId}:${date}`;
+      if (suppressed.has(suppressionKey)) {
+        // skip — overridden
+        return;
+      }
+
+      out.push({
+        ...pw,
+        id: `${parentId}:${date}`,
+        date,
+        recurrence_parent_id: parentId,
+        status: "planned",
+        workout_session_id: undefined,
+      });
+    };
+
     if (recurrenceType === "daily") {
       while (cur <= until) {
-        out.push({
-          ...pw,
-          id: `${parentId}:${cur}`,
-          date: cur,
-          recurrence_parent_id: parentId,
-          status: "planned",
-          workout_session_id: undefined,
-        });
+        if (cur >= pw.date) pushInstance(cur);
         cur = addDays(cur, 1);
       }
       continue;
     }
 
-    // ---- WEEKLY ----
     if (recurrenceType === "weekly") {
       if (!recurrenceDays.length) continue;
 
       while (cur <= until) {
         if (cur >= pw.date && recurrenceDays.includes(weekdayPy(cur))) {
-          out.push({
-            ...pw,
-            id: `${parentId}:${cur}`,
-            date: cur,
-            recurrence_parent_id: parentId,
-            status: "planned",
-          });
+          pushInstance(cur);
         }
         cur = addDays(cur, 1);
       }
       continue;
     }
 
-    // ---- MONTHLY (same day-of-month) ----
     if (recurrenceType === "monthly") {
       const originalDay = Number(pw.date.split("-")[2]);
 
       while (cur <= until) {
         if (cur >= pw.date && Number(cur.split("-")[2]) === originalDay) {
-          out.push({
-            ...pw,
-            id: `${parentId}:${cur}`,
-            date: cur,
-            recurrence_parent_id: parentId,
-            status: "planned",
-            workout_session_id: undefined,
-          });
+          pushInstance(cur);
         }
         cur = addDays(cur, 1);
       }
       continue;
+    }
+  }
+
+  // -----------------------------
+  // 3. Inject override rows
+  // -----------------------------
+  for (const ov of overrides) {
+    if (ov.date >= startDate && ov.date <= endDate) {
+      out.push(ov);
+    }
+  }
+
+  // -----------------------------
+  // 4. Inject normal one-offs
+  // -----------------------------
+  for (const pw of oneOffs) {
+    if (pw.date >= startDate && pw.date <= endDate) {
+      out.push(pw);
     }
   }
 
@@ -209,7 +239,6 @@ function sortForDate(items: PlannedWorkout[]) {
 
 export const usePlannedWorkoutsStoreInternal = create<PlannedWorkoutsStore>(
   (set, get) => {
-  
     return {
       byId: {},
       loading: false,
@@ -236,7 +265,7 @@ export const usePlannedWorkoutsStoreInternal = create<PlannedWorkoutsStore>(
         set({ loading: true });
         try {
           const res = await api.get(
-            `/planned-workouts?start_date=${startDate}&end_date=${endDate}`
+            `/planned-workouts?start_date=${startDate}&end_date=${endDate}`,
           );
           const items = (res.data ?? []) as PlannedWorkout[];
           get().upsertMany(items);
@@ -302,7 +331,7 @@ export const usePlannedWorkoutsStoreInternal = create<PlannedWorkoutsStore>(
           set({ loading: true });
           try {
             const res = await api.get(
-              `/planned-workouts?start_date=${startDate}&end_date=${endDate}`
+              `/planned-workouts?start_date=${startDate}&end_date=${endDate}`,
             );
             const items = (res.data ?? []) as PlannedWorkout[];
             get().upsertMany(items);
@@ -391,7 +420,7 @@ export const usePlannedWorkoutsStoreInternal = create<PlannedWorkoutsStore>(
         return grouped;
       },
     };
-  }
+  },
 );
 
 type Options = {
@@ -462,7 +491,7 @@ export function usePlannedWorkouts(opts?: Options) {
       arr = arr.filter(pw => pw.date === opts.date);
     } else if (opts?.startDate && opts?.endDate) {
       arr = arr.filter(
-        pw => pw.date >= opts.startDate! && pw.date <= opts.endDate!
+        pw => pw.date >= opts.startDate! && pw.date <= opts.endDate!,
       );
     }
 

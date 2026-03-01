@@ -436,7 +436,9 @@ async def start_ai_chat(payload: dict, user_id=Depends(get_current_user)):
 
     # run in background (DO NOT await)
     asyncio.create_task(
-        ai_runner.run_chat(job_id=job_id, user_id=user_id, input_payload=payload)
+        ai_runner.run_chat(
+            job_id=job_id, user_id=user_id, input_payload=payload, db=get_db(user_id)
+        )
     )
     return {"job_id": str(job_id), "conversation_id": conversation_id}
 

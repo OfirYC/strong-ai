@@ -69,7 +69,6 @@ async def chat_completion(
         reasoning_effort=reasoning,  # Use "none" to disable reasoning
     )
 
-    print("[OPENAI_CLIENT]: Response:", response)
 
     # Defensive parsing
     if not response.choices:

@@ -17,10 +17,16 @@ MAX_TOOL_ROUNDS = 6
 
 class AIRunner:
     def __init__(self, db, ws_manager):
-        self.db = db
+        effective_db = db
         self.ws_manager = ws_manager
 
-    async def run_chat(self, job_id: str, user_id: str, input_payload: dict) -> str:
+    async def run_chat(
+        self,
+        job_id: str,
+        user_id: str,
+        input_payload: dict,
+        db=None,  # optional override
+    ) -> str:
         """
         Expects:
           - job_id: already created by the API layer
@@ -31,7 +37,8 @@ class AIRunner:
           - job_id
         """
 
-        emitter = AIEmitter(self.db, self.ws_manager)
+        effective_db = db or self.db
+        emitter = AIEmitter(effective_db, self.ws_manager)
 
         try:
             conversation_id = input_payload.get("conversation_id")
@@ -41,12 +48,14 @@ class AIRunner:
             # if your frontend includes system/tool roles, keep them as-is;
             # we prepend our own system message below.
 
-            user_doc = await self.db.users.find_one({"_id": ObjectId(user_id)})
+            user_doc = await effective_db.users.find_one({"_id": ObjectId(user_id)})
             user_context = {"profile": user_doc or {}}
             system_prompt = build_system_prompt(user_context)
 
             openai_messages = [{"role": "system", "content": system_prompt}]
-            history = await list_messages(self.db, user_id, conversation_id, limit=200)
+            history = await list_messages(
+                effective_db, user_id, conversation_id, limit=200
+            )
             openai_messages.extend(history)
 
             print(
@@ -91,13 +100,13 @@ class AIRunner:
                 # no tools -> final assistant message
                 if not tool_calls_buffer:
                     await add_message(
-                        self.db,
+                        effective_db,
                         user_id=user_id,
                         conversation_id=conversation_id,
                         role="assistant",
                         content=assistant_content,
                     )
-                    await touch_conversation(self.db, conversation_id)
+                    await touch_conversation(effective_db, conversation_id)
                     await emitter.emit(
                         job_id, "assistant_message", {"content": assistant_content}
                     )
@@ -123,7 +132,7 @@ class AIRunner:
                 openai_messages.append(assistant_tool_message)
 
                 await add_message(
-                    self.db,
+                    effective_db,
                     user_id=user_id,
                     conversation_id=conversation_id,
                     role="assistant",
@@ -161,10 +170,10 @@ class AIRunner:
                     print(
                         f"{datetime.utcnow().isoformat()} - Finished executing tool {tool_name} in job {job_id}"
                     )
-                
+
                     try:
                         tool_result = await execute_tool(
-                            tool_name, parsed_args, self.db, user_id
+                            tool_name, parsed_args, effective_db, user_id
                         )
                         await emitter.emit(
                             job_id,
@@ -198,7 +207,7 @@ class AIRunner:
                     )
 
                     await add_message(
-                        self.db,
+                        effective_db,
                         user_id=user_id,
                         conversation_id=conversation_id,
                         role="tool",
@@ -206,21 +215,21 @@ class AIRunner:
                         tool_call_id=tc["id"],
                         tool_name=tool_name,
                     )
-                    await touch_conversation(self.db, conversation_id)
+                    await touch_conversation(effective_db, conversation_id)
 
             await emitter.emit(job_id, "done", {})
-            await mark_completed(self.db, job_id)
+            await mark_completed(effective_db, job_id)
 
         except Exception as e:
             await emitter.emit(job_id, "error", {"message": str(e)})
             # add an error message to the conversation
             await add_message(
-                self.db,
+                effective_db,
                 user_id=user_id,
                 conversation_id=input_payload.get("conversation_id"),
                 role="assistant",
                 content=f"Error: {str(e)}",
             )
-            await mark_failed(self.db, job_id)
+            await mark_failed(effective_db, job_id)
 
         return job_id

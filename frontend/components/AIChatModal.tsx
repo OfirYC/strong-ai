@@ -138,6 +138,10 @@ const TOOL_META: Record<string, ToolMeta> = {
     label: "Removing scheduled workout...",
     done: "Removed scheduled workout",
   },
+  schedule__patch_occurrence: {
+    label: "Patching scheduled workout...",
+    done: "Patched scheduled workout",
+  },
 
   workout_history__get_all: {
     label: "Analyzing recent workouts...",
@@ -1463,6 +1467,7 @@ const styles = StyleSheet.create({
     paddingRight: 10, // space before the button
     // Android only, harmless on iOS:
     textAlignVertical: "top",
+    maxHeight: 120, // 👈 critical: prevents infinite growth
   },
 
   sendButton: {

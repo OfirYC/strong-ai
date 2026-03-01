@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, model_validator
 from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
 from bson import ObjectId
@@ -400,6 +400,21 @@ class PlannedWorkout(BaseModel):
     recurrence_parent_id: Optional[str] = (
         None  # Links instance to parent recurring workout
     )
+
+    # Overriding recurring instances as exceptions
+    is_override: bool = False
+    original_date: Optional[str] = None  # required if is_override=True
+
+    @model_validator(mode="after")
+    def validate_override_structure(self):
+        if self.is_override:
+            if self.is_recurring:
+                raise ValueError("Override cannot be recurring")
+            if not self.recurrence_parent_id:
+                raise ValueError("Override must have recurrence_parent_id")
+            if not self.original_date:
+                raise ValueError("Override must have original_date")
+        return self
 
 
 class Conversation(BaseModel):
