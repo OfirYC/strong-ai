@@ -717,13 +717,10 @@ export default function ActiveWorkoutSheet({
               </View>
             ) : (
               <View style={styles.expandedTopBar}>
-                <View style={{ flex: 1 }} />
+                <View style={styles.topBarLeft} />
                 <Animated.View
                   pointerEvents="none"
-                  style={[
-                    styles.topBarTimerOverlay,
-                    { opacity: timerTopOpacity },
-                  ]}
+                  style={[styles.topBarCenter, { opacity: timerTopOpacity }]}
                 >
                   <WorkoutElapsedTimerText
                     startTime={workoutStartTime}
@@ -734,21 +731,23 @@ export default function ActiveWorkoutSheet({
                   />
                 </Animated.View>
 
-                <TouchableOpacity
-                  style={styles.finishButton}
-                  onPress={handleSaveAndFinish}
-                  disabled={saving || exercises.length === 0}
-                >
-                  <Text
-                    style={[
-                      styles.finishButtonText,
-                      (saving || exercises.length === 0) &&
-                        styles.finishButtonTextDisabled,
-                    ]}
+                <View style={styles.topBarRight}>
+                  <TouchableOpacity
+                    style={styles.finishButton}
+                    onPress={handleSaveAndFinish}
+                    disabled={saving || exercises.length === 0}
                   >
-                    {saving ? "Saving..." : "Finish"}
-                  </Text>
-                </TouchableOpacity>
+                    <Text
+                      style={[
+                        styles.finishButtonText,
+                        (saving || exercises.length === 0) &&
+                          styles.finishButtonTextDisabled,
+                      ]}
+                    >
+                      {saving ? "Saving..." : "Finish"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             )}
           </TouchableOpacity>
@@ -1040,8 +1039,24 @@ const styles = StyleSheet.create({
   expandedTopBar: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 0,
-    paddingVertical: 0,
+    paddingHorizontal: 0, // ← important
+    height: 44, // ← lock row height
+  },
+
+  topBarLeft: {
+    flex: 1,
+  },
+
+  topBarCenter: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  topBarRight: {
+    marginLeft: "auto", // ensures right alignment
   },
   topBarTimerOverlay: {
     position: "absolute",
