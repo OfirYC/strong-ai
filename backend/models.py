@@ -600,7 +600,7 @@ class ConversationListResponse(BaseModel):
 class Message(BaseModel):
     id: Optional[str] = None
     conversation_id: str
-    role: Literal["user", "assistant"]
+    role: Literal["user", "assistant", "tool"]
     content: str
     created_at: datetime
 

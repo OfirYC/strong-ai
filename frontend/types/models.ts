@@ -729,7 +729,7 @@ export interface components {
              * Role
              * @enum {string}
              */
-            role: "user" | "assistant";
+            role: "user" | "assistant" | "tool";
             /** Content */
             content: string;
             /**

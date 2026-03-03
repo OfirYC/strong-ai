@@ -8,7 +8,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from services.ai.store import (
     create_conversation,
     add_message,
-    list_messages,
+    fetch_messages_formatted,
     touch_conversation,
 )
 from services.ai.chat_name import rename_conversation
@@ -103,7 +103,6 @@ from auth import (
     create_access_token,
     decode_access_token,
 )
-from seed_exercises_new import EXERCISES
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -458,7 +457,7 @@ async def start_ai_chat(payload: dict, user_id=Depends(get_current_user)):
     "/ai/conversations/{conversation_id}/messages", response_model=MessagesResponse
 )
 async def get_messages(conversation_id: str, user_id: str = Depends(get_current_user)):
-    msgs = await list_messages(db, user_id, conversation_id, limit=500)
+    msgs = await fetch_messages_formatted(db, user_id, conversation_id, limit=500)
     return MessagesResponse(messages=msgs)
 
 

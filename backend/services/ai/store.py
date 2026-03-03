@@ -72,3 +72,34 @@ async def list_messages(db, user_id: str, conversation_id: str, limit: int = 200
             d["tool_call_id"] = m["tool_call_id"]
         out.append(d)
     return out
+
+
+def format_messages_for_api(msgs):
+    return [
+        {
+            "id": str(m["_id"]),
+            "conversation_id": str(m["conversation_id"]),
+            "role": m["role"],
+            "content": m.get("content"),
+            "tool_calls": m.get("tool_calls"),
+            "tool_call_id": m.get("tool_call_id"),
+            "created_at": m["created_at"],
+        }
+        for m in msgs
+    ]
+
+
+async def fetch_messages_formatted(
+    db, user_id: str, conversation_id: str, limit: int = 200
+):
+    cur = (
+        db.chat_messages.find(
+            {
+                "conversation_id": ObjectId(conversation_id),
+                "user_id": ObjectId(user_id),
+            }
+        )
+        .sort("created_at", 1)
+        .limit(limit)
+    )
+    return format_messages_for_api(await cur.to_list(length=limit))
