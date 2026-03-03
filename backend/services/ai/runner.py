@@ -70,6 +70,9 @@ class AIRunner:
                 tool_calls_buffer = {}  # idx -> {id,name,arguments}
 
                 async for chunk in stream:
+                    if not chunk.choices:
+                        continue  # skip empty or control chunks
+
                     choice = chunk.choices[0]
                     delta = choice.delta
 
@@ -221,6 +224,12 @@ class AIRunner:
             await mark_completed(effective_db, job_id)
 
         except Exception as e:
+            import traceback
+
+            print("\n\n===== AI RUNNER CRASH =====")
+            traceback.print_exc()
+            print("===== END TRACE =====\n\n")
+
             await emitter.emit(job_id, "error", {"message": str(e)})
             # add an error message to the conversation
             await add_message(
