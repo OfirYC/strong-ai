@@ -1,15 +1,6 @@
 import { create } from "zustand";
 import api from "../utils/api";
-
-export interface Conversation {
-  id: string;
-  user_id: string;
-  title: string;
-  created_at: string;
-  updated_at: string;
-  last_message_at?: string;
-  active_job_id?: string | null;
-}
+import { Conversation } from "../types/gen";
 
 interface ConversationsState {
   conversations: Conversation[];

@@ -1,33 +1,31 @@
-import React, { useState, useEffect, useMemo } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { format, parseISO } from "date-fns";
-import { useRouter, useLocalSearchParams } from "expo-router";
-import { useWorkout, useWorkouts } from "../store/workoutsStore";
-import { useExercises } from "../store/exercisesStore";
-import { useTemplatesStoreInternal } from "../store/templatesStore";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useEffect, useMemo, useState } from "react";
 import {
-  WorkoutSummary,
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import RoutineDetailModal from "../components/RoutineDetailModal";
+import { useExercises } from "../store/exercisesStore";
+import { usePRs } from "../store/prsStore";
+import { useWorkout } from "../store/workoutsStore";
+import {
+  ExerciseKind,
   WorkoutSession,
   WorkoutSet,
+  WorkoutSummary,
   WorkoutTemplate,
   formatDuration,
   formatWorkoutDuration,
-  formatDurationMinutes,
   isDurationBased,
   usesWeight,
-  ExerciseKind,
 } from "../types";
-import RoutineDetailModal from "../components/RoutineDetailModal";
-import { usePRs } from "../store/prsStore";
 
 interface ExerciseWithSets {
   exercise_id: string;
@@ -36,7 +34,7 @@ interface ExerciseWithSets {
   sets: WorkoutSet[];
   estimated_1rm?: number;
 }
-function safeParseISO(s?: string) {
+function safeParseISO(s?: string | null) {
   if (!s) return null;
   try {
     return parseISO(s);
@@ -178,7 +176,7 @@ function computeExercisesWithSets(params: {
       name: sumEx?.name || "Unknown Exercise",
       exercise_kind: (sumEx?.exercise_kind || "Barbell") as ExerciseKind,
       sets: ex.sets,
-      estimated_1rm: sumEx?.estimated_1rm,
+      estimated_1rm: sumEx?.estimated_1rm ?? undefined,
     };
   });
 }
@@ -188,7 +186,11 @@ export default function WorkoutDetailScreen() {
   const { workoutId } = useLocalSearchParams<{ workoutId: string }>();
 
   const { workout, loading: workoutLoading } = useWorkout(workoutId);
-  const { byId: prsById, getByWorkoutId: getPRsByWorkoutId, loading: prsLoading } = usePRs();
+  const {
+    byId: prsById,
+    getByWorkoutId: getPRsByWorkoutId,
+    loading: prsLoading,
+  } = usePRs();
   const { byId: exercisesById, getAll: getAllExercises } = useExercises();
 
   useEffect(() => {
@@ -206,7 +208,7 @@ export default function WorkoutDetailScreen() {
         Object.values(exercisesById).map(ex => [
           ex.id,
           { name: ex.name, exercise_kind: ex.exercise_kind },
-        ])
+        ]),
       ),
     });
   }, [workout, exercisesById, prsById]);
@@ -274,7 +276,7 @@ export default function WorkoutDetailScreen() {
   const renderSetValue = (
     set: WorkoutSet,
     kind: ExerciseKind,
-    index: number
+    index: number,
   ) => {
     const isDuration = isDurationBased(kind);
     const hasWeight = usesWeight(kind);

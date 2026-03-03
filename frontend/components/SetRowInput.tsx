@@ -48,13 +48,13 @@ const SET_TYPE_DESCRIPTIONS: Record<SetType, string> = {
 
 const MS_ENABLED_EXERCISE_KINDS: ExerciseKind[] = ["Cardio", "Weighted Cardio"];
 export interface SetData {
-  weight?: number;
-  reps?: number;
-  duration?: number; // seconds
-  distance?: number; // km
+  weight?: number | null;
+  reps?: number | null;
+  duration?: number | null; // seconds
+  distance?: number | null; // km
   set_type?: SetType;
-  completed?: boolean;
-  rest_timer: number | null; // seconds to rest after completing the set
+  completed?: boolean | null;
+  rest_timer?: number | null; // seconds to rest after completing the set
 }
 
 interface SetRowInputProps {

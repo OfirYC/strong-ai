@@ -1,7 +1,8 @@
-from pydantic import BaseModel, Field, EmailStr, model_validator
+from pydantic import BaseModel, Field, EmailStr, model_validator, ConfigDict
 from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
 from bson import ObjectId
+from enum import Enum
 
 
 class PyObjectId(ObjectId):
@@ -20,7 +21,116 @@ class PyObjectId(ObjectId):
         field_schema.update(type="string")
 
 
-# User Models
+# ============= ENUMS =============
+
+
+class ExerciseKind(str, Enum):
+    BARBELL = "Barbell"
+    DUMBBELL = "Dumbbell"
+    MACHINE_OTHER = "Machine/Other"
+    WEIGHTED_BODYWEIGHT = "Weighted Bodyweight"
+    ASSISTED_BODYWEIGHT = "Assisted Bodyweight"
+    REPS_ONLY = "Reps Only"
+    DURATION = "Duration"
+    CARDIO = "Cardio"
+    WEIGHTED_CARDIO = "Weighted Cardio"
+    WEIGHTED_DURATION = "Weighted Duration"
+    BAND = "Band"
+    CABLE = "Cable"
+    KETTLEBELL = "Kettlebell"
+    EMOM = "EMOM (Every Minute On The Minute)"
+    ETOT = "ETOT (Every Thirty Seconds on Thirty Seconds)"
+
+
+class ExerciseCategory(str, Enum):
+    STRENGTH = "Strength"
+    CARDIO = "Cardio"
+    MOBILITY = "Mobility"
+    PLYOMETRIC = "Plyometric"
+    ISOMETRIC = "Isometric Strength"
+    STABILITY = "Stability"
+    RECOVERY = "Recovery"
+    CONTROL = "Control"
+
+
+class BodyPart(str, Enum):
+    CHEST = "Chest"
+    BACK = "Back"
+    SHOULDERS = "Shoulders"
+    BICEPS = "Biceps"
+    TRICEPS = "Triceps"
+    FOREARMS = "Forearms"
+    CORE = "Core"
+    ABS = "Abs"
+    OBLIQUES = "Obliques"
+    LEGS = "Legs"
+    QUADS = "Quads"
+    HAMSTRINGS = "Hamstrings"
+    GLUTES = "Glutes"
+    GLUTE_MEDIUS = "Glute Medius"
+    CALVES = "Calves"
+    HIPS = "Hips"
+    TRAPS = "Traps"
+    FULL_BODY = "Full Body"
+    FEET = "Feet"
+    ANKLES = "Ankles"
+    SHINS = "Shins"
+    OTHER = "Other"
+
+
+class SetType(str, Enum):
+    NORMAL = "normal"
+    WARMUP = "warmup"
+    COOLDOWN = "cooldown"
+    FAILURE = "failure"
+
+
+class PlannedWorkoutStatus(str, Enum):
+    PLANNED = "planned"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    SKIPPED = "skipped"
+
+
+class PlannedWorkoutType(str, Enum):
+    STRENGTH = "strength"
+    RUN = "run"
+    MOBILITY = "mobility"
+    CARDIO = "cardio"
+    HIIT = "hiit"
+    OTHER = "other"
+
+
+class RecurrenceType(str, Enum):
+    DAILY = "daily"
+    WEEKLY = "weekly"
+    MONTHLY = "monthly"
+
+
+class PRType(str, Enum):
+    ONE_RM = "1rm"
+    WEIGHT = "weight"
+    REPS = "reps"
+    VOLUME = "volume"
+    DURATION = "duration"
+
+
+class TrainingAge(str, Enum):
+    NEW = "new"
+    ONE_TO_TWO = "1-2y"
+    TWO_TO_FIVE = "2-5y"
+    FIVE_PLUS = "5y+"
+
+
+class Sex(str, Enum):
+    MALE = "male"
+    FEMALE = "female"
+    OTHER = "other"
+
+
+# ============= USER MODELS =============
+
+
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
@@ -34,51 +144,34 @@ class UserLogin(BaseModel):
 class TrainingPhase(BaseModel):
     """A phase in the user's training history"""
 
-    label: str  # e.g. "Room lifting phase"
-    description: (
-        str  # e.g. "Dec 2020–2022: lifting in room, calisthenics, building base"
-    )
+    label: str
+    description: str
 
 
 class ProfileInsights(BaseModel):
     """AI-generated insights from user's freeform profile text"""
 
-    injury_tags: List[str] = (
-        []
-    )  # e.g. ["shin stress fractures", "posterior tibial irritation"]
-    current_issues: List[str] = (
-        []
-    )  # e.g. ["posterior tib discomfort", "hip flexor tightness"]
-    strength_tags: List[str] = []  # e.g. ["high work capacity", "EMOM resilience"]
-    weak_point_tags: List[str] = (
-        []
-    )  # e.g. ["tends to overload shins", "barefoot overuse risk"]
+    injury_tags: List[str] = []
+    current_issues: List[str] = []
+    strength_tags: List[str] = []
+    weak_point_tags: List[str] = []
     training_phases: List[TrainingPhase] = []
-    psych_profile: Optional[str] = None  # e.g. "high grit, tends to overdo volume"
+    psych_profile: Optional[str] = None
 
 
 class UserProfile(BaseModel):
     """User profile information"""
 
-    # Basic info
-    sex: Optional[str] = None  # "male", "female", "other", null
+    sex: Optional[Sex] = None
     date_of_birth: Optional[datetime] = None
     height_cm: Optional[float] = None
     weight_kg: Optional[float] = None
-
-    # Training context
-    training_age: Optional[str] = None  # "new", "1-2y", "2-5y", "5y+"
+    training_age: Optional[TrainingAge] = None
     goals: Optional[str] = None
-
-    # Physiology / constraints
     injury_history: Optional[str] = None
     weaknesses: Optional[str] = None
     strengths: Optional[str] = None
-
-    # Background
     background_story: Optional[str] = None
-
-    # AI-generated insights
     insights: Optional[ProfileInsights] = None
 
 
@@ -87,13 +180,17 @@ class User(BaseModel):
     email: EmailStr
     password_hash: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
-
-    # Profile fields
     profile: UserProfile = Field(default_factory=UserProfile)
 
     class Config:
         populate_by_name = True
         json_encoders = {ObjectId: str}
+
+
+class User(BaseModel):
+    id: str
+    email: str
+    token: str
 
 
 class UserResponse(BaseModel):
@@ -105,11 +202,11 @@ class UserResponse(BaseModel):
 class ProfileUpdate(BaseModel):
     """Update user profile"""
 
-    sex: Optional[str] = None
+    sex: Optional[Sex] = None
     date_of_birth: Optional[datetime] = None
     height_cm: Optional[float] = None
     weight_kg: Optional[float] = None
-    training_age: Optional[str] = None
+    training_age: Optional[TrainingAge] = None
     goals: Optional[str] = None
     injury_history: Optional[str] = None
     weaknesses: Optional[str] = None
@@ -128,29 +225,31 @@ class UserContext(BaseModel):
     insights: Optional[ProfileInsights] = None
 
 
-# Exercise Models
+# ============= EXERCISE MODELS =============
+
+
 class ExerciseCreate(BaseModel):
     name: str
-    exercise_kind: str  # Barbell, Dumbbell, Machine/Other, Weighted Bodyweight, Assisted Bodyweight, Reps Only, Cardio, Duration
-    primary_body_parts: List[str]
-    secondary_body_parts: Optional[List[str]] = []
-    category: Optional[str] = "Strength"
+    exercise_kind: ExerciseKind
+    primary_body_parts: List[BodyPart]
+    secondary_body_parts: List[BodyPart] = []
+    category: ExerciseCategory = ExerciseCategory.STRENGTH
     is_custom: bool = False
     instructions: Optional[str] = None
-    image: Optional[str] = None  # URL to exercise image
+    image: Optional[str] = None
 
 
 class Exercise(BaseModel):
     id: Optional[str] = Field(default=None)
     name: str
-    exercise_kind: str
-    primary_body_parts: List[str]
-    secondary_body_parts: Optional[List[str]] = []
-    category: Optional[str] = "Strength"
+    exercise_kind: ExerciseKind
+    primary_body_parts: List[BodyPart]
+    secondary_body_parts: List[BodyPart] = []
+    category: ExerciseCategory = ExerciseCategory.STRENGTH
     is_custom: bool = False
     user_id: Optional[str] = None
     instructions: Optional[str] = None
-    image: Optional[str] = None  # URL to exercise image
+    image: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     class Config:
@@ -163,22 +262,26 @@ class ExerciseUpdate(BaseModel):
     image: Optional[str] = None
 
 
-# Workout Template Models
+# ============= WORKOUT TEMPLATE MODELS =============
+
+
 class TemplateSetItem(BaseModel):
     """A single set in a template exercise with default values"""
 
     weight: Optional[float] = None
     reps: Optional[int] = None
-    duration: Optional[float] = None  # in seconds (supports decimals for centiseconds)
-    distance: Optional[float] = None  # in km
-    set_type: Literal["normal", "warmup", "cooldown", "failure"] = "normal"
+    duration: Optional[float] = None
+    distance: Optional[float] = None
+    set_type: SetType = SetType.NORMAL
     rest_timer: Optional[int] = None
 
 
 class TemplateExerciseItem(BaseModel):
+    model_config = ConfigDict(json_schema_mode_override="serialization")
+
     exercise_id: str
     order: int
-    sets: List[TemplateSetItem] = []  # Actual sets with values
+    sets: List[TemplateSetItem] = []
     notes: Optional[str] = None
     # Legacy fields for backward compatibility
     default_sets: int = 3
@@ -208,25 +311,19 @@ class WorkoutTemplate(BaseModel):
         json_encoders = {ObjectId: str}
 
 
+# ============= WORKOUT SESSION MODELS =============
+
+
 class WorkoutSetItem(BaseModel):
-    # Set type
-    set_type: Literal["normal", "warmup", "cooldown", "failure"] = "normal"
+    set_type: SetType = SetType.NORMAL
     completed_at: Optional[datetime] = None
     completed: Optional[bool] = False
-
-    # Weight + Reps
     reps: Optional[int] = None
     weight: Optional[float] = None
-
-    # Cardio fields
     distance: Optional[float] = None
     duration: Optional[float] = None
     calories: Optional[int] = None
-
-    # NEW – strict rest timer
     rest_timer: Optional[int] = None
-
-    # PR flags
     is_volume_pr: bool = False
     is_weight_pr: bool = False
     is_reps_pr: bool = False
@@ -234,6 +331,8 @@ class WorkoutSetItem(BaseModel):
 
 
 class WorkoutExerciseItem(BaseModel):
+    model_config = ConfigDict(json_schema_mode_override="serialization")
+
     exercise_id: str
     order: int
     sets: List[WorkoutSetItem] = []
@@ -242,14 +341,10 @@ class WorkoutExerciseItem(BaseModel):
 
 class WorkoutSessionCreate(BaseModel):
     template_id: Optional[str] = None
-    planned_workout_id: Optional[str] = (
-        None  # Link to planned workout if starting from schedule
-    )
+    planned_workout_id: Optional[str] = None
     notes: Optional[str] = None
-    name: Optional[str] = None  # Allow custom workout name
-    exercises: Optional[List[WorkoutExerciseItem]] = (
-        []
-    )  # custom exercises if no template
+    name: Optional[str] = None
+    exercises: Optional[List[WorkoutExerciseItem]] = None
 
 
 class WorkoutSessionUpdate(BaseModel):
@@ -257,17 +352,17 @@ class WorkoutSessionUpdate(BaseModel):
     notes: Optional[str] = None
     ended_at: Optional[datetime] = None
     name: Optional[str] = None
-    skipped: Optional[bool] = False
+    skipped: Optional[bool] = Field(
+        default=None, description="Whether the workout was skipped"
+    )
 
 
 class WorkoutSession(BaseModel):
     id: Optional[str] = Field(default=None)
     user_id: str
     template_id: Optional[str] = None
-    planned_workout_id: Optional[str] = (
-        None  # Link to planned workout if started from schedule
-    )
-    name: Optional[str] = None  # Workout name
+    planned_workout_id: Optional[str] = None
+    name: Optional[str] = None
     started_at: Optional[datetime] = Field(default_factory=datetime.utcnow)
     ended_at: Optional[datetime] = None
     skipped: bool = False
@@ -280,13 +375,15 @@ class WorkoutSession(BaseModel):
         json_encoders = {ObjectId: str}
 
 
-# Workout Summary DTOs (for history view)
+# ============= WORKOUT SUMMARY DTOs =============
+
+
 class WorkoutExerciseSummary(BaseModel):
     exercise_id: str
     name: str
-    exercise_kind: str
+    exercise_kind: ExerciseKind
     set_count: int
-    best_set_display: str  # e.g. "60kg × 10" or "0:30"
+    best_set_display: str
     estimated_1rm: Optional[float] = None
 
 
@@ -304,17 +401,53 @@ class WorkoutSummary(BaseModel):
     template_id: Optional[str] = None
 
 
-# PR Record Models
+class WorkoutCountResponse(BaseModel):
+    count: int
+
+
+# ============= EXERCISE HISTORY DTOs =============
+
+
+class ExerciseHistorySet(BaseModel):
+    reps: Optional[int] = None
+    weight: Optional[float] = None
+    duration: Optional[float] = None
+    distance: Optional[float] = None
+    set_type: SetType = SetType.NORMAL
+    rest_timer: Optional[int] = None
+
+
+class ExerciseHistoryEntry(BaseModel):
+    workout_id: str
+    workout_name: str
+    date: str = ""
+    sets: List[ExerciseHistorySet] = []
+
+
+class ExerciseHistoryResponse(BaseModel):
+    exercise_id: str
+    exercise_kind: ExerciseKind
+    window_days: int
+    workouts_scanned: int
+    history: List[ExerciseHistoryEntry]
+    max_weight: Optional[float] = None
+    max_reps: Optional[int] = None
+    best_e1rm: Optional[float] = None
+
+
+# ============= PR RECORD MODELS =============
+
+
 class PRRecord(BaseModel):
     id: Optional[str] = Field(default=None)
     user_id: str
     exercise_id: str
     workout_id: Optional[str] = None
-    pr_type: str = "1rm"  # "1rm", "weight", "reps", "volume", "duration"
+    pr_type: PRType = PRType.ONE_RM
     weight: Optional[float] = None
     reps: Optional[int] = None
-    duration: Optional[int] = None  # in seconds
-    volume: Optional[float] = None  # weight * reps
+    duration: Optional[int] = None
+    volume: Optional[float] = None
     estimated_1rm: Optional[float] = None
     date: datetime = Field(default_factory=datetime.utcnow)
 
@@ -323,30 +456,23 @@ class PRRecord(BaseModel):
         json_encoders = {ObjectId: str}
 
 
-# Planned Workout Models
+# ============= PLANNED WORKOUT MODELS =============
+
+
 class PlannedWorkoutCreate(BaseModel):
     """Create a planned workout"""
 
     date: str  # YYYY-MM-DD format
     name: str
     template_id: Optional[str] = None
-    type: Optional[str] = None  # e.g. "strength", "run", "mobility"
+    type: Optional[PlannedWorkoutType] = None
     notes: Optional[str] = None
     order: int = 0
-
-    # one-off inline prescription (same structure as template.exercises)
-    # When set, this planned workout stores exercises directly instead of (or in addition to) template_id.
     inline_exercises: Optional[List[TemplateExerciseItem]] = None
-
-    # Recurring schedule fields
     is_recurring: bool = False
-    recurrence_type: Optional[str] = None  # "daily", "weekly", "monthly"
-    recurrence_days: Optional[List[int]] = (
-        None  # For weekly: [0=Monday, 1=Tuesday, ..., 6=Sunday]
-    )
-    recurrence_end_date: Optional[str] = (
-        None  # YYYY-MM-DD format or None for indefiniteite
-    )
+    recurrence_type: Optional[RecurrenceType] = None
+    recurrence_days: Optional[List[int]] = None
+    recurrence_end_date: Optional[str] = None
 
 
 class PlannedWorkoutUpdate(BaseModel):
@@ -355,17 +481,13 @@ class PlannedWorkoutUpdate(BaseModel):
     date: Optional[str] = None
     name: Optional[str] = None
     template_id: Optional[str] = None
-    type: Optional[str] = None
+    type: Optional[PlannedWorkoutType] = None
     notes: Optional[str] = None
     order: Optional[int] = None
-    status: Optional[str] = None  # "planned", "in_progress", "completed", "skipped"
-
-    # NEW: allow updating inline_exercises directly (for admin / REST usage)
+    status: Optional[PlannedWorkoutStatus] = None
     inline_exercises: Optional[List[TemplateExerciseItem]] = None
-
-    # Recurring fields (optional updates)
     is_recurring: Optional[bool] = None
-    recurrence_type: Optional[str] = None
+    recurrence_type: Optional[RecurrenceType] = None
     recurrence_days: Optional[List[int]] = None
     recurrence_end_date: Optional[str] = None
 
@@ -378,32 +500,20 @@ class PlannedWorkout(BaseModel):
     date: str  # YYYY-MM-DD format
     name: str
     template_id: Optional[str] = None
-
-    # NEW: one-time embedded exercise prescription (what ai_chat.py writes as 'inline_exercises')
-    # Shape matches TemplateExerciseItem as produced by _build_template_exercises_from_compact.
     inline_exercises: Optional[List[TemplateExerciseItem]] = None
-
-    type: Optional[str] = None
+    type: Optional[PlannedWorkoutType] = None
     notes: Optional[str] = None
-    status: str = "planned"  # "planned", "in_progress", "completed", "skipped"
+    status: PlannedWorkoutStatus = PlannedWorkoutStatus.PLANNED
     workout_session_id: Optional[str] = None
     order: int = 0
     created_at: datetime = Field(default_factory=datetime.utcnow)
-
-    # Recurring schedule fields
     is_recurring: bool = False
-    recurrence_type: Optional[str] = None  # "daily", "weekly", "monthly"
-    recurrence_days: Optional[List[int]] = (
-        None  # For weekly: [0=Monday, 1=Tuesday, ..., 6=Sunday]
-    )
-    recurrence_end_date: Optional[str] = None  # YYYY-MM-DD format
-    recurrence_parent_id: Optional[str] = (
-        None  # Links instance to parent recurring workout
-    )
-
-    # Overriding recurring instances as exceptions
+    recurrence_type: Optional[RecurrenceType] = None
+    recurrence_days: Optional[List[int]] = None
+    recurrence_end_date: Optional[str] = None
+    recurrence_parent_id: Optional[str] = None
     is_override: bool = False
-    original_date: Optional[str] = None  # required if is_override=True
+    original_date: Optional[str] = None
 
     @model_validator(mode="after")
     def validate_override_structure(self):
@@ -417,14 +527,87 @@ class PlannedWorkout(BaseModel):
         return self
 
 
+# ============= RESPONSE MODELS (id always present) =============
+
+
+class ExerciseResponse(Exercise):
+    id: str
+
+
+class WorkoutSessionResponse(WorkoutSession):
+    id: str
+    started_at: str
+    template_id: Optional[str] = None
+    planned_workout_id: Optional[str] = None
+    name: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class WorkoutTemplateResponse(WorkoutTemplate):
+    id: str
+    notes: Optional[str] = None
+
+
+class PlannedWorkoutResponse(PlannedWorkout):
+    id: str
+    template_id: Optional[str] = None
+    notes: Optional[str] = None
+    workout_session_id: Optional[str] = None
+    recurrence_parent_id: Optional[str] = None
+    original_date: Optional[str] = None
+
+
+class PRRecordResponse(PRRecord):
+    id: str
+
+
+# ============= AI JOB MODELS =============
+
+
+class Job(BaseModel):
+    id: str = Field(alias="_id")
+    status: str
+    kind: str
+    created_at: datetime
+    completed_at: Optional[datetime] = None
+    conversation_id: Optional[str] = None
+
+    class Config:
+        populate_by_name = True
+
+
+class ActiveJobResponse(BaseModel):
+    job: Optional[Job] = None
+
+
+# ============= AI / CONVERSATION MODELS =============
+
+
 class Conversation(BaseModel):
     id: str
     user_id: str
-
     title: str
-
     created_at: datetime
     updated_at: datetime
     last_message_at: datetime
-
     active_job_id: Optional[str] = None
+
+
+class ConversationListResponse(BaseModel):
+    conversations: List[Conversation]
+
+
+class Message(BaseModel):
+    id: Optional[str] = None
+    conversation_id: str
+    role: Literal["user", "assistant"]
+    content: str
+    created_at: datetime
+
+
+class MessageResponse(Message):
+    id: str
+
+
+class MessagesResponse(BaseModel):
+    messages: List[MessageResponse]

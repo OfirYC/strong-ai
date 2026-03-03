@@ -18,7 +18,8 @@ import {
 } from "react-native";
 import { BarChart, LineChart } from "react-native-gifted-charts";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Exercise, ExerciseHistory, ExerciseHistoryResponse } from "../types";
+import { Exercise, ExerciseHistoryResponse } from "../types";
+import type { ExerciseHistoryEntry as ExerciseHistory } from "../types/gen";
 import api from "../utils/api";
 import { SetNumber } from "./SetNumber";
 import { useExercises } from "../store/exercisesStore";
@@ -102,7 +103,7 @@ export default function ExerciseDetailModal({
     setLoadingData(true);
     try {
       const res = await api.get(
-        `/workouts/history/by-exercise?exercise_id=${exercise.id}&days_back=180&limit_workouts=100`
+        `/workouts/history/by-exercise?exercise_id=${exercise.id}&days_back=180&limit_workouts=100`,
       );
       const data = res.data as ExerciseHistoryResponse;
 
@@ -114,12 +115,12 @@ export default function ExerciseDetailModal({
             workout_name: h.workout_name,
             date: h.date, // ISO string
             sets: h.sets || [],
-          } satisfies ExerciseHistory)
+          }) satisfies ExerciseHistory,
       );
 
       // 2) Sort by date ASCENDING so charts + PR progression are chronological
       const sortedHistory = [...mappedHistory].sort(
-        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
       );
 
       // keep this as the history we render in the History tab
@@ -139,16 +140,16 @@ export default function ExerciseDetailModal({
       const volumePerWorkout = sortedHistory.map(h =>
         h.sets.reduce(
           (sum: number, s: any) => sum + (s.weight || 0) * (s.reps || 0),
-          0
-        )
+          0,
+        ),
       );
 
       const maxRepsPerWorkout = sortedHistory.map(h =>
-        Math.max(...h.sets.map((s: any) => s.reps || 0), 0)
+        Math.max(...h.sets.map((s: any) => s.reps || 0), 0),
       );
 
       const totalRepsPerWorkout = sortedHistory.map(h =>
-        h.sets.reduce((sum: number, s: any) => sum + (s.reps || 0), 0)
+        h.sets.reduce((sum: number, s: any) => sum + (s.reps || 0), 0),
       );
 
       // Best set per workout -> estimated 1RM
@@ -210,7 +211,7 @@ export default function ExerciseDetailModal({
     } catch (error: any) {
       Alert.alert(
         "Error",
-        error.response?.data?.detail || "Failed to save instructions"
+        error.response?.data?.detail || "Failed to save instructions",
       );
     } finally {
       setSaving(false);
@@ -229,7 +230,7 @@ export default function ExerciseDetailModal({
     if (status !== "granted") {
       Alert.alert(
         "Permission needed",
-        "Please grant camera roll permissions to upload images"
+        "Please grant camera roll permissions to upload images",
       );
       return;
     }
@@ -259,7 +260,7 @@ export default function ExerciseDetailModal({
       } catch (error: any) {
         Alert.alert(
           "Error",
-          error.response?.data?.detail || "Failed to upload image"
+          error.response?.data?.detail || "Failed to upload image",
         );
       } finally {
         setUploadingImage(false);
@@ -429,28 +430,32 @@ export default function ExerciseDetailModal({
 
               <Text style={styles.setsPerformedLabel}>Sets Performed</Text>
 
-              {item.sets.map((set, setIndex) => (
-                <View key={setIndex} style={styles.historySetRow}>
-                  <SetNumber setIndex={setIndex} setType={set.set_type} />
-                  <View style={styles.setDetails}>
-                    {set.weight !== undefined && set.weight > 0 && (
-                      <Text style={styles.setMetric}>{set.weight} kg</Text>
-                    )}
-                    {set.reps !== undefined && set.reps > 0 && (
-                      <Text style={styles.setMetric}>{set.reps} reps</Text>
-                    )}
-                    {set.duration !== undefined && set.duration > 0 && (
-                      <Text style={styles.setMetric}>
-                        {Math.floor(set.duration / 60)}:
-                        {(set.duration % 60).toString().padStart(2, "0")}
-                      </Text>
-                    )}
-                    {set.distance !== undefined && set.distance > 0 && (
-                      <Text style={styles.setMetric}>{set.distance} km</Text>
-                    )}
+              {item.sets.map(
+                (set: ExerciseHistory["sets"][number], setIndex: number) => (
+                  <View key={setIndex} style={styles.historySetRow}>
+                    <SetNumber setIndex={setIndex} setType={set.set_type} />
+                    <View style={styles.setDetails}>
+                      {set.weight != null && set.weight > 0 && (
+                        <Text style={styles.setMetric}>{set.weight} kg</Text>
+                      )}
+                      {set.reps != null && set.reps > 0 && (
+                        <Text style={styles.setMetric}>{set.reps} reps</Text>
+                      )}
+                      {set.duration != null && set.duration > 0 && (
+                        <Text style={styles.setMetric}>
+                          {Math.floor((set.duration ?? 0) / 60)}:
+                          {((set.duration ?? 0) % 60)
+                            .toString()
+                            .padStart(2, "0")}
+                        </Text>
+                      )}
+                      {set.distance != null && set.distance > 0 && (
+                        <Text style={styles.setMetric}>{set.distance} km</Text>
+                      )}
+                    </View>
                   </View>
-                </View>
-              ))}
+                ),
+              )}
             </View>
           ))
       )}
@@ -618,7 +623,7 @@ export default function ExerciseDetailModal({
               hideDataPoints={false}
               trimYAxisAtTop={true} // ★ key to avoid being cut at top
               pointerConfig={makeLinePointerConfig(item =>
-                item.value ? `${item.value.toFixed(1)} kg` : "0 kg"
+                item.value ? `${item.value.toFixed(1)} kg` : "0 kg",
               )}
             />
           </View>
@@ -674,7 +679,7 @@ export default function ExerciseDetailModal({
               dataPointsWidth={8}
               hideDataPoints={false}
               pointerConfig={makeLinePointerConfig(item =>
-                item.value ? `${item.value.toFixed(1)} kg` : "0 kg"
+                item.value ? `${item.value.toFixed(1)} kg` : "0 kg",
               )}
             />
           </View>

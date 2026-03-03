@@ -279,8 +279,8 @@ export default function ActiveWorkoutSheet({
   }, [activeWorkout?.exercises, exercisesById, refetchById]);
 
   const lastCommittedRef = useRef<{
-    name: string | undefined;
-    notes: string | undefined;
+    name: string | null | undefined;
+    notes: string | null | undefined;
   }>({
     name: workoutName,
     notes: workoutNotes,
@@ -352,7 +352,15 @@ export default function ActiveWorkoutSheet({
     const newExercise: WorkoutExercise = {
       exercise_id: exercise.id,
       order: exercises.length,
-      sets,
+      sets: (sets as WorkoutSet[]).map(s => ({
+        ...s,
+        set_type: s.set_type ?? ("normal" as const),
+        completed: s.completed ?? false,
+        is_volume_pr: s.is_volume_pr ?? false,
+        is_weight_pr: s.is_weight_pr ?? false,
+        is_reps_pr: s.is_reps_pr ?? false,
+        is_duration_pr: s.is_duration_pr ?? false,
+      })),
     };
 
     syncExercises([...exercises, newExercise]);
@@ -368,6 +376,11 @@ export default function ActiveWorkoutSheet({
     const newSet: WorkoutSet = {
       set_type: "normal",
       rest_timer: getDefaultRestTimer(),
+      completed: false,
+      is_volume_pr: false,
+      is_weight_pr: false,
+      is_reps_pr: false,
+      is_duration_pr: false,
     };
 
     if (fields.includes("weight")) newSet.weight = 0;
@@ -1562,10 +1575,10 @@ export function useWorkoutLiveActivity(
       derived;
 
     let currentExerciseName: string | undefined;
-    let currentWeight: number | undefined;
-    let currentReps: number | undefined;
-    let currentDurationSeconds: number | undefined;
-    let currentDistanceKm: number | undefined;
+    let currentWeight: number | null | undefined;
+    let currentReps: number | null | undefined;
+    let currentDurationSeconds: number | null | undefined;
+    let currentDistanceKm: number | null | undefined;
 
     if (currentExerciseId && typeof currentSetIndex === "number") {
       const ex = exercises.find(e => e.exercise_id === currentExerciseId);
@@ -1596,10 +1609,10 @@ export function useWorkoutLiveActivity(
           : undefined,
       restEndAtMs: restEndAtRef.current ?? undefined,
       restStartedAtMs: restStartAtRef.current ?? undefined,
-      currentWeight,
-      currentReps,
-      currentDurationSeconds,
-      currentDistanceKm,
+      currentWeight: currentWeight ?? undefined,
+      currentReps: currentReps ?? undefined,
+      currentDurationSeconds: currentDurationSeconds ?? undefined,
+      currentDistanceKm: currentDistanceKm ?? undefined,
     };
   }, [derived, exercises, exercisesById, workoutName, getStartedAtMs]);
 

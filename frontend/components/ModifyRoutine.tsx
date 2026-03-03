@@ -35,7 +35,7 @@ import { useExercises } from "../store/exercisesStore";
 type OnSaveRoutine = (
   name: string,
   notes: string,
-  exercises: TemplateExercise[]
+  exercises: TemplateExercise[],
 ) => Promise<void>;
 
 export function ModifyRoutine({
@@ -67,7 +67,7 @@ export function ModifyRoutine({
   const [isDraggingList, setIsDraggingList] = useState(false);
   const [extraTopPadding, setExtraTopPadding] = useState(0);
   const listRef = useRef<typeof DraggableFlatList<TemplateExercise> | null>(
-    null
+    null,
   );
   const itemRefs = useRef<Record<string, View | null>>({});
 
@@ -97,7 +97,7 @@ export function ModifyRoutine({
     selectedExercises?.map(e => ({
       id: e.exercise_id,
       sets: e.sets,
-    })) || []
+    })) || [],
   );
 
   const getDefaultRestTimer = () => {
@@ -108,7 +108,9 @@ export function ModifyRoutine({
     const newExercise: TemplateExercise = {
       exercise_id: exercise.id,
       order: selectedExercises.length,
-      sets: [{ set_type: "normal", rest_timer: getDefaultRestTimer() }], // Start with one empty set
+      sets: [{ set_type: "normal", rest_timer: getDefaultRestTimer() }],
+      default_sets: 3,
+      default_reps: null,
     };
 
     setSelectedExercises(prev => [...prev, newExercise]);
@@ -128,12 +130,12 @@ export function ModifyRoutine({
           style: "destructive",
           onPress: () => {
             const newExercises = selectedExercises.filter(
-              (_, i) => i !== index
+              (_, i) => i !== index,
             );
             setSelectedExercises(newExercises);
           },
         },
-      ]
+      ],
     );
   };
 
@@ -161,7 +163,7 @@ export function ModifyRoutine({
   const updateSet = (
     exerciseIndex: number,
     setIndex: number,
-    fields: Partial<WorkoutSet> // <---- TYPE!
+    fields: Partial<WorkoutSet>, // <---- TYPE!
   ) => {
     const newExercises = [...selectedExercises];
 
@@ -171,7 +173,7 @@ export function ModifyRoutine({
     newExercises[exerciseIndex] = {
       ...oldExercise,
       sets: oldSets.map((set, i) =>
-        i === setIndex ? { ...set, ...fields } : set
+        i === setIndex ? { ...set, ...fields } : set,
       ),
     };
 

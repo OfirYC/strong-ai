@@ -1,10 +1,45 @@
-export interface User {
-  id: string;
-  email: string;
-  token: string;
-}
+// ============= IMPORTS FROM GENERATED TYPES =============
+// All interfaces come from the backend — do not manually duplicate them here.
+// Run 'yarn generate:types' to update.
 
-export const EXERCISE_KINDS = [
+export type {
+  User,
+  Exercise,
+  ExerciseKind,
+  ExerciseCategory,
+  BodyPart,
+  SetType,
+  WorkoutSet,
+  WorkoutSetItem,
+  WorkoutExercise,
+  WorkoutExerciseItem,
+  TemplateSet,
+  TemplateSetItem,
+  TemplateExercise,
+  TemplateExerciseItem,
+  WorkoutTemplate,
+  WorkoutTemplateResponse,
+  WorkoutSession,
+  WorkoutSessionResponse,
+  WorkoutExerciseSummary,
+  WorkoutSummary,
+  PRRecord,
+  PRRecordResponse,
+  ExerciseHistoryEntry,
+  ExerciseHistoryResponse,
+  PlannedWorkout,
+  PlannedWorkoutResponse,
+  ProfileInsights,
+  UserProfile,
+} from "@/types/gen";
+
+import type { ExerciseKind, SetType } from "@/types/gen";
+
+// ============= CONST ARRAYS =============
+// Derived from generated types — TS will error here if backend adds a new value
+// and you haven't added it to the array yet.
+
+export const EXERCISE_KINDS: ExerciseKind[] = [
   "Barbell",
   "Dumbbell",
   "Machine/Other",
@@ -15,30 +50,17 @@ export const EXERCISE_KINDS = [
   "Cardio",
   "Weighted Cardio",
   "Weighted Duration",
+  "Band",
+  "Cable",
+  "Kettlebell",
   "EMOM (Every Minute On The Minute)",
   "ETOT (Every Thirty Seconds on Thirty Seconds)",
-] as const;
+];
 
-export type ExerciseKind = (typeof EXERCISE_KINDS)[number];
+export const SET_TYPES: SetType[] = ["normal", "warmup", "cooldown", "failure"];
 
-export interface Exercise {
-  id: string;
-  name: string;
-  exercise_kind: ExerciseKind;
-  primary_body_parts: string[];
-  secondary_body_parts?: string[];
-  category: string;
-  is_custom: boolean;
-  user_id?: string;
-  instructions?: string;
-  image?: string;
-}
+// ============= UI CONFIG =============
 
-// Set types for workout sets
-export const SET_TYPES = ["normal", "warmup", "cooldown", "failure"] as const;
-export type SetType = (typeof SET_TYPES)[number];
-
-// Set type display config
 export const SET_TYPE_CONFIG: Record<
   SetType,
   { label: string; initial: string; color: string; bgColor: string }
@@ -68,33 +90,9 @@ export const SET_TYPE_CONFIG: Record<
     bgColor: "rgba(239, 68, 68, 0.15)",
   },
 };
-export interface WorkoutSet {
-  // Set type
-  set_type?: SetType;
 
-  // Weight + Reps (for strength exercises)
-  reps?: number;
-  weight?: number;
+// ============= HELPER FUNCTIONS =============
 
-  // Cardio fields
-  distance?: number; // in km
-  duration?: number; // in seconds
-  calories?: number;
-
-  completed?: boolean;
-  completed_at?: string;
-
-  // Rest timer (NEW)
-  rest_timer: number | null;
-
-  // PR flags
-  is_volume_pr?: boolean;
-  is_weight_pr?: boolean;
-  is_reps_pr?: boolean;
-  is_duration_pr?: boolean;
-}
-
-// Helper function to determine what fields an exercise needs
 export function getExerciseFields(kind: ExerciseKind): string[] {
   switch (kind) {
     case "Barbell":
@@ -113,6 +111,11 @@ export function getExerciseFields(kind: ExerciseKind): string[] {
       return ["duration", "distance", "weight"];
     case "Weighted Duration":
       return ["duration", "weight"];
+    case "Band":
+    case "Cable":
+      return ["weight", "reps"];
+    case "Kettlebell":
+      return ["weight", "reps"];
     case "EMOM (Every Minute On The Minute)":
     case "ETOT (Every Thirty Seconds on Thirty Seconds)":
       return ["reps", "weight", "duration"];
@@ -121,7 +124,6 @@ export function getExerciseFields(kind: ExerciseKind): string[] {
   }
 }
 
-// Helper to check if exercise is duration-based
 export function isDurationBased(kind: ExerciseKind): boolean {
   return [
     "Duration",
@@ -133,7 +135,6 @@ export function isDurationBased(kind: ExerciseKind): boolean {
   ].includes(kind);
 }
 
-// Helper to check if exercise uses weight
 export function usesWeight(kind: ExerciseKind): boolean {
   return [
     "Barbell",
@@ -143,17 +144,18 @@ export function usesWeight(kind: ExerciseKind): boolean {
     "Assisted Bodyweight",
     "Weighted Cardio",
     "Weighted Duration",
+    "Band",
+    "Cable",
+    "Kettlebell",
     "EMOM (Every Minute On The Minute)",
     "ETOT (Every Thirty Seconds on Thirty Seconds)",
   ].includes(kind);
 }
 
-// Helper to check if exercise uses distance
 export function usesDistance(kind: ExerciseKind): boolean {
   return ["Cardio", "Weighted Cardio"].includes(kind);
 }
 
-// Helper to check if exercise uses reps
 export function usesReps(kind: ExerciseKind): boolean {
   return [
     "Barbell",
@@ -162,109 +164,22 @@ export function usesReps(kind: ExerciseKind): boolean {
     "Weighted Bodyweight",
     "Assisted Bodyweight",
     "Reps Only",
+    "Band",
+    "Cable",
+    "Kettlebell",
     "EMOM (Every Minute On The Minute)",
     "ETOT (Every Thirty Seconds on Thirty Seconds)",
   ].includes(kind);
 }
 
-export interface WorkoutExercise {
-  exercise_id: string;
-  order: number;
-  sets: WorkoutSet[];
-  notes?: string;
-}
+// ============= FORMAT HELPERS =============
 
-export interface TemplateSet {
-  weight?: number;
-  reps?: number;
-  duration?: number;
-  distance?: number;
-  set_type?: SetType;
-
-  // NEW
-  rest_timer: number | null;
-}
-
-export interface TemplateExercise {
-  exercise_id: string;
-  order: number;
-  sets: TemplateSet[];
-  notes?: string;
-  // Legacy fields
-  default_sets?: number;
-  default_reps?: number;
-  default_weight?: number;
-}
-
-export interface WorkoutTemplate {
-  id: string;
-  user_id: string;
-  name: string;
-  notes?: string;
-  exercises: TemplateExercise[];
-  created_at: string;
-  updated_at: string;
-}
-
-export interface WorkoutSession {
-  id: string;
-  user_id: string;
-  template_id?: string;
-  name?: string;
-  started_at: string;
-  ended_at?: string;
-  skipped?: boolean
-  notes?: string;
-  exercises: WorkoutExercise[];
-  planned_workout_id?: string;
-}
-
-// Workout Summary types for history view
-export interface WorkoutExerciseSummary {
-  exercise_id: string;
-  name: string;
-  exercise_kind: ExerciseKind;
-  set_count: number;
-  best_set_display: string;
-  estimated_1rm?: number;
-}
-
-export interface WorkoutSummary {
-  id: string;
-  name?: string;
-  started_at: string;
-  ended_at?: string;
-  duration_seconds: number;
-  exercise_count: number;
-  set_count: number;
-  total_volume_kg: number;
-  pr_count: number;
-  exercises: WorkoutExerciseSummary[];
-  template_id?: string;
-}
-
-export interface PRRecord {
-  id: string;
-  user_id: string;
-  exercise_id: string;
-  workout_id?: string;
-  pr_type: string;
-  weight?: number;
-  reps?: number;
-  duration?: number;
-  volume?: number;
-  estimated_1rm?: number;
-  date: string;
-}
-
-// Helper to format duration in mm:ss.cc (with centiseconds support)
 export function formatDuration(seconds: number): string {
   const totalCentiseconds = Math.round(seconds * 100);
   const mins = Math.floor(totalCentiseconds / 6000);
   const secs = Math.floor((totalCentiseconds % 6000) / 100);
   const centis = totalCentiseconds % 100;
 
-  // Only show centiseconds if they exist
   if (centis > 0) {
     return `${mins}:${secs.toString().padStart(2, "0")}.${centis
       .toString()
@@ -273,7 +188,6 @@ export function formatDuration(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
-// Helper to format duration in minutes (e.g., "12m")
 export function formatDurationMinutes(seconds: number): string {
   const mins = Math.round(seconds / 60);
   return `${mins}m`;
@@ -288,34 +202,7 @@ export function formatWorkoutDuration(seconds: number): string {
 
   const hours = Math.floor(totalMins / 60);
   const mins = totalMins % 60;
-
-  // pad minutes to always 2 digits (e.g., 1:05)
   const paddedMins = mins.toString().padStart(2, "0");
 
   return `${hours}h ${paddedMins}m`;
-}
-
-export interface ExerciseHistory {
-  workout_id: string;
-  workout_name: string;
-  date: string;
-  sets: {
-    reps?: number;
-    weight?: number;
-    duration?: number;
-    distance?: number;
-    set_type: SetType;
-    rest_timer: number | null;
-  }[];
-}
-
-export interface ExerciseHistoryResponse {
-  exercise_id: string;
-  exercise_kind: ExerciseKind;
-  window_days: number;
-  workouts_scanned: number;
-  history: ExerciseHistory[];
-  max_weight: number | undefined | null;
-  max_reps: number | undefined | null;
-  best_e1rm: number | undefined | null;
 }

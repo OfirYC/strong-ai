@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import api from "../utils/api";
 import { Exercise, EXERCISE_KINDS, ExerciseKind } from "../types";
+import type { BodyPart } from "../types/gen";
 import { useExercises } from "../store/exercisesStore"; // ✅ NEW
 
 const BODY_PARTS = [
@@ -48,7 +49,7 @@ export default function CreateExerciseModal({
   const [name, setName] = useState("");
   const [selectedBodyPart, setSelectedBodyPart] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<ExerciseKind | null>(
-    null
+    null,
   );
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [instructions, setInstructions] = useState("");
@@ -67,7 +68,7 @@ export default function CreateExerciseModal({
     if (status !== "granted") {
       Alert.alert(
         "Permission needed",
-        "Please grant camera roll permissions to upload images"
+        "Please grant camera roll permissions to upload images",
       );
       return;
     }
@@ -115,8 +116,9 @@ export default function CreateExerciseModal({
         await api.post("/exercises", {
           name: name.trim(),
           exercise_kind: selectedCategory,
-          primary_body_parts: [selectedBodyPart],
-          category: selectedCategory,
+          primary_body_parts: [selectedBodyPart as BodyPart],
+          secondary_body_parts: [] as BodyPart[],
+          category: selectedCategory as any,
           is_custom: true,
           image: imageBase64 || null,
           instructions: instructions.trim() || null,
@@ -132,7 +134,7 @@ export default function CreateExerciseModal({
     } catch (error: any) {
       Alert.alert(
         "Error",
-        error.response?.data?.detail || "Failed to create exercise"
+        error.response?.data?.detail || "Failed to create exercise",
       );
     } finally {
       setSaving(false);

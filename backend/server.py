@@ -1,4 +1,5 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Header
+from pydantic import BaseModel
 from services.ai.types import ChatRequest
 from dotenv import load_dotenv
 from fastapi import Query, WebSocketDisconnect, WebSocket
@@ -19,7 +20,7 @@ from pathlib import Path
 from typing import List, Optional, Dict, Set, Any
 from datetime import datetime, timedelta
 from bson import ObjectId
-from constants import EXERCISE_KIND_RULES  # add this
+from constants import EXERCISE_KIND_RULES
 import json
 import time
 import secrets
@@ -51,7 +52,7 @@ from models import (
     User,
     UserCreate,
     UserLogin,
-    UserResponse,
+    User,
     UserProfile,
     ProfileUpdate,
     UserContext,
@@ -59,18 +60,41 @@ from models import (
     Exercise,
     ExerciseCreate,
     ExerciseUpdate,
+    ExerciseHistoryResponse,
+    ExerciseResponse,
     WorkoutTemplate,
     WorkoutTemplateCreate,
+    WorkoutTemplateResponse,
     WorkoutSession,
     WorkoutSessionCreate,
     WorkoutSessionUpdate,
-    PRRecord,
+    WorkoutSessionResponse,
     WorkoutSummary,
     WorkoutExerciseSummary,
+    WorkoutCountResponse,
+    PRRecord,
+    PRRecordResponse,
     PlannedWorkout,
     PlannedWorkoutCreate,
     PlannedWorkoutUpdate,
+    PlannedWorkoutResponse,
     Conversation,
+    ConversationListResponse,
+    ActiveJobResponse,
+    Job,
+    Message,
+    MessageResponse,
+    MessagesResponse,
+    # Enums
+    ExerciseKind,
+    ExerciseCategory,
+    BodyPart,
+    SetType,
+    PlannedWorkoutStatus,
+    PlannedWorkoutType,
+    RecurrenceType,
+    PRType,
+    UserResponse,
 )
 from services.ai.profile_insights import generate_profile_insights
 from auth import (
@@ -143,7 +167,6 @@ async def get_current_user_ws(ws: WebSocket) -> str:
     token = ws.query_params.get("token")
 
     if not token:
-        # 1008 = policy violation (auth failure)
         await ws.close(code=1008)
         raise WebSocketDisconnect(code=1008)
 
@@ -159,63 +182,49 @@ async def get_current_user_ws(ws: WebSocket) -> str:
 # ============= AUTH ROUTES =============
 @api_router.post("/auth/register", response_model=UserResponse)
 async def register(user_data: UserCreate):
-    # Check if user exists
     existing_user = await db.users.find_one({"email": user_data.email})
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    # Create user
     password_hash = get_password_hash(user_data.password)
     user = User(email=user_data.email, password_hash=password_hash)
 
     result = await db.users.insert_one(user.dict(by_alias=True, exclude={"id"}))
     user_id = str(result.inserted_id)
 
-    # Create token
     token = create_access_token({"user_id": user_id})
-
     return UserResponse(id=user_id, email=user.email, token=token)
 
 
 @api_router.post("/auth/login", response_model=UserResponse)
 async def login(credentials: UserLogin):
-    # Find user
     user_doc = await db.users.find_one({"email": credentials.email})
     if not user_doc:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    # Verify password
     if not verify_password(credentials.password, user_doc["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     user_id = str(user_doc["_id"])
-
-    # Create token
     token = create_access_token({"user_id": user_id})
-
     return UserResponse(id=user_id, email=user_doc["email"], token=token)
 
 
-@api_router.post("/auth/refresh")
+@api_router.post("/auth/refresh", response_model=UserResponse)
 async def refresh_token(current_user: str = Depends(get_current_user)):
     if not current_user:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
-    # current_user is already the user_id string
     user_id = current_user
-
-    # Optional but recommended: fetch email for response consistency
     user_doc = await db.users.find_one({"_id": ObjectId(user_id)})
     if not user_doc:
         raise HTTPException(status_code=401, detail="User not found")
 
-    # Create new access token
     new_token = create_access_token({"user_id": user_id})
+    return UserResponse(id=user_id, email=user_doc.get("email"), token=new_token)
 
-    return {"id": user_id, "email": user_doc.get("email"), "token": new_token}
 
-
-@api_router.post("/auth/apple")
+@api_router.post("/auth/apple", response_model=UserResponse)
 async def apple_signin(payload: dict):
     """
     Verify Apple's identity token (JWT) using Apple's JWKS,
@@ -223,7 +232,6 @@ async def apple_signin(payload: dict):
     and return our app access token.
     Expects payload: { apple_token: str, client_id?: str, email?: str }
     """
-
     apple_token = payload.get("apple_token") or payload.get("identity_token")
     if not apple_token:
         raise HTTPException(
@@ -288,14 +296,13 @@ async def apple_signin(payload: dict):
             )
 
     token = create_access_token({"user_id": user_id})
-    return {"id": user_id, "email": email, "token": token}
+    return UserResponse(id=user_id, email=email, token=token)
 
 
-# ============= Web Socket =============
+# ============= WEBSOCKET =============
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     user_id = await get_current_user_ws(ws)
-
     await ws_manager.connect(user_id, ws)
 
     try:
@@ -307,9 +314,6 @@ async def websocket_endpoint(ws: WebSocket):
         await ws_manager.disconnect(user_id, ws)
 
 
-# ==========================================================
-# 2️⃣ AI Job Streaming WebSocket
-# ==========================================================
 @app.websocket("/ws/ai/jobs/{job_id}")
 @api_router.websocket("/ws/ai/jobs/{job_id}")
 async def ai_job_ws(websocket: WebSocket, job_id: str):
@@ -330,13 +334,11 @@ async def ai_job_ws(websocket: WebSocket, job_id: str):
         f"WebSocket connected for job {job_id}, waiting for runner to signal ready..."
     )
 
-    # ✅ tell the runner "WS is connected, start streaming"
     mark_ws_ready(job_id)
     print(f"WebSocket for job {job_id} is ready, runner can start streaming results")
 
     try:
         while True:
-            # Keep alive. Client can send "ping" or anything.
             await websocket.receive_text()
     except WebSocketDisconnect:
         print(f"WebSocket disconnected for job {job_id}")
@@ -347,15 +349,16 @@ async def ai_job_ws(websocket: WebSocket, job_id: str):
         await websocket.close(code=1011)
 
 
-@api_router.get("/ai/conversations")
+# ============= AI ROUTES =============
+@api_router.get("/ai/conversations", response_model=ConversationListResponse)
 async def get_conversations(user_id=Depends(get_current_user)):
     conversations = (
         await db.conversations.find({"user_id": ObjectId(user_id)})
         .sort("created_at", 1)
         .to_list(length=None)
     )
-    return {
-        "conversations": [
+    return ConversationListResponse(
+        conversations=[
             Conversation(
                 id=str(c["_id"]),
                 user_id=str(c["user_id"]),
@@ -369,10 +372,12 @@ async def get_conversations(user_id=Depends(get_current_user)):
             )
             for c in conversations
         ]
-    }
+    )
 
 
-@api_router.get("/ai/conversations/{conversation_id}/active-job")
+@api_router.get(
+    "/ai/conversations/{conversation_id}/active-job", response_model=ActiveJobResponse
+)
 async def get_active_job(conversation_id: str, user_id=Depends(get_current_user)):
     job = await db.ai_jobs.find_one(
         {
@@ -384,12 +389,28 @@ async def get_active_job(conversation_id: str, user_id=Depends(get_current_user)
     )
 
     if not job:
-        return {"job": None}
+        return ActiveJobResponse(job=None)
 
-    return {"job": {"_id": str(job["_id"]), "status": job["status"]}}
+    return ActiveJobResponse(
+        job=Job(
+            _id=str(job["_id"]),
+            status=job["status"],
+            kind=job.get("kind", "chat"),
+            created_at=job["created_at"],
+            completed_at=job.get("completed_at"),
+            conversation_id=(
+                str(job["conversation_id"]) if job.get("conversation_id") else None
+            ),
+        )
+    )
 
 
-@api_router.post("/ai/chat/start")
+class StartChatResponse(BaseModel):
+    job_id: str
+    conversation_id: str
+
+
+@api_router.post("/ai/chat/start", response_model=StartChatResponse)
 async def start_ai_chat(payload: dict, user_id=Depends(get_current_user)):
     conversation_id = payload.get("conversation_id")
     is_new_conversation = False
@@ -398,17 +419,14 @@ async def start_ai_chat(payload: dict, user_id=Depends(get_current_user)):
         payload["conversation_id"] = conversation_id
         is_new_conversation = True
 
-    # validate ownership
     convo = await db.conversations.find_one(
         {"_id": ObjectId(conversation_id), "user_id": ObjectId(user_id)}
     )
     if not convo:
         raise HTTPException(status_code=403, detail="Invalid conversation_id")
 
-    # persist ONLY the newest user message (last one)
     user_message = payload.get("user_message")
     if user_message and user_message.get("role") == "user":
-        # Name the conversation on initiation
         if is_new_conversation:
             asyncio.create_task(
                 rename_conversation(
@@ -422,34 +440,31 @@ async def start_ai_chat(payload: dict, user_id=Depends(get_current_user)):
             db, user_id, conversation_id, "user", user_message.get("content", "")
         )
         await touch_conversation(db, conversation_id)
-    """
-    IMPORTANT:
-    - Create job in DB
-    - Return job_id immediately
-    - Start generation in background task (so WS can connect)
-    """
+
     job_id = await create_job(db, user_id, payload, kind="chat")
     await touch_conversation(db, conversation_id, job_id)
 
-    # create the event now, so runner can wait for WS
     get_or_create_event(job_id)
 
-    # run in background (DO NOT await)
     asyncio.create_task(
         ai_runner.run_chat(
             job_id=job_id, user_id=user_id, input_payload=payload, db=get_db(user_id)
         )
     )
-    return {"job_id": str(job_id), "conversation_id": conversation_id}
+    return StartChatResponse(job_id=str(job_id), conversation_id=conversation_id)
 
 
-@api_router.get("/ai/conversations/{conversation_id}/messages")
-async def get_messages(conversation_id: str, user_id=Depends(get_current_user)):
+@api_router.get(
+    "/ai/conversations/{conversation_id}/messages", response_model=MessagesResponse
+)
+async def get_messages(conversation_id: str, user_id: str = Depends(get_current_user)):
     msgs = await list_messages(db, user_id, conversation_id, limit=500)
-    return {"messages": msgs}
+    return MessagesResponse(messages=msgs)
 
 
 # ============= PROFILE ROUTES =============
+
+
 @api_router.get("/profile", response_model=UserProfile)
 async def get_profile(user_id: str = Depends(get_current_user)):
     """Get user profile"""
@@ -457,7 +472,6 @@ async def get_profile(user_id: str = Depends(get_current_user)):
     if not user_doc:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Return profile, or default empty profile if not exists
     profile_data = user_doc.get("profile", {})
     return UserProfile(**profile_data)
 
@@ -467,7 +481,6 @@ async def update_profile(
     profile_data: ProfileUpdate, user_id: str = Depends(get_current_user)
 ):
     """Update user profile and auto-generate insights"""
-    # Build update dict with only provided fields
     update_dict = {}
     for field, value in profile_data.dict(exclude_unset=True).items():
         if value is not None:
@@ -478,25 +491,19 @@ async def update_profile(
             {"_id": ObjectId(user_id)}, {"$set": update_dict}
         )
 
-    # Get updated profile
     user_doc = await get_db(user_id).users.find_one({"_id": ObjectId(user_id)})
     profile_dict = user_doc.get("profile", {})
     profile = UserProfile(**profile_dict)
 
-    # Try to auto-generate insights if profile has enough info
     try:
         insights = await generate_profile_insights(profile)
-        # Save insights to database
         await get_db(user_id).users.update_one(
             {"_id": ObjectId(user_id)}, {"$set": {"profile.insights": insights.dict()}}
         )
-        # Update profile with insights
         profile.insights = insights
     except ValueError:
-        # Not enough info yet, skip insights generation
         pass
     except Exception as e:
-        # Log error but don't fail the profile update
         print(f"Failed to auto-generate insights: {e}")
 
     return profile
@@ -511,17 +518,13 @@ async def get_user_context(user_id: str = Depends(get_current_user)):
 
     profile = user_doc.get("profile", {})
 
-    # Calculate age from date_of_birth if available
     age = None
     if profile.get("date_of_birth"):
-        from datetime import datetime, timedelta
-
         dob = profile["date_of_birth"]
         if isinstance(dob, str):
             dob = datetime.fromisoformat(dob.replace("Z", "+00:00"))
         age = (datetime.utcnow() - dob).days // 365
 
-    # Build context object
     basic_info = {
         "sex": profile.get("sex"),
         "age": age,
@@ -540,7 +543,6 @@ async def get_user_context(user_id: str = Depends(get_current_user)):
         "strengths": profile.get("strengths"),
     }
 
-    # Check if profile is complete (at least basic info filled)
     is_complete = all(
         [
             profile.get("sex"),
@@ -550,7 +552,6 @@ async def get_user_context(user_id: str = Depends(get_current_user)):
         ]
     )
 
-    # Get insights if they exist
     insights_data = profile.get("insights")
     insights = ProfileInsights(**insights_data) if insights_data else None
 
@@ -564,7 +565,11 @@ async def get_user_context(user_id: str = Depends(get_current_user)):
     )
 
 
-@api_router.post("/profile/insights/generate", response_model=dict)
+class InsightsResponse(BaseModel):
+    insights: dict
+
+
+@api_router.post("/profile/insights/generate", response_model=InsightsResponse)
 async def generate_insights(user_id: str = Depends(get_current_user)):
     """Generate AI-powered insights from user's profile"""
     user_doc = await get_db(user_id).users.find_one({"_id": ObjectId(user_id)})
@@ -575,16 +580,11 @@ async def generate_insights(user_id: str = Depends(get_current_user)):
     profile = UserProfile(**profile_data)
 
     try:
-        # Generate insights using AI
         insights = await generate_profile_insights(profile)
-
-        # Save insights to database
         await get_db(user_id).users.update_one(
             {"_id": ObjectId(user_id)}, {"$set": {"profile.insights": insights.dict()}}
         )
-
-        return {"insights": insights.dict()}
-
+        return InsightsResponse(insights=insights.dict())
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -594,14 +594,15 @@ async def generate_insights(user_id: str = Depends(get_current_user)):
 
 
 # ============= EXERCISE ROUTES =============
-@api_router.get("/exercises")
+
+
+@api_router.get("/exercises", response_model=List[ExerciseResponse])
 async def get_exercises(
     user_id: str = Depends(get_current_user),
     body_part: Optional[str] = None,
-    exercise_kind: Optional[str] = None,
+    exercise_kind: Optional[ExerciseKind] = None,
     search: Optional[str] = None,
 ):
-    # Build query - show all exercises (default + custom from all users)
     query = {}
 
     if body_part:
@@ -611,14 +612,13 @@ async def get_exercises(
         ]
 
     if exercise_kind:
-        query["exercise_kind"] = exercise_kind
+        query["exercise_kind"] = exercise_kind.value
 
     if search:
         query["name"] = {"$regex": search, "$options": "i"}
 
     exercises = await get_db(user_id).exercises.find(query).to_list(1000)
 
-    # Convert _id to id for frontend
     result = []
     for ex in exercises:
         ex_dict = dict(ex)
@@ -628,12 +628,12 @@ async def get_exercises(
     return result
 
 
-@api_router.post("/exercises", response_model=Exercise)
+@api_router.post("/exercises", response_model=ExerciseResponse)
 async def create_exercise(
     exercise_data: ExerciseCreate, user_id: str = Depends(get_current_user)
 ):
     exercise_dict = exercise_data.dict()
-    exercise_dict["is_custom"] = True  # Always mark user-created exercises as custom
+    exercise_dict["is_custom"] = True
     exercise_dict["user_id"] = user_id
 
     exercise = Exercise(**exercise_dict)
@@ -642,11 +642,10 @@ async def create_exercise(
         exercise.dict(by_alias=True, exclude={"id"})
     )
     exercise.id = str(result.inserted_id)
-
     return exercise
 
 
-@api_router.get("/exercises/{exercise_id}", response_model=Exercise)
+@api_router.get("/exercises/{exercise_id}", response_model=ExerciseResponse)
 async def get_exercise(exercise_id: str, user_id: str = Depends(get_current_user)):
     exercise = await get_db(user_id).exercises.find_one({"_id": ObjectId(exercise_id)})
     if not exercise:
@@ -655,7 +654,7 @@ async def get_exercise(exercise_id: str, user_id: str = Depends(get_current_user
     return Exercise(**{**exercise, "id": str(exercise["_id"])})
 
 
-@api_router.patch("/exercises/{exercise_id}", response_model=Exercise)
+@api_router.patch("/exercises/{exercise_id}", response_model=ExerciseResponse)
 async def update_exercise(
     exercise_id: str,
     update_data: ExerciseUpdate,
@@ -665,7 +664,6 @@ async def update_exercise(
     if not exercise:
         raise HTTPException(status_code=404, detail="Exercise not found")
 
-    # Build update dict with only provided fields
     update_dict = {}
     if update_data.instructions is not None:
         update_dict["instructions"] = update_data.instructions
@@ -684,13 +682,15 @@ async def update_exercise(
 
 
 # ============= TEMPLATE ROUTES =============
-@api_router.get("/templates", response_model=List[WorkoutTemplate])
+
+
+@api_router.get("/templates", response_model=List[WorkoutTemplateResponse])
 async def get_templates(user_id: str = Depends(get_current_user)):
     templates = await get_db(user_id).templates.find({"user_id": user_id}).to_list(1000)
     return [WorkoutTemplate(**{**t, "id": str(t["_id"])}) for t in templates]
 
 
-@api_router.post("/templates", response_model=WorkoutTemplate)
+@api_router.post("/templates", response_model=WorkoutTemplateResponse)
 async def create_template(
     template_data: WorkoutTemplateCreate, user_id: str = Depends(get_current_user)
 ):
@@ -700,11 +700,10 @@ async def create_template(
         template.dict(by_alias=True, exclude={"id"})
     )
     template.id = str(result.inserted_id)
-
     return template
 
 
-@api_router.get("/templates/{template_id}", response_model=WorkoutTemplate)
+@api_router.get("/templates/{template_id}", response_model=WorkoutTemplateResponse)
 async def get_template(template_id: str, user_id: str = Depends(get_current_user)):
     template = await get_db(user_id).templates.find_one(
         {"_id": ObjectId(template_id), "user_id": user_id}
@@ -715,7 +714,7 @@ async def get_template(template_id: str, user_id: str = Depends(get_current_user
     return WorkoutTemplate(**{**template, "id": str(template["_id"])})
 
 
-@api_router.put("/templates/{template_id}", response_model=WorkoutTemplate)
+@api_router.put("/templates/{template_id}", response_model=WorkoutTemplateResponse)
 async def update_template(
     template_id: str,
     template_data: WorkoutTemplateCreate,
@@ -746,11 +745,12 @@ async def delete_template(template_id: str, user_id: str = Depends(get_current_u
 
 
 # ============= WORKOUT SESSION ROUTES =============
-@api_router.post("/workouts", response_model=WorkoutSession)
+
+
+@api_router.post("/workouts", response_model=WorkoutSessionResponse)
 async def start_workout(
     workout_data: WorkoutSessionCreate, user_id: str = Depends(get_current_user)
 ):
-    # If template_id is provided, load the template and pre-populate exercises
     exercises = workout_data.exercises or []
     name = workout_data.name
     notes = workout_data.notes
@@ -762,12 +762,9 @@ async def start_workout(
         if template:
             name = name or template.get("name")
             notes = notes or template.get("notes")
-            # Convert template exercises to workout exercises with pre-populated sets
             for tmpl_ex in template.get("exercises", []):
-                # Check if new format (has 'sets' array) or legacy format
                 tmpl_sets = tmpl_ex.get("sets", [])
                 if tmpl_sets:
-                    # New format: use the sets directly, including rest_timer
                     sets = []
                     for tmpl_set in tmpl_sets:
                         set_item = {
@@ -776,29 +773,24 @@ async def start_workout(
                             "reps": tmpl_set.get("reps"),
                             "duration": tmpl_set.get("duration"),
                             "distance": tmpl_set.get("distance"),
-                            # NEW: carry over rest_timer; strict number|null
                             "rest_timer": tmpl_set.get("rest_timer", None),
                         }
 
-                        # Remove None values but ALWAYS keep set_type & rest_timer key present
                         set_item = {
                             k: v
                             for k, v in set_item.items()
                             if (v is not None) or (k in ("set_type", "rest_timer"))
                         }
 
-                        # Ensure keys exist
                         set_item.setdefault("set_type", "normal")
                         if "rest_timer" not in set_item:
                             set_item["rest_timer"] = None
 
                         sets.append(set_item)
                 else:
-                    # Legacy format: create default sets
                     sets = []
                     num_sets = tmpl_ex.get("default_sets", 3)
                     for _ in range(num_sets):
-                        # NEW: default rest_timer is explicitly null
                         set_item = {
                             "set_type": "normal",
                             "rest_timer": None,
@@ -836,7 +828,6 @@ async def start_workout(
     )
     workout.id = str(result.inserted_id)
 
-    # If this workout is linked to a planned workout, update its status
     if workout_data.planned_workout_id:
         if ObjectId.is_valid(workout_data.planned_workout_id):
             await get_db(user_id).planned_workouts.update_one(
@@ -852,7 +843,7 @@ async def start_workout(
     return workout
 
 
-@api_router.put("/workouts/{workout_id}", response_model=WorkoutSession)
+@api_router.put("/workouts/{workout_id}", response_model=WorkoutSessionResponse)
 async def update_workout(
     workout_id: str,
     workout_data: WorkoutSessionUpdate,
@@ -866,13 +857,11 @@ async def update_workout(
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Workout not found")
 
-    # Check for PRs if workout is completed
     if workout_data.ended_at:
         await check_and_create_prs(user_id, workout_id)
 
     workout = await get_db(user_id).workouts.find_one({"_id": ObjectId(workout_id)})
 
-    # If workout is marked as skipped, and linked to a planned workout, update its status
     if workout_data.skipped and workout.get("planned_workout_id"):
         planned_id = workout["planned_workout_id"]
         if ObjectId.is_valid(planned_id):
@@ -881,7 +870,6 @@ async def update_workout(
                 {"$set": {"status": "skipped"}},
             )
 
-    # If workout is completed and linked to a planned workout, update its status
     if workout_data.ended_at and workout.get("planned_workout_id"):
         planned_id = workout["planned_workout_id"]
         if ObjectId.is_valid(planned_id):
@@ -909,13 +897,13 @@ async def delete_workout(workout_id: str, user_id: str = Depends(get_current_use
     return {"message": "Workout deleted successfully"}
 
 
-@api_router.get("/workouts/count")
+@api_router.get("/workouts/count", response_model=WorkoutCountResponse)
 async def get_workout_count_all(user_id: str = Depends(get_current_user)):
     count = await db.workouts.count_documents({"user_id": user_id})
-    return {"count": count}
+    return WorkoutCountResponse(count=count)
 
 
-@api_router.get("/workouts", response_model=List[WorkoutSession])
+@api_router.get("/workouts", response_model=List[WorkoutSessionResponse])
 async def get_workouts(
     user_id: str = Depends(get_current_user),
     limit: int = 50,
@@ -936,7 +924,7 @@ async def get_workouts(
     return [WorkoutSession(**{**w, "id": str(w["_id"])}) for w in workouts]
 
 
-@api_router.get("/workouts/history/by-exercise")
+@api_router.get("/workouts/history/by-exercise", response_model=ExerciseHistoryResponse)
 async def get_workout_history_by_exercise(
     exercise_id: str,
     days_back: int = 120,
@@ -947,11 +935,9 @@ async def get_workout_history_by_exercise(
     Return FULL workout history for a specific exercise,
     grouped by workout, preserving sets and workout metadata.
     """
-
     if not exercise_id:
         raise HTTPException(status_code=400, detail="exercise_id is required")
 
-    # clamp inputs
     days_back = max(1, min(int(days_back), 730))
     limit_workouts = max(1, min(int(limit_workouts), 300))
 
@@ -960,14 +946,12 @@ async def get_workout_history_by_exercise(
 
     EXERCISE_KIND_ENUM: List[str] = list(EXERCISE_KIND_RULES.keys())
 
-    # Stable fallback when unknown kinds appear
     DEFAULT_EXERCISE_KIND = (
         "Machine/Other"
         if "Machine/Other" in EXERCISE_KIND_RULES
         else (EXERCISE_KIND_ENUM[0] if EXERCISE_KIND_ENUM else "Machine/Other")
     )
 
-    # Determine kind for record logic
     ex_kind = DEFAULT_EXERCISE_KIND
     if ObjectId.is_valid(exercise_id):
         ex_doc = await get_db(user_id).exercises.find_one(
@@ -980,8 +964,6 @@ async def get_workout_history_by_exercise(
 
     allowed = set((EXERCISE_KIND_RULES.get(ex_kind) or {}).get("fields", []) or [])
 
-    # Pull relevant workouts
-
     workouts = (
         await get_db(user_id)
         .workouts.find(
@@ -989,7 +971,7 @@ async def get_workout_history_by_exercise(
                 "user_id": user_id,
                 "ended_at": {"$ne": None},
                 "started_at": {"$gte": start_date, "$lte": end_date},
-                "exercises.exercise_id": exercise_id,  # <- this is the new filter
+                "exercises.exercise_id": exercise_id,
             }
         )
         .sort("started_at", -1)
@@ -997,7 +979,6 @@ async def get_workout_history_by_exercise(
         .to_list(limit_workouts)
     )
 
-    # build full workout history
     history = []
     max_weight = 0
     max_reps = 0
@@ -1016,7 +997,6 @@ async def get_workout_history_by_exercise(
                 reps = s.get("reps") or 0
                 weight = s.get("weight") or 0
 
-                # record tracking
                 if "reps" in allowed:
                     if reps > max_reps:
                         max_reps = reps
@@ -1034,7 +1014,7 @@ async def get_workout_history_by_exercise(
                         "duration": s.get("duration"),
                         "distance": s.get("distance"),
                         "set_type": s.get("set_type", "normal"),
-                        "rest_timer": s.get("rest_timer", None),  # NEW
+                        "rest_timer": s.get("rest_timer", None),
                     }
                 )
 
@@ -1050,16 +1030,16 @@ async def get_workout_history_by_exercise(
 
     history.sort(key=lambda x: x["date"] or "", reverse=True)
 
-    return {
-        "exercise_id": exercise_id,
-        "exercise_kind": ex_kind,
-        "window_days": days_back,
-        "workouts_scanned": len(workouts),
-        "history": history,
-        "max_weight": max_weight or None,
-        "max_reps": max_reps or None,
-        "best_e1rm": round(best_e1rm, 2) if best_e1rm > 0 else None,
-    }
+    return ExerciseHistoryResponse(
+        exercise_id=exercise_id,
+        exercise_kind=ex_kind,
+        window_days=days_back,
+        workouts_scanned=len(workouts),
+        history=history,
+        max_weight=max_weight or None,
+        max_reps=max_reps or None,
+        best_e1rm=round(best_e1rm, 2) if best_e1rm > 0 else None,
+    )
 
 
 from datetime import datetime, timedelta, timezone
@@ -1069,7 +1049,6 @@ from fastapi import HTTPException, Depends, Query
 
 def _parse_yyyy_mm_dd(s: str, field: str) -> datetime:
     try:
-        # returns naive datetime at 00:00:00 for that date
         return datetime.strptime(s, "%Y-%m-%d")
     except Exception:
         raise HTTPException(status_code=400, detail=f"{field} must be YYYY-MM-DD")
@@ -1078,19 +1057,14 @@ def _parse_yyyy_mm_dd(s: str, field: str) -> datetime:
 def _day_bounds_utc(
     date_yyyy_mm_dd: str, tz_offset_minutes: int
 ) -> tuple[datetime, datetime]:
-    """
-    Compute [start_utc, end_utc) bounds for the given local date, using tz_offset_minutes.
-    Example: tz_offset_minutes=120 means local time = UTC+2.
-    """
     local_start = _parse_yyyy_mm_dd(date_yyyy_mm_dd, "date")
     offset = timedelta(minutes=int(tz_offset_minutes))
-    # local -> utc: utc = local - offset
     start_utc = (local_start - offset).replace(tzinfo=timezone.utc)
     end_utc = (local_start + timedelta(days=1) - offset).replace(tzinfo=timezone.utc)
     return start_utc, end_utc
 
 
-@api_router.get("/workouts/by-date", response_model=List[WorkoutSession])
+@api_router.get("/workouts/by-date", response_model=List[WorkoutSessionResponse])
 async def get_workouts_by_date(
     date: str = Query(..., description="YYYY-MM-DD in user's local date"),
     tz_offset_minutes: int = Query(
@@ -1128,7 +1102,7 @@ async def get_workouts_by_date(
     return [WorkoutSession(**{**w, "id": str(w["_id"])}) for w in workouts]
 
 
-@api_router.get("/workouts/by-date-range", response_model=List[WorkoutSession])
+@api_router.get("/workouts/by-date-range", response_model=List[WorkoutSessionResponse])
 async def get_workouts_by_date_range(
     start_date: str = Query(..., description="YYYY-MM-DD (local)"),
     end_date: str = Query(..., description="YYYY-MM-DD (local), inclusive"),
@@ -1151,7 +1125,6 @@ async def get_workouts_by_date_range(
 
     offset = timedelta(minutes=int(tz_offset_minutes))
 
-    # inclusive end_date => upper bound is next day at 00:00 local
     start_utc = (start_local - offset).replace(tzinfo=timezone.utc)
     end_utc = (end_local + timedelta(days=1) - offset).replace(tzinfo=timezone.utc)
 
@@ -1174,7 +1147,7 @@ async def get_workouts_by_date_range(
     return [WorkoutSession(**{**w, "id": str(w["_id"])}) for w in workouts]
 
 
-@api_router.get("/workouts/{workout_id}", response_model=WorkoutSession)
+@api_router.get("/workouts/{workout_id}", response_model=WorkoutSessionResponse)
 async def get_workout(workout_id: str, user_id: str = Depends(get_current_user)):
     workout = await get_db(user_id).workouts.find_one(
         {"_id": ObjectId(workout_id), "user_id": user_id}
@@ -1185,13 +1158,15 @@ async def get_workout(workout_id: str, user_id: str = Depends(get_current_user))
     return WorkoutSession(**{**workout, "id": str(workout["_id"])})
 
 
-@api_router.get("/workouts/batch/{workout_ids}", response_model=List[WorkoutSession])
-async def get_workout(workout_ids: str, user_id: str = Depends(get_current_user)):
+@api_router.get(
+    "/workouts/batch/{workout_ids}", response_model=List[WorkoutSessionResponse]
+)
+async def get_workouts_batch(
+    workout_ids: str, user_id: str = Depends(get_current_user)
+):
     workout_id_list = workout_ids.split(",")
-    # type cast to workoutsession list
 
     workouts = []
-    # Modify this to not use findone in a loop, but rather a single query
     if workout_id_list:
         workouts = (
             await get_db(user_id)
@@ -1210,8 +1185,6 @@ async def get_workout(workout_ids: str, user_id: str = Depends(get_current_user)
             .to_list(len(workout_id_list))
         )
         workouts = [WorkoutSession(**{**w, "id": str(w["_id"])}) for w in workouts]
-    else:
-        workouts = []
 
     return workouts
 
@@ -1225,7 +1198,6 @@ async def get_workout_detail(workout_id: str, user_id: str = Depends(get_current
     if not workout:
         raise HTTPException(status_code=404, detail="Workout not found")
 
-    # Get all exercise details
     exercise_ids = [ex["exercise_id"] for ex in workout.get("exercises", [])]
     exercises_map = {}
     if exercise_ids:
@@ -1247,7 +1219,6 @@ async def get_workout_detail(workout_id: str, user_id: str = Depends(get_current
         for ex in exercises:
             exercises_map[str(ex["_id"])] = ex
 
-    # Count PRs for this workout
     prs = await get_db(user_id).prs.find({"workout_id": workout_id}).to_list(100)
     pr_count = len(prs)
 
@@ -1272,14 +1243,12 @@ async def get_workout_detail(workout_id: str, user_id: str = Depends(get_current
         ex_name = ex_data.get("name", "Unknown Exercise")
         ex_kind = ex_data.get("exercise_kind", "Barbell")
 
-        # Calculate best set and volume
         best_weight = 0
         best_reps = 0
         best_duration = 0
         estimated_1rm = None
 
         for s in sets:
-            # Skip warmup and cooldown sets for stats calculation
             set_type = s.get("set_type", "normal")
             if set_type in ("warmup", "cooldown"):
                 continue
@@ -1299,7 +1268,6 @@ async def get_workout_detail(workout_id: str, user_id: str = Depends(get_current
             if duration > best_duration:
                 best_duration = duration
 
-        # Format best set display
         if ex_kind in ["Cardio", "Duration"]:
             if best_duration > 0:
                 total_centis = int(round(best_duration * 100))
@@ -1348,7 +1316,9 @@ async def get_workout_detail(workout_id: str, user_id: str = Depends(get_current
 
 
 # ============= PR ROUTES =============
-@api_router.get("/prs", response_model=List[PRRecord])
+
+
+@api_router.get("/prs", response_model=List[PRRecordResponse])
 async def get_prs(
     user_id: str = Depends(get_current_user), exercise_id: Optional[str] = None
 ):
@@ -1371,7 +1341,6 @@ async def check_and_create_prs(user_id: str, workout_id: str):
     for ex_idx, exercise in enumerate(workout.get("exercises", [])):
         exercise_id = exercise["exercise_id"]
 
-        # Get exercise details to determine type
         ex_data = (
             await get_db(user_id).exercises.find_one({"_id": ObjectId(exercise_id)})
             if ObjectId.is_valid(exercise_id)
@@ -1380,14 +1349,12 @@ async def check_and_create_prs(user_id: str, workout_id: str):
         ex_kind = ex_data.get("exercise_kind", "Barbell") if ex_data else "Barbell"
         is_duration_based = ex_kind in ["Cardio", "Duration"]
 
-        # Get all previous PRs for this exercise
         existing_prs = (
             await get_db(user_id)
             .prs.find({"user_id": user_id, "exercise_id": exercise_id})
             .to_list(100)
         )
 
-        # Extract max values from existing PRs (handle None values)
         max_weight = max([pr.get("weight") or 0 for pr in existing_prs], default=0) or 0
         max_reps = max([pr.get("reps") or 0 for pr in existing_prs], default=0) or 0
         max_volume = max([pr.get("volume") or 0 for pr in existing_prs], default=0) or 0
@@ -1399,7 +1366,6 @@ async def check_and_create_prs(user_id: str, workout_id: str):
         )
 
         for set_idx, set_data in enumerate(exercise.get("sets", [])):
-            # Skip warmup and cooldown sets for PR calculation
             set_type = set_data.get("set_type", "normal")
             if set_type in ("warmup", "cooldown"):
                 continue
@@ -1409,21 +1375,18 @@ async def check_and_create_prs(user_id: str, workout_id: str):
             duration = set_data.get("duration") or 0
             volume = weight * reps if weight > 0 and reps > 0 else 0
 
-            # Calculate estimated 1RM using Brzycki formula
             estimated_1rm = (
                 weight * (36 / (37 - reps))
                 if reps > 0 and reps < 37 and weight > 0
                 else weight
             )
 
-            # Initialize PR flags
             is_weight_pr = False
             is_reps_pr = False
             is_volume_pr = False
             is_duration_pr = False
             is_1rm_pr = False
 
-            # Check for various PR types
             if not is_duration_based:
                 if weight > max_weight and weight > 0:
                     is_weight_pr = True
@@ -1445,13 +1408,12 @@ async def check_and_create_prs(user_id: str, workout_id: str):
                     is_duration_pr = True
                     max_duration = duration
 
-            # Create PR records for each type of PR
             if is_weight_pr:
                 pr = PRRecord(
                     user_id=user_id,
                     exercise_id=exercise_id,
                     workout_id=workout_id,
-                    pr_type="weight",
+                    pr_type=PRType.WEIGHT,
                     weight=weight,
                     reps=reps,
                 )
@@ -1464,7 +1426,7 @@ async def check_and_create_prs(user_id: str, workout_id: str):
                     user_id=user_id,
                     exercise_id=exercise_id,
                     workout_id=workout_id,
-                    pr_type="reps",
+                    pr_type=PRType.REPS,
                     weight=weight,
                     reps=reps,
                 )
@@ -1477,7 +1439,7 @@ async def check_and_create_prs(user_id: str, workout_id: str):
                     user_id=user_id,
                     exercise_id=exercise_id,
                     workout_id=workout_id,
-                    pr_type="volume",
+                    pr_type=PRType.VOLUME,
                     weight=weight,
                     reps=reps,
                     volume=volume,
@@ -1491,7 +1453,7 @@ async def check_and_create_prs(user_id: str, workout_id: str):
                     user_id=user_id,
                     exercise_id=exercise_id,
                     workout_id=workout_id,
-                    pr_type="1rm",
+                    pr_type=PRType.ONE_RM,
                     weight=weight,
                     reps=reps,
                     estimated_1rm=estimated_1rm,
@@ -1505,14 +1467,13 @@ async def check_and_create_prs(user_id: str, workout_id: str):
                     user_id=user_id,
                     exercise_id=exercise_id,
                     workout_id=workout_id,
-                    pr_type="duration",
+                    pr_type=PRType.DURATION,
                     duration=duration,
                 )
                 await get_db(user_id).prs.insert_one(
                     pr.dict(by_alias=True, exclude={"id"})
                 )
 
-            # Update set with PR flags in the workout document
             if is_weight_pr or is_reps_pr or is_volume_pr or is_duration_pr:
                 pr_flags_updates.append(
                     {
@@ -1525,7 +1486,6 @@ async def check_and_create_prs(user_id: str, workout_id: str):
                     }
                 )
 
-    # Update workout with PR flags
     if pr_flags_updates:
         for update in pr_flags_updates:
             await get_db(user_id).workouts.update_one(
@@ -1550,14 +1510,11 @@ async def check_and_create_prs(user_id: str, workout_id: str):
 
 
 # ============= PLANNED WORKOUT HELPER FUNCTIONS =============
+
+
 def expand_recurring_workouts(
     planned_workouts: List[dict], start_date: str, end_date: str
 ) -> List[dict]:
-    """
-    Expand recurring workouts into individual instances for a date range.
-    Returns a list of workout instances with their scheduled dates.
-    Each instance resets to 'planned' status (status is determined by linked workout sessions).
-    """
     from datetime import date
 
     start = date.fromisoformat(start_date)
@@ -1567,65 +1524,51 @@ def expand_recurring_workouts(
 
     for pw in planned_workouts:
         if not pw.get("is_recurring", False):
-            # Non-recurring workout - only add if in range
             pw_date = date.fromisoformat(pw["date"])
             if start <= pw_date <= end:
                 expanded.append(pw)
         else:
-            # Recurring workout - expand to all occurrences
             recurrence_type = pw.get("recurrence_type")
             recurrence_end_str = pw.get("recurrence_end_date")
 
-            # Determine the actual end date for this recurrence
             actual_end = end
             if recurrence_end_str:
                 recurrence_end = date.fromisoformat(recurrence_end_str)
                 actual_end = min(end, recurrence_end)
 
-            # Start from the workout's initial date
             pw_start_date = date.fromisoformat(pw["date"])
             current_date = max(start, pw_start_date)
 
             if recurrence_type == "daily":
-                # Generate daily occurrences
                 while current_date <= actual_end:
                     instance = pw.copy()
                     instance["date"] = current_date.isoformat()
                     instance["recurrence_parent_id"] = str(pw["_id"])
-                    # Reset status to planned for each instance (actual status comes from workout sessions)
                     instance["status"] = "planned"
                     instance["workout_session_id"] = None
                     expanded.append(instance)
                     current_date += timedelta(days=1)
 
             elif recurrence_type == "weekly":
-                # Generate weekly occurrences based on selected days
                 recurrence_days = pw.get("recurrence_days", [])
                 if not recurrence_days:
                     continue
 
-                # Start from the earliest date that matches one of the recurrence days
-                # Move current_date to the first matching weekday if needed
                 while current_date <= actual_end:
-                    # Check if current_date's weekday is in recurrence_days
-                    # weekday() returns 0=Monday, 6=Sunday (matches our format)
                     if current_date.weekday() in recurrence_days:
                         instance = pw.copy()
                         instance["date"] = current_date.isoformat()
                         instance["recurrence_parent_id"] = str(pw["_id"])
-                        # Reset status to planned for each instance
                         instance["status"] = "planned"
                         instance["workout_session_id"] = None
                         expanded.append(instance)
                     current_date += timedelta(days=1)
 
             elif recurrence_type == "monthly":
-                # Generate monthly occurrences (same day each month)
                 original_day = pw_start_date.day
                 current_date = max(start, pw_start_date)
 
                 while current_date <= actual_end:
-                    # Try to create occurrence on the same day of month
                     try:
                         occurrence_date = date(
                             current_date.year, current_date.month, original_day
@@ -1634,15 +1577,12 @@ def expand_recurring_workouts(
                             instance = pw.copy()
                             instance["date"] = occurrence_date.isoformat()
                             instance["recurrence_parent_id"] = str(pw["_id"])
-                            # Reset status to planned for each instance
                             instance["status"] = "planned"
                             instance["workout_session_id"] = None
                             expanded.append(instance)
                     except ValueError:
-                        # Day doesn't exist in this month (e.g., Feb 31), skip
                         pass
 
-                    # Move to next month
                     if current_date.month == 12:
                         current_date = date(current_date.year + 1, 1, 1)
                     else:
@@ -1650,7 +1590,6 @@ def expand_recurring_workouts(
                             current_date.year, current_date.month + 1, 1
                         )
 
-    # Sort by date and order
     expanded.sort(key=lambda x: (x["date"], x.get("order", 0)))
     return expanded
 
@@ -1663,7 +1602,6 @@ async def enrich_planned_workouts_with_sessions(
     if not planned_workouts:
         return planned_workouts
 
-    # 1) Collect all candidate IDs + build per-date windows
     date_windows = {}
     id_candidates = set()
 
@@ -1674,7 +1612,6 @@ async def enrich_planned_workouts_with_sessions(
             end = dt.fromisoformat(date_str + "T23:59:59")
             date_windows[pw.get("id") or pw.get("_id")] = (start, end)
 
-        # collect possible planned_workout_id references
         if pw.get("id"):
             id_candidates.add(str(pw["id"]))
         if pw.get("_id") and isinstance(pw["_id"], ObjectId):
@@ -1686,13 +1623,11 @@ async def enrich_planned_workouts_with_sessions(
     if not id_candidates:
         return planned_workouts
 
-    # 2) Single DB fetch: all sessions tied to these IDs
     sessions_cursor = get_db(user_id).workouts.find(
         {"user_id": user_id, "planned_workout_id": {"$in": id_candidates}}
     )
     sessions = await sessions_cursor.to_list(200)
 
-    # 3) Index sessions by planned_workout_id
     sessions_by_planned: dict[str, list] = {}
     for s in sessions:
         pid = str(s.get("planned_workout_id"))
@@ -1700,14 +1635,12 @@ async def enrich_planned_workouts_with_sessions(
 
     enriched = []
 
-    # 4) Resolve status per item from memory, no more DB hits
     for pw in planned_workouts:
         pw = dict(pw)
         if pw.get("status") == "skipped":
             enriched.append(pw)
             continue
 
-        # determine which ID to inspect
         candidates = []
         if pw.get("id"):
             candidates.append(str(pw["id"]))
@@ -1720,7 +1653,6 @@ async def enrich_planned_workouts_with_sessions(
         for cid in candidates:
             matching.extend(sessions_by_planned.get(cid, []))
 
-        # date window filter
         date_str = pw.get("date")
         if matching and date_str:
             start, end = dt.fromisoformat(date_str + "T00:00:00"), dt.fromisoformat(
@@ -1732,7 +1664,6 @@ async def enrich_planned_workouts_with_sessions(
                 if s.get("started_at") and start <= s["started_at"] <= end
             ]
 
-        # choose the latest
         if matching:
             session = max(
                 matching, key=lambda s: s.get("created_at", s.get("started_at"))
@@ -1766,7 +1697,9 @@ async def enrich_planned_workouts_with_sessions(
 
 
 # ============= PLANNED WORKOUT ROUTES =============
-@api_router.post("/planned-workouts", response_model=PlannedWorkout)
+
+
+@api_router.post("/planned-workouts", response_model=PlannedWorkoutResponse)
 async def create_planned_workout(
     workout_data: PlannedWorkoutCreate, user_id: str = Depends(get_current_user)
 ):
@@ -1793,7 +1726,7 @@ def _is_yyyy_mm_dd(s: str) -> bool:
         return False
 
 
-@api_router.get("/planned-workouts", response_model=List[PlannedWorkout])
+@api_router.get("/planned-workouts", response_model=List[PlannedWorkoutResponse])
 async def get_planned_workouts(
     user_id: str = Depends(get_current_user),
     start_date: Optional[str] = None,
@@ -1806,8 +1739,6 @@ async def get_planned_workouts(
     - If 'start_date' and 'end_date' are provided, returns workouts in that range (expanded + actual sessions)
     - Otherwise, returns all planned workouts (not expanded)
     """
-
-    # Normalize inputs
     if date and (start_date or end_date):
         raise HTTPException(
             status_code=400,
@@ -1839,7 +1770,6 @@ async def get_planned_workouts(
 
     base_query = {"user_id": user_id}
 
-    # If no range/date: return all parents and one-offs (unexpanded), as before
     if not start_date and not end_date:
         workouts = await get_db(user_id).planned_workouts.find(base_query).to_list(1000)
         for w in workouts:
@@ -1849,12 +1779,10 @@ async def get_planned_workouts(
     range_query = {
         **base_query,
         "$or": [
-            # Non-recurring scheduled within range
             {
                 "is_recurring": {"$ne": True},
                 "date": {"$gte": start_date, "$lte": end_date},
             },
-            # Recurring parent overlaps range window (possible to generate at least one occurrence)
             {
                 "is_recurring": True,
                 "date": {"$lte": end_date},
@@ -1870,7 +1798,6 @@ async def get_planned_workouts(
 
     workouts = await get_db(user_id).planned_workouts.find(range_query).to_list(2000)
 
-    # Convert ObjectId to string
     for w in workouts:
         w["id"] = str(w["_id"])
 
@@ -1879,7 +1806,7 @@ async def get_planned_workouts(
     return [PlannedWorkout(**w) for w in enriched]
 
 
-@api_router.get("/planned-workouts/{workout_id}", response_model=PlannedWorkout)
+@api_router.get("/planned-workouts/{workout_id}", response_model=PlannedWorkoutResponse)
 async def get_planned_workout(
     workout_id: str, user_id: str = Depends(get_current_user)
 ):
@@ -1897,7 +1824,7 @@ async def get_planned_workout(
     return PlannedWorkout(**{**workout, "id": str(workout["_id"])})
 
 
-@api_router.put("/planned-workouts/{workout_id}", response_model=PlannedWorkout)
+@api_router.put("/planned-workouts/{workout_id}", response_model=PlannedWorkoutResponse)
 async def update_planned_workout(
     workout_id: str,
     workout_data: PlannedWorkoutUpdate,
@@ -1907,7 +1834,6 @@ async def update_planned_workout(
     if not ObjectId.is_valid(workout_id):
         raise HTTPException(status_code=400, detail="Invalid workout ID")
 
-    # Check if workout exists and belongs to user
     existing = await get_db(user_id).planned_workouts.find_one(
         {"_id": ObjectId(workout_id), "user_id": user_id}
     )
@@ -1915,7 +1841,6 @@ async def update_planned_workout(
     if not existing:
         raise HTTPException(status_code=404, detail="Planned workout not found")
 
-    # Update only provided fields
     update_data = {
         k: v for k, v in workout_data.dict(exclude_unset=True).items() if v is not None
     }
@@ -1949,7 +1874,9 @@ async def delete_planned_workout(
     return {"message": "Planned workout deleted"}
 
 
-# ============= SEED DATA =============
+# ============= ROOT =============
+
+
 @api_router.get("/")
 async def root():
     return {"message": "Strong Workout Tracker API", "version": "1.0.0"}

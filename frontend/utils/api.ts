@@ -1,10 +1,11 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { storageKey } from "../env";
+import type { paths } from "../types/models";
 
 const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || "";
 
-const api: AxiosInstance = axios.create({
+const axiosInstance: AxiosInstance = axios.create({
   baseURL: `${API_URL}/api`,
   headers: {
     "Content-Type": "application/json",
@@ -110,18 +111,15 @@ const Metrics = (() => {
   };
 })();
 
-/* exported helpers (call from any screen / debug button) */
 export const dumpApiCounts = (top?: number) => Metrics.dumpCounts(top);
-
 export const dumpApiRecent = (last?: number) => Metrics.dumpRecent(last);
-
 export const resetApiMetrics = () => Metrics.reset();
 
 /* =========================================
-   Request interceptor
+   Interceptors
    ========================================= */
 
-api.interceptors.request.use(async config => {
+axiosInstance.interceptors.request.use(async config => {
   const k = Metrics.key(config);
   Metrics.incCount(k);
 
@@ -139,7 +137,6 @@ api.interceptors.request.use(async config => {
 
   Metrics.markInflight(k, reqId, start);
 
-  // ❗ KEEP CURRENT BEHAVIOR — AsyncStorage read per request
   const userData = await AsyncStorage.getItem(storageKey("user"));
   if (userData) {
     try {
@@ -155,11 +152,7 @@ api.interceptors.request.use(async config => {
   return config;
 });
 
-/* =========================================
-   Response interceptor
-   ========================================= */
-
-api.interceptors.response.use(
+axiosInstance.interceptors.response.use(
   (res: AxiosResponse) => {
     const cfg = res.config;
     const k = Metrics.key(cfg);
@@ -168,7 +161,6 @@ api.interceptors.response.use(
 
     const serverMsRaw =
       res.headers?.["x-server-time-ms"] ?? res.headers?.["X-Server-Time-Ms"];
-
     const serverMs = serverMsRaw != null ? Number(serverMsRaw) : null;
 
     const reqId = cfg.headers?.["X-Request-Id"];
@@ -239,8 +231,167 @@ api.interceptors.response.use(
   },
 );
 
-export default api;
+/* =========================================
+   Type helpers — extract request/response
+   types directly from the generated paths
+   ========================================= */
 
+type ResponseBody<
+  P extends keyof paths,
+  M extends keyof paths[P],
+> = paths[P][M] extends {
+  responses: { 200: { content: { "application/json": infer R } } };
+}
+  ? R
+  : never;
+
+type RequestBody<
+  P extends keyof paths,
+  M extends keyof paths[P],
+> = paths[P][M] extends {
+  requestBody: { content: { "application/json": infer B } };
+}
+  ? B
+  : never;
+
+type QueryParams<
+  P extends keyof paths,
+  M extends keyof paths[P],
+> = paths[P][M] extends {
+  parameters: { query?: infer Q };
+}
+  ? Q
+  : never;
+
+type PathParams<
+  P extends keyof paths,
+  M extends keyof paths[P],
+> = paths[P][M] extends {
+  parameters: { path: infer Pp };
+}
+  ? Pp
+  : never;
+
+// Short path = strip the /api prefix for callers
+type ApiPath = keyof paths;
+
+// Exact static match: '/workouts' -> '/api/workouts'
+type FullPath<S extends string> = `/api${S}` extends ApiPath
+  ? `/api${S}`
+  : never;
+
+// Strip query string from a path string type: '/foo?bar=1' -> '/foo'
+type StripQuery<S extends string> = S extends `${infer Base}?${string}`
+  ? Base
+  : S;
+
+// Dynamic match — handles up to 2 path params, and strips query strings:
+// '/conversations/${id}/messages' -> '/api/ai/conversations/{id}/messages'
+// '/workouts/history/by-exercise?exercise_id=...' -> '/api/workouts/history/by-exercise'
+type MatchPath<S extends string> = {
+  [P in ApiPath]: `/api${StripQuery<S>}` extends (
+    P extends `${infer A}{${string}}${infer B}{${string}}${infer C}`
+      ? `${A}${string}${B}${string}${C}`
+      : P extends `${infer A}{${string}}${infer B}`
+        ? `${A}${string}${B}`
+        : P
+  )
+    ? P
+    : never;
+}[ApiPath];
+
+// Resolve: exact first, then dynamic, then fall back to any
+type ResolvedPath<S extends string> =
+  FullPath<StripQuery<S>> extends ApiPath
+    ? FullPath<StripQuery<S>>
+    : MatchPath<S> extends ApiPath
+      ? MatchPath<S>
+      : never;
+
+// When path doesn't resolve, default P to never which makes ResponseBody return any
+type SafeResponseBody<P, M extends string> = [P] extends [never]
+  ? any
+  : P extends ApiPath
+    ? M extends keyof paths[P]
+      ? paths[P][M] extends {
+          responses: { 200: { content: { "application/json": infer R } } };
+        }
+        ? R
+        : any
+      : any
+    : any;
+
+// Replace {param} tokens in a path string with actual values at runtime
+function interpolatePath(path: string, params: Record<string, string>): string {
+  return path.replace(/\{(\w+)\}/g, (_, key) => {
+    if (!(key in params)) throw new Error(`Missing path param: ${key}`);
+    return encodeURIComponent(params[key]);
+  });
+}
+
+/* =========================================
+   Typed API client
+   ========================================= */
+
+const api = {
+  get<S extends string, P extends ApiPath = ResolvedPath<S>>(
+    path: S,
+    config?: AxiosRequestConfig & {
+      params?: QueryParams<P, "get">;
+      pathParams?: Record<string, string>;
+    },
+  ): Promise<AxiosResponse<SafeResponseBody<P, "get">>> {
+    const url = config?.pathParams
+      ? interpolatePath(path, config.pathParams)
+      : path;
+    return axiosInstance.get(url, config);
+  },
+
+  post<S extends string, P extends ApiPath = ResolvedPath<S>>(
+    path: S,
+    data?: RequestBody<P, "post">,
+    config?: AxiosRequestConfig & { pathParams?: Record<string, string> },
+  ): Promise<AxiosResponse<SafeResponseBody<P, "post">>> {
+    const url = config?.pathParams
+      ? interpolatePath(path, config.pathParams)
+      : path;
+    return axiosInstance.post(url, data, config);
+  },
+
+  put<S extends string, P extends ApiPath = ResolvedPath<S>>(
+    path: S,
+    data?: RequestBody<P, "put">,
+    config?: AxiosRequestConfig & { pathParams?: Record<string, string> },
+  ): Promise<AxiosResponse<SafeResponseBody<P, "put">>> {
+    const url = config?.pathParams
+      ? interpolatePath(path, config.pathParams)
+      : path;
+    return axiosInstance.put(url, data, config);
+  },
+
+  patch<S extends string, P extends ApiPath = ResolvedPath<S>>(
+    path: S,
+    data?: RequestBody<P, "patch">,
+    config?: AxiosRequestConfig & { pathParams?: Record<string, string> },
+  ): Promise<AxiosResponse<SafeResponseBody<P, "patch">>> {
+    const url = config?.pathParams
+      ? interpolatePath(path, config.pathParams)
+      : path;
+    return axiosInstance.patch(url, data, config);
+  },
+
+  delete<S extends string, P extends ApiPath = ResolvedPath<S>>(
+    path: S,
+    config?: AxiosRequestConfig & { pathParams?: Record<string, string> },
+  ): Promise<AxiosResponse<SafeResponseBody<P, "delete">>> {
+    const url = config?.pathParams
+      ? interpolatePath(path, config.pathParams)
+      : path;
+    return axiosInstance.delete(url, config);
+  },
+};
+
+export default api;
 type WsHandlers = {
   onOpen?: () => void;
   onClose?: (e: { code?: number; reason?: string }) => void;
@@ -430,4 +581,3 @@ export function createWsClient(
     },
   };
 }
-

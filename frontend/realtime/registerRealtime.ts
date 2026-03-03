@@ -12,7 +12,8 @@ import {
   usePlannedWorkoutsStoreInternal,
 } from "../store/plannedWorkoutsStore";
 import { useWorkoutsStoreInternal } from "../store/workoutsStore";
-import { Conversation, useConversationsStoreInternal } from "../store/convesationsStore";
+import {  useConversationsStoreInternal } from "../store/convesationsStore";
+import { Conversation } from "../types/gen";
 // import { useUserStore } from "../store/userStore";
 // import { usePrRecords } from "../store/prRecordsStore";
 

@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { create } from "zustand";
 import type { Exercise } from "../types";
+import type { BodyPart } from "../types/gen";
 import api from "../utils/api";
 
 type ExercisesStore = {
@@ -136,7 +137,7 @@ export function useExercises(opts?: Options) {
 
     const mg = opts?.muscleGroup;
     if (mg && mg !== "All") {
-      arr = arr.filter(ex => ex.primary_body_parts?.includes(mg));
+      arr = arr.filter(ex => ex.primary_body_parts?.includes(mg as BodyPart));
     }
 
     const search = opts?.search?.trim();

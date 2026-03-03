@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -9,15 +9,16 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import Button from '../components/Button';
-import api from '../utils/api';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import Button from "../components/Button";
+import api from "../utils/api";
+import type { Sex, TrainingAge } from "../types/gen";
 
-const STEPS = ['Basics', 'Training', 'About You', 'Done'];
+const STEPS = ["Basics", "Training", "About You", "Done"];
 
 export default function OnboardingScreen() {
   const router = useRouter();
@@ -25,27 +26,27 @@ export default function OnboardingScreen() {
   const [loading, setLoading] = useState(false);
 
   // Form state
-  const [sex, setSex] = useState('');
+  const [sex, setSex] = useState<Sex | "">("");
   const [dateOfBirth, setDateOfBirth] = useState<Date>(new Date(1990, 0, 1));
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [heightCm, setHeightCm] = useState('');
-  const [weightKg, setWeightKg] = useState('');
-  const [trainingAge, setTrainingAge] = useState('');
-  const [goals, setGoals] = useState('');
-  const [injuryHistory, setInjuryHistory] = useState('');
-  const [weaknesses, setWeaknesses] = useState('');
-  const [strengths, setStrengths] = useState('');
-  const [backgroundStory, setBackgroundStory] = useState('');
+  const [heightCm, setHeightCm] = useState("");
+  const [weightKg, setWeightKg] = useState("");
+  const [trainingAge, setTrainingAge] = useState<TrainingAge | "">("");
+  const [goals, setGoals] = useState("");
+  const [injuryHistory, setInjuryHistory] = useState("");
+  const [weaknesses, setWeaknesses] = useState("");
+  const [strengths, setStrengths] = useState("");
+  const [backgroundStory, setBackgroundStory] = useState("");
 
   const saveProfile = async (skipToEnd = false) => {
     try {
       setLoading(true);
-      await api.put('/profile', {
-        sex: sex || null,
+      await api.put("/profile", {
+        sex: (sex as Sex) || null,
         date_of_birth: dateOfBirth ? dateOfBirth.toISOString() : null,
         height_cm: heightCm ? parseFloat(heightCm) : null,
         weight_kg: weightKg ? parseFloat(weightKg) : null,
-        training_age: trainingAge || null,
+        training_age: (trainingAge as TrainingAge) || null,
         goals: goals || null,
         injury_history: injuryHistory || null,
         weaknesses: weaknesses || null,
@@ -55,11 +56,11 @@ export default function OnboardingScreen() {
 
       if (skipToEnd || currentStep === STEPS.length - 1) {
         // Profile complete, go to main app
-        router.replace('/(tabs)/workout');
+        router.replace("/(tabs)/workout");
       }
     } catch (error: any) {
-      console.error('Failed to save profile:', error);
-      Alert.alert('Error', 'Failed to save profile');
+      console.error("Failed to save profile:", error);
+      Alert.alert("Error", "Failed to save profile");
     } finally {
       setLoading(false);
     }
@@ -76,12 +77,12 @@ export default function OnboardingScreen() {
 
   const handleSkip = () => {
     Alert.alert(
-      'Skip Onboarding',
-      'You can complete your profile later in Settings',
+      "Skip Onboarding",
+      "You can complete your profile later in Settings",
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Skip', onPress: () => router.replace('/(tabs)/workout') },
-      ]
+        { text: "Cancel", style: "cancel" },
+        { text: "Skip", onPress: () => router.replace("/(tabs)/workout") },
+      ],
     );
   };
 
@@ -106,13 +107,21 @@ export default function OnboardingScreen() {
 
       <Text style={styles.label}>Sex</Text>
       <View style={styles.optionsRow}>
-        {['male', 'female', 'other'].map((option) => (
+        {(["male", "female", "other"] as const).map(option => (
           <TouchableOpacity
             key={option}
-            style={[styles.optionButton, sex === option && styles.optionButtonActive]}
+            style={[
+              styles.optionButton,
+              sex === option && styles.optionButtonActive,
+            ]}
             onPress={() => setSex(option)}
           >
-            <Text style={[styles.optionText, sex === option && styles.optionTextActive]}>
+            <Text
+              style={[
+                styles.optionText,
+                sex === option && styles.optionTextActive,
+              ]}
+            >
               {option.charAt(0).toUpperCase() + option.slice(1)}
             </Text>
           </TouchableOpacity>
@@ -120,7 +129,7 @@ export default function OnboardingScreen() {
       </View>
 
       <Text style={styles.label}>Date of Birth</Text>
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.datePickerButton}
         onPress={() => setShowDatePicker(true)}
       >
@@ -129,7 +138,7 @@ export default function OnboardingScreen() {
         </Text>
         <Ionicons name="calendar-outline" size={20} color="#007AFF" />
       </TouchableOpacity>
-      
+
       {showDatePicker && (
         <View style={styles.datePickerContainer}>
           <DateTimePicker
@@ -137,7 +146,7 @@ export default function OnboardingScreen() {
             mode="date"
             display="spinner"
             onChange={(event, selectedDate) => {
-              setShowDatePicker(Platform.OS === 'ios');
+              setShowDatePicker(Platform.OS === "ios");
               if (selectedDate) {
                 setDateOfBirth(selectedDate);
               }
@@ -177,12 +186,12 @@ export default function OnboardingScreen() {
 
       <Text style={styles.label}>Training Age</Text>
       <View style={styles.optionsGrid}>
-        {[
-          { value: 'new', label: 'New' },
-          { value: '1-2y', label: '1-2 years' },
-          { value: '2-5y', label: '2-5 years' },
-          { value: '5y+', label: '5+ years' },
-        ].map((option) => (
+        {([
+          { value: "new", label: "New" },
+          { value: "1-2y", label: "1-2 years" },
+          { value: "2-5y", label: "2-5 years" },
+          { value: "5y+", label: "5+ years" },
+        ] as const).map(option => (
           <TouchableOpacity
             key={option.value}
             style={[
@@ -276,7 +285,8 @@ export default function OnboardingScreen() {
     <View style={styles.stepContainer}>
       <Text style={styles.stepTitle}>Almost done!</Text>
       <Text style={styles.description}>
-        You've completed all the essential information. You can always update your profile later in settings.
+        You've completed all the essential information. You can always update
+        your profile later in settings.
       </Text>
     </View>
   );
@@ -284,7 +294,7 @@ export default function OnboardingScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardView}
       >
         {/* Header */}
@@ -339,7 +349,7 @@ export default function OnboardingScreen() {
           )}
 
           <Button
-            title={currentStep === STEPS.length - 1 ? 'Finish' : 'Next'}
+            title={currentStep === STEPS.length - 1 ? "Finish" : "Next"}
             onPress={handleNext}
             loading={loading}
             style={styles.nextButton}
@@ -353,58 +363,58 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F7',
+    backgroundColor: "#F5F5F7",
   },
   keyboardView: {
     flex: 1,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 24,
     paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
+    borderBottomColor: "#E5E5EA",
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#1C1C1E',
+    fontWeight: "600",
+    color: "#1C1C1E",
   },
   skipButton: {
     fontSize: 16,
-    color: '#007AFF',
+    color: "#007AFF",
   },
   progressContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+    flexDirection: "row",
+    justifyContent: "space-around",
     paddingHorizontal: 24,
     paddingVertical: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
   },
   progressItem: {
-    alignItems: 'center',
+    alignItems: "center",
     flex: 1,
   },
   progressDot: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#E5E5EA',
+    backgroundColor: "#E5E5EA",
     marginBottom: 8,
   },
   progressDotActive: {
-    backgroundColor: '#007AFF',
+    backgroundColor: "#007AFF",
   },
   progressText: {
     fontSize: 12,
-    color: '#8E8E93',
+    color: "#8E8E93",
   },
   progressTextActive: {
-    color: '#007AFF',
-    fontWeight: '600',
+    color: "#007AFF",
+    fontWeight: "600",
   },
   scrollView: {
     flex: 1,
@@ -417,49 +427,49 @@ const styles = StyleSheet.create({
   },
   stepTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1C1C1E',
+    fontWeight: "bold",
+    color: "#1C1C1E",
     marginBottom: 24,
   },
   description: {
     fontSize: 16,
-    color: '#8E8E93',
+    color: "#8E8E93",
     lineHeight: 24,
     marginBottom: 16,
   },
   label: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1C1C1E',
+    fontWeight: "600",
+    color: "#1C1C1E",
     marginTop: 16,
     marginBottom: 8,
   },
   input: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
-    color: '#1C1C1E',
+    color: "#1C1C1E",
     borderWidth: 1,
-    borderColor: '#E5E5EA',
+    borderColor: "#E5E5EA",
   },
   datePickerButton: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
     borderWidth: 1,
-    borderColor: '#E5E5EA',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    borderColor: "#E5E5EA",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   datePickerText: {
     fontSize: 16,
-    color: '#1C1C1E',
+    color: "#1C1C1E",
   },
   datePickerContainer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 12,
     padding: 8,
     marginTop: 8,
@@ -472,63 +482,63 @@ const styles = StyleSheet.create({
     minHeight: 200,
   },
   optionsRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
   },
   optionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 12,
   },
   optionButton: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderWidth: 2,
-    borderColor: '#E5E5EA',
-    alignItems: 'center',
+    borderColor: "#E5E5EA",
+    alignItems: "center",
   },
   optionButtonWide: {
     flex: 0,
-    minWidth: '48%',
+    minWidth: "48%",
   },
   optionButtonActive: {
-    borderColor: '#007AFF',
-    backgroundColor: '#E5F0FF',
+    borderColor: "#007AFF",
+    backgroundColor: "#E5F0FF",
   },
   optionText: {
     fontSize: 16,
-    color: '#1C1C1E',
+    color: "#1C1C1E",
   },
   optionTextActive: {
-    color: '#007AFF',
-    fontWeight: '600',
+    color: "#007AFF",
+    fontWeight: "600",
   },
   footer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     padding: 24,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderTopWidth: 1,
-    borderTopColor: '#E5E5EA',
+    borderTopColor: "#E5E5EA",
     gap: 12,
   },
   backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 16,
     paddingHorizontal: 24,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#007AFF',
+    borderColor: "#007AFF",
     gap: 8,
   },
   backButtonText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#007AFF',
+    fontWeight: "600",
+    color: "#007AFF",
   },
   nextButton: {
     flex: 1,
