@@ -1194,7 +1194,10 @@ export interface components {
             planned_workout_id?: string | null;
             /** Name */
             name?: string | null;
-            /** Started At */
+            /**
+             * Started At
+             * Format: date-time
+             */
             started_at: string;
             /** Ended At */
             ended_at?: string | null;

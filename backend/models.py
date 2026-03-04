@@ -528,19 +528,13 @@ class PlannedWorkout(BaseModel):
 
 
 # ============= RESPONSE MODELS (id always present) =============
-
-
 class ExerciseResponse(Exercise):
     id: str
 
 
 class WorkoutSessionResponse(WorkoutSession):
     id: str
-    started_at: str
-    template_id: Optional[str] = None
-    planned_workout_id: Optional[str] = None
-    name: Optional[str] = None
-    notes: Optional[str] = None
+    started_at: datetime
 
 
 class WorkoutTemplateResponse(WorkoutTemplate):
