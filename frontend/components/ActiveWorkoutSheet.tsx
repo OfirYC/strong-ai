@@ -878,7 +878,7 @@ export default function ActiveWorkoutSheet({
                         placeholder="Add workout description..."
                         placeholderTextColor="#8E8E93"
                         multiline
-                        numberOfLines={2}
+                        scrollEnabled={false}
                       />
                     </View>
                   )}
@@ -1016,7 +1016,6 @@ const styles = StyleSheet.create({
   },
   collapsedContent: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: 10,
   },
@@ -1024,8 +1023,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+    flex: 1,
+    minWidth: 0, // critical for truncation in RN
   },
   collapsedTitle: {
+    flex: 1,
     fontSize: 17,
     fontWeight: "600",
     color: "#1C1C1E",
@@ -1034,6 +1036,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+    flexShrink: 0, // prevents timer from shrinking
   },
   timerBadge: {
     flexDirection: "row",
@@ -1056,9 +1059,7 @@ const styles = StyleSheet.create({
     height: 44, // ← lock row height
   },
 
-  topBarLeft: {
-    flex: 1,
-  },
+  topBarLeft: {},
 
   topBarCenter: {
     position: "absolute",
@@ -1069,7 +1070,7 @@ const styles = StyleSheet.create({
   },
 
   topBarRight: {
-    marginLeft: "auto", // ensures right alignment
+    marginLeft: "auto",
   },
   topBarTimerOverlay: {
     position: "absolute",
@@ -1160,7 +1161,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#3A3A3C",
     padding: 0,
-    minHeight: 40,
   },
   finishButton: {
     backgroundColor: "#007AFF",
