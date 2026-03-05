@@ -1,24 +1,18 @@
-import React from "react";
+import React, { useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "../../store/authStore";
 import Button from "../../components/Button";
+import MuscleVolumeModal from "../../components/MuscleVolumeModal";
 import * as Updates from "expo-updates";
-import Constants from "expo-constants";
 const isDev = __DEV__;
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, logout } = useAuthStore();
-  const updateInfo = {
-    updateId: Updates.updateId,
-    runtimeVersion: Updates.runtimeVersion,
-    channel: Updates.channel,
-    isEmbeddedLaunch: Updates.isEmbeddedLaunch,
-    createdAt: Updates.createdAt,
-  };
+  const [muscleVolumeVisible, setMuscleVolumeVisible] = useState(false);
 
   const handleLogout = () => {
     Alert.alert("Logout", "Are you sure you want to logout?", [
@@ -60,9 +54,12 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={24} color="#8E8E93" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => setMuscleVolumeVisible(true)}
+          >
             <View style={styles.menuItemLeft}>
-              <Ionicons name="stats-chart-outline" size={24} color="#FFFFFF" />
+              <Ionicons name="stats-chart-outline" size={24} color="#007AFF" />
               <Text style={styles.menuItemText}>Statistics</Text>
             </View>
             <Ionicons name="chevron-forward" size={24} color="#8E8E93" />
@@ -70,7 +67,7 @@ export default function ProfileScreen() {
 
           <TouchableOpacity style={styles.menuItem}>
             <View style={styles.menuItemLeft}>
-              <Ionicons name="help-circle-outline" size={24} color="#FFFFFF" />
+              <Ionicons name="help-circle-outline" size={24} color="#007AFF" />
               <Text style={styles.menuItemText}>Help & Support</Text>
             </View>
             <Ionicons name="chevron-forward" size={24} color="#8E8E93" />
@@ -86,6 +83,7 @@ export default function ProfileScreen() {
             Embedded Launch: {Updates.isEmbeddedLaunch ? "Yes" : "No"}
           </Text>
         </View>
+
         <Button
           title="Logout"
           onPress={handleLogout}
@@ -93,6 +91,11 @@ export default function ProfileScreen() {
           style={styles.logoutButton}
         />
       </View>
+
+      <MuscleVolumeModal
+        visible={muscleVolumeVisible}
+        onClose={() => setMuscleVolumeVisible(false)}
+      />
     </SafeAreaView>
   );
 }

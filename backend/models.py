@@ -1,8 +1,16 @@
-from pydantic import BaseModel, Field, EmailStr, model_validator, ConfigDict
+from pydantic import (
+    BaseModel,
+    Field,
+    EmailStr,
+    model_validator,
+    ConfigDict,
+    field_validator,
+)
 from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
 from bson import ObjectId
 from enum import Enum
+from body_parts import ALL_SLUGS
 
 
 class PyObjectId(ObjectId):
@@ -51,6 +59,47 @@ class ExerciseCategory(str, Enum):
     STABILITY = "Stability"
     RECOVERY = "Recovery"
     CONTROL = "Control"
+
+
+class MuscleLoad(BaseModel):
+    """
+    A single muscle's involvement in an exercise.
+    slug references the in-code MUSCLE_TREE — no DB collection needed.
+
+    Tagging convention:
+      - Tag at the most specific level you know (head > muscle > group)
+      - role="primary"    → main movers, load_pct sums to ~100 across all primaries
+      - role="secondary"  → meaningfully loaded, no sum constraint
+      - role="stabilizer" → isometric/bracing, no sum constraint
+
+    Examples:
+      Barbell Curl:
+        {"slug": "biceps-long-head",   "role": "primary",    "load_pct": 60}
+        {"slug": "biceps-short-head",  "role": "primary",    "load_pct": 40}
+        {"slug": "brachialis",         "role": "secondary",  "load_pct": 50}
+        {"slug": "forearms-flexors",   "role": "stabilizer", "load_pct": 20}
+
+      Posterior Tibialis Cable Raise:
+        {"slug": "tibialis-posterior", "role": "primary",    "load_pct": 100}
+
+      Short Foot / Arch Raise:
+        {"slug": "abductor-hallucis",  "role": "primary",    "load_pct": 60}
+        {"slug": "flexor-digitorum-brevis", "role": "primary", "load_pct": 40}
+        {"slug": "plantar-fascia",     "role": "secondary",  "load_pct": 30}
+    """
+
+    slug: str
+    role: Literal["primary", "secondary", "stabilizer"]
+    load_pct: float = Field(ge=0, le=100)
+
+    @field_validator("slug")
+    @classmethod
+    def slug_must_exist(cls, v: str) -> str:
+        if v not in ALL_SLUGS:
+            raise ValueError(
+                f"Unknown muscle slug: '{v}'. Check body_parts.MUSCLE_TREE."
+            )
+        return v
 
 
 class BodyPart(str, Enum):
@@ -226,6 +275,33 @@ class UserContext(BaseModel):
 
 
 # ============= EXERCISE MODELS =============
+class MuscleTopExercise(BaseModel):
+    name: str
+    hypertrophy_sets: float  # weekly avg hard sets
+    strength_score: float  # weekly avg kg·intensity
+    endurance_reps: float  # weekly avg effective reps
+
+
+class MuscleVolumeEntry(BaseModel):
+    slug: str
+    name: str
+    level: int  # 0=group 1=muscle 2=head
+
+    # Hypertrophy: hard sets/week in 5–30 rep range, load_pct weighted
+    hypertrophy_sets: float  # primary role
+    hypertrophy_sets_secondary: float
+    hypertrophy_sets_stabilizer: float
+
+    # Strength: intensity-weighted tonnage/week
+    # sum(reps × weight × intensity_factor), intensity_factor=max(0,(pct1rm−0.75)/0.25)
+    strength_score: float
+
+    # Endurance: effective reps/week
+    # EMOM total_reps, duration/3, distance*1000/1.5, high-rep (≥15) sets
+    endurance_reps: float
+
+    best_e1rm: Optional[float]
+    top_exercises: List[MuscleTopExercise]
 
 
 class ExerciseCreate(BaseModel):
@@ -233,6 +309,7 @@ class ExerciseCreate(BaseModel):
     exercise_kind: ExerciseKind
     primary_body_parts: List[BodyPart]
     secondary_body_parts: List[BodyPart] = []
+    muscle_loads: List[MuscleLoad] = []
     category: ExerciseCategory = ExerciseCategory.STRENGTH
     is_custom: bool = False
     instructions: Optional[str] = None
@@ -245,6 +322,13 @@ class Exercise(BaseModel):
     exercise_kind: ExerciseKind
     primary_body_parts: List[BodyPart]
     secondary_body_parts: List[BodyPart] = []
+    muscle_loads: List[MuscleLoad] = []
+
+    @property
+    def is_tagged(self) -> bool:
+        """False = still on legacy body parts. Use to track tagging progress."""
+        return len(self.muscle_loads) > 0
+
     category: ExerciseCategory = ExerciseCategory.STRENGTH
     is_custom: bool = False
     user_id: Optional[str] = None
@@ -258,6 +342,7 @@ class Exercise(BaseModel):
 
 
 class ExerciseUpdate(BaseModel):
+    muscle_loads: Optional[List[MuscleLoad]] = None
     instructions: Optional[str] = None
     image: Optional[str] = None
 
@@ -527,7 +612,16 @@ class PlannedWorkout(BaseModel):
         return self
 
 
-# ============= RESPONSE MODELS (id always present) =============
+# ============= RESPONSE MODELS (id always present) =============§
+class MuscleVolumeResponse(BaseModel):
+    days: int
+    weeks: float
+    start_date: str
+    end_date: str
+    workout_count: int
+    muscles: List[MuscleVolumeEntry]
+
+
 class ExerciseResponse(Exercise):
     id: str
 

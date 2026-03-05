@@ -122,6 +122,7 @@ export default function CreateExerciseModal({
           is_custom: true,
           image: imageBase64 || null,
           instructions: instructions.trim() || null,
+          muscle_loads: []
         })
       ).data as Exercise;
 

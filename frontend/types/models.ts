@@ -432,6 +432,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/analytics/muscle-volume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Muscle Volume */
+        get: operations["get_muscle_volume_api_analytics_muscle_volume_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/prs": {
         parameters: {
             query?: never;
@@ -582,6 +599,11 @@ export interface components {
              * @default []
              */
             secondary_body_parts: components["schemas"]["BodyPart"][];
+            /**
+             * Muscle Loads
+             * @default []
+             */
+            muscle_loads: components["schemas"]["MuscleLoad"][];
             /** @default Strength */
             category: components["schemas"]["ExerciseCategory"];
             /**
@@ -663,6 +685,11 @@ export interface components {
              * @default []
              */
             secondary_body_parts: components["schemas"]["BodyPart"][];
+            /**
+             * Muscle Loads
+             * @default []
+             */
+            muscle_loads: components["schemas"]["MuscleLoad"][];
             /** @default Strength */
             category: components["schemas"]["ExerciseCategory"];
             /**
@@ -684,6 +711,8 @@ export interface components {
         };
         /** ExerciseUpdate */
         ExerciseUpdate: {
+            /** Muscle Loads */
+            muscle_loads?: components["schemas"]["MuscleLoad"][] | null;
             /** Instructions */
             instructions?: string | null;
             /** Image */
@@ -742,6 +771,92 @@ export interface components {
         MessagesResponse: {
             /** Messages */
             messages: components["schemas"]["MessageResponse"][];
+        };
+        /**
+         * MuscleLoad
+         * @description A single muscle's involvement in an exercise.
+         *     slug references the in-code MUSCLE_TREE — no DB collection needed.
+         *
+         *     Tagging convention:
+         *       - Tag at the most specific level you know (head > muscle > group)
+         *       - role="primary"    → main movers, load_pct sums to ~100 across all primaries
+         *       - role="secondary"  → meaningfully loaded, no sum constraint
+         *       - role="stabilizer" → isometric/bracing, no sum constraint
+         *
+         *     Examples:
+         *       Barbell Curl:
+         *         {"slug": "biceps-long-head",   "role": "primary",    "load_pct": 60}
+         *         {"slug": "biceps-short-head",  "role": "primary",    "load_pct": 40}
+         *         {"slug": "brachialis",         "role": "secondary",  "load_pct": 50}
+         *         {"slug": "forearms-flexors",   "role": "stabilizer", "load_pct": 20}
+         *
+         *       Posterior Tibialis Cable Raise:
+         *         {"slug": "tibialis-posterior", "role": "primary",    "load_pct": 100}
+         *
+         *       Short Foot / Arch Raise:
+         *         {"slug": "abductor-hallucis",  "role": "primary",    "load_pct": 60}
+         *         {"slug": "flexor-digitorum-brevis", "role": "primary", "load_pct": 40}
+         *         {"slug": "plantar-fascia",     "role": "secondary",  "load_pct": 30}
+         */
+        MuscleLoad: {
+            /** Slug */
+            slug: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "primary" | "secondary" | "stabilizer";
+            /** Load Pct */
+            load_pct: number;
+        };
+        /** MuscleTopExercise */
+        MuscleTopExercise: {
+            /** Name */
+            name: string;
+            /** Hypertrophy Sets */
+            hypertrophy_sets: number;
+            /** Strength Score */
+            strength_score: number;
+            /** Endurance Reps */
+            endurance_reps: number;
+        };
+        /** MuscleVolumeEntry */
+        MuscleVolumeEntry: {
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /** Level */
+            level: number;
+            /** Hypertrophy Sets */
+            hypertrophy_sets: number;
+            /** Hypertrophy Sets Secondary */
+            hypertrophy_sets_secondary: number;
+            /** Hypertrophy Sets Stabilizer */
+            hypertrophy_sets_stabilizer: number;
+            /** Strength Score */
+            strength_score: number;
+            /** Endurance Reps */
+            endurance_reps: number;
+            /** Best E1Rm */
+            best_e1rm: number | null;
+            /** Top Exercises */
+            top_exercises: components["schemas"]["MuscleTopExercise"][];
+        };
+        /** MuscleVolumeResponse */
+        MuscleVolumeResponse: {
+            /** Days */
+            days: number;
+            /** Weeks */
+            weeks: number;
+            /** Start Date */
+            start_date: string;
+            /** End Date */
+            end_date: string;
+            /** Workout Count */
+            workout_count: number;
+            /** Muscles */
+            muscles: components["schemas"]["MuscleVolumeEntry"][];
         };
         /** PRRecordResponse */
         PRRecordResponse: {
@@ -2448,6 +2563,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkoutSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_muscle_volume_api_analytics_muscle_volume_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MuscleVolumeResponse"];
                 };
             };
             /** @description Validation Error */

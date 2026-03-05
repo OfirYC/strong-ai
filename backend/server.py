@@ -95,6 +95,9 @@ from models import (
     RecurrenceType,
     PRType,
     UserResponse,
+    MuscleVolumeResponse,
+    MuscleTopExercise,
+    MuscleVolumeEntry,
 )
 from services.ai.profile_insights import generate_profile_insights
 from auth import (
@@ -1314,7 +1317,287 @@ async def get_workout_detail(workout_id: str, user_id: str = Depends(get_current
     )
 
 
-# ============= PR ROUTES =============
+# ============= PR/STATISTIC ROUTES =============
+
+# ── Kind classification ───────────────────────────────────────────────────────
+
+EMOM_KINDS = {
+    "EMOM (Every Minute On The Minute)",
+    "ETOT (Every Thirty Seconds on Thirty Seconds)",
+}
+CARDIO_KINDS = {"Cardio", "Weighted Cardio"}
+DURATION_KINDS = {"Duration", "Weighted Duration"}
+
+
+# ── Scoring functions ─────────────────────────────────────────────────────────
+
+
+def _hyp_score(kind: str, reps, weight, duration, load_pct: float) -> float:
+    """
+    Effective hypertrophy sets (0.0–1.0+ per working set).
+    Hard sets 5–30 rep range = full credit, peaked at 8–12.
+    EMOM/ETOT = (total_reps / 10) * 0.4  (sub-failure discount).
+    Duration / Cardio = 0.
+    """
+    load = load_pct / 100.0
+
+    if kind in CARDIO_KINDS or kind in DURATION_KINDS:
+        return 0.0
+
+    if kind in EMOM_KINDS:
+        if not reps:
+            return 0.0
+        return (reps / 10.0) * 0.4 * load
+
+    if reps is None:
+        return 0.0
+
+    if 8 <= reps <= 12:
+        factor = 1.0
+    elif 5 <= reps < 8:
+        factor = 0.7 + (reps - 5) / 3.0 * 0.3
+    elif 13 <= reps <= 30:
+        factor = max(0.4, 1.0 - (reps - 12) / 18.0 * 0.6)
+    else:
+        return 0.0  # <5 or >30: negligible hyp signal
+
+    return factor * load
+
+
+def _str_score(kind: str, reps, weight, e1rm, load_pct: float) -> float:
+    """
+    Strength score in kg·intensity units.
+    Needs weight + e1RM. Zero below 75% 1RM, ramps to full at 100%.
+    EMOM heavy work gets 60% credit (sub-maximal by design).
+    """
+    if not weight or weight <= 0:
+        return 0.0
+
+    load = load_pct / 100.0
+
+    if not e1rm or e1rm <= 0:
+        # No e1RM known: credit raw tonnage only for low-rep sets (≤6)
+        if reps and reps <= 6 and kind not in (CARDIO_KINDS | DURATION_KINDS):
+            return reps * weight * 0.3 * load
+        return 0.0
+
+    intensity = min(weight / e1rm, 1.0)
+    if intensity < 0.75:
+        return 0.0
+    intensity_factor = (intensity - 0.75) / 0.25
+
+    if not reps:
+        return 0.0
+
+    multiplier = 0.6 if kind in EMOM_KINDS else 1.0
+    return reps * weight * intensity_factor * multiplier * load
+
+
+def _end_score(kind: str, reps, weight, duration, distance, load_pct: float) -> float:
+    """
+    Effective endurance reps.
+    EMOM/ETOT: full total_reps credit (primary endurance modality).
+    Cardio: duration/3 + distance_km*1000/1.5.
+    Duration: duration/3.
+    Reps ≥15: full credit. Reps 10–14: 30% credit. <10: 0.
+    """
+    load = load_pct / 100.0
+
+    if kind in EMOM_KINDS:
+        return (reps or 0) * load
+
+    if kind in CARDIO_KINDS:
+        eff = 0.0
+        if duration:
+            eff += duration / 3.0
+        if distance:
+            eff += (distance * 1000.0) / 1.5
+        return eff * load
+
+    if kind in DURATION_KINDS:
+        return ((duration or 0) / 3.0) * load
+
+    if reps is None:
+        return 0.0
+    if reps >= 15:
+        return reps * load
+    if reps >= 10:
+        return reps * 0.3 * load
+    return 0.0
+
+
+@api_router.get("/analytics/muscle-volume", response_model=MuscleVolumeResponse)
+async def get_muscle_volume(
+    days: int = Query(28, ge=1, le=730),
+    user_id: str = Depends(get_current_user),
+):
+    from body_parts import get_ancestors, MUSCLE_MAP
+
+    end_dt = datetime.utcnow()
+    start_dt = end_dt - timedelta(days=days)
+    weeks = days / 7.0
+
+    # ── 1. Workouts ──────────────────────────────────────────────────────────
+    workouts = await db.workouts.find(
+        {
+            "user_id": user_id,
+            "ended_at": {"$ne": None},
+            "started_at": {"$gte": start_dt, "$lte": end_dt},
+        }
+    ).to_list(length=None)
+
+    if not workouts:
+        return MuscleVolumeResponse(
+            days=days,
+            weeks=round(weeks, 2),
+            start_date=start_dt.date().isoformat(),
+            end_date=end_dt.date().isoformat(),
+            workout_count=0,
+            muscles=[],
+        )
+
+    # ── 2. Bulk fetch exercises ──────────────────────────────────────────────
+    ex_ids = {
+        ex.get("exercise_id")
+        for w in workouts
+        for ex in (w.get("exercises") or [])
+        if ex.get("exercise_id")
+    }
+    valid_ids = [ObjectId(i) for i in ex_ids if ObjectId.is_valid(i)]
+    ex_docs = await db.exercises.find({"_id": {"$in": valid_ids}}).to_list(length=None)
+    ex_info: Dict[str, dict] = {
+        str(d["_id"]): {
+            "name": d.get("name", ""),
+            "kind": d.get("kind", "Barbell"),
+            "muscle_loads": d.get("muscle_loads") or [],
+        }
+        for d in ex_docs
+    }
+
+    # ── 3. Accumulators ──────────────────────────────────────────────────────
+    slug_data: Dict[str, dict] = {}
+
+    def ensure(slug: str):
+        if slug not in slug_data:
+            node = MUSCLE_MAP.get(slug, {})
+            slug_data[slug] = {
+                "slug": slug,
+                "name": node.get("name", slug),
+                "level": node.get("level", 0),
+                "hyp_primary": 0.0,
+                "hyp_secondary": 0.0,
+                "hyp_stabilizer": 0.0,
+                "strength": 0.0,
+                "endurance": 0.0,
+                "best_e1rm": None,
+                "exercises": {},
+            }
+
+    def credit(slug, role, hyp, strength, endurance, e1rm, ex_name):
+        ensure(slug)
+        d = slug_data[slug]
+        if role == "primary":
+            d["hyp_primary"] += hyp
+        elif role == "secondary":
+            d["hyp_secondary"] += hyp * 0.4
+        else:
+            d["hyp_stabilizer"] += hyp * 0.15
+        d["strength"] += strength
+        d["endurance"] += endurance
+        if e1rm and (d["best_e1rm"] is None or e1rm > d["best_e1rm"]):
+            d["best_e1rm"] = e1rm
+        if ex_name:
+            ex = d["exercises"].setdefault(
+                ex_name, {"hyp": 0.0, "str": 0.0, "end": 0.0}
+            )
+            ex["hyp"] += hyp
+            ex["str"] += strength
+            ex["end"] += endurance
+
+    # ── 4. Walk all sets ─────────────────────────────────────────────────────
+    for workout in workouts:
+        for ex_item in workout.get("exercises") or []:
+            ex_id = ex_item.get("exercise_id")
+            if not ex_id or ex_id not in ex_info:
+                continue
+
+            info = ex_info[ex_id]
+            muscle_loads = info["muscle_loads"]
+            if not muscle_loads:
+                continue
+
+            kind = info["kind"] or "Barbell"
+            ex_name = info["name"]
+
+            for s in ex_item.get("sets") or []:
+                if s.get("set_type", "normal") in ("warmup", "cooldown"):
+                    continue
+
+                reps = s.get("reps")
+                weight = s.get("weight")
+                duration = s.get("duration")
+                distance = s.get("distance")
+
+                # Epley e1RM
+                e1rm = None
+                if weight and weight > 0 and reps and 0 < reps < 37:
+                    e1rm = round(weight * (1 + reps / 30.0), 2)
+
+                for ml in muscle_loads:
+                    slug = ml.get("slug")
+                    role = ml.get("role", "primary")
+                    load_pct = float(ml.get("load_pct") or 100.0)
+
+                    if not slug or slug not in MUSCLE_MAP:
+                        continue
+
+                    hyp = _hyp_score(kind, reps, weight, duration, load_pct)
+                    st = _str_score(kind, reps, weight, e1rm, load_pct)
+                    end = _end_score(kind, reps, weight, duration, distance, load_pct)
+
+                    credit(slug, role, hyp, st, end, e1rm, ex_name)
+                    for ancestor in get_ancestors(slug):
+                        credit(ancestor, role, hyp, st, end, e1rm, ex_name)
+
+    # ── 5. Build response ─────────────────────────────────────────────────────
+    muscles = []
+    for d in slug_data.values():
+        top_exs = sorted(
+            d["exercises"].items(), key=lambda x: x[1]["hyp"], reverse=True
+        )[:5]
+        muscles.append(
+            MuscleVolumeEntry(
+                slug=d["slug"],
+                name=d["name"],
+                level=d["level"],
+                hypertrophy_sets=round(d["hyp_primary"] / weeks, 3),
+                hypertrophy_sets_secondary=round(d["hyp_secondary"] / weeks, 3),
+                hypertrophy_sets_stabilizer=round(d["hyp_stabilizer"] / weeks, 3),
+                strength_score=round(d["strength"] / weeks, 1),
+                endurance_reps=round(d["endurance"] / weeks, 1),
+                best_e1rm=round(d["best_e1rm"], 2) if d["best_e1rm"] else None,
+                top_exercises=[
+                    MuscleTopExercise(
+                        name=n,
+                        hypertrophy_sets=round(v["hyp"] / weeks, 2),
+                        strength_score=round(v["str"] / weeks, 1),
+                        endurance_reps=round(v["end"] / weeks, 1),
+                    )
+                    for n, v in top_exs
+                ],
+            )
+        )
+
+    muscles.sort(key=lambda m: m.hypertrophy_sets, reverse=True)
+
+    return MuscleVolumeResponse(
+        days=days,
+        weeks=round(weeks, 2),
+        start_date=start_dt.date().isoformat(),
+        end_date=end_dt.date().isoformat(),
+        workout_count=len(workouts),
+        muscles=muscles,
+    )
 
 
 @api_router.get("/prs", response_model=List[PRRecordResponse])
