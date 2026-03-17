@@ -15,22 +15,20 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import api from "../utils/api";
-import { Exercise, EXERCISE_KINDS, ExerciseKind } from "../types";
-import type { BodyPart } from "../types/gen";
-import { useExercises } from "../store/exercisesStore"; // ✅ NEW
+import {
+  Exercise,
+  EXERCISE_KINDS,
+  ExerciseKind,
+  ExerciseCategory,
+} from "../types";
 
-const BODY_PARTS = [
-  "Arms",
-  "Back",
-  "Cardio",
-  "Chest",
-  "Core",
-  "Full-Body",
-  "Legs",
-  "Olympic",
-  "Other",
-  "Shoulders",
-];
+import {
+  BODY_PARTS,
+  EXERCISE_CATEGORYS,
+  type BodyPart,
+  type ExerciseCreate,
+} from "../types/gen";
+import { useExercises } from "../store/exercisesStore"; // ✅ NEW
 
 interface CreateExerciseModalProps {
   visible: boolean;
@@ -47,10 +45,12 @@ export default function CreateExerciseModal({
   const { loading: exercisesLoading, upsert } = useExercises();
 
   const [name, setName] = useState("");
-  const [selectedBodyPart, setSelectedBodyPart] = useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<ExerciseKind | null>(
+  const [selectedBodyPart, setSelectedBodyPart] = useState<BodyPart | null>(
     null,
   );
+  const [selectedKind, setSelectedKind] = useState<ExerciseKind | null>(null);
+  const [selectedCategory, setSelectedCategory] =
+    useState<ExerciseCategory | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [instructions, setInstructions] = useState("");
   const [saving, setSaving] = useState(false);
@@ -58,6 +58,7 @@ export default function CreateExerciseModal({
   const resetForm = () => {
     setName("");
     setSelectedBodyPart(null);
+    setSelectedKind(null);
     setSelectedCategory(null);
     setImageBase64(null);
     setInstructions("");
@@ -104,6 +105,10 @@ export default function CreateExerciseModal({
       Alert.alert("Error", "Please select a body part");
       return;
     }
+    if (!selectedKind) {
+      Alert.alert("Error", "Please select a kind");
+      return;
+    }
     if (!selectedCategory) {
       Alert.alert("Error", "Please select a category");
       return;
@@ -115,14 +120,14 @@ export default function CreateExerciseModal({
       const exercise = (
         await api.post("/exercises", {
           name: name.trim(),
-          exercise_kind: selectedCategory,
+          exercise_kind: selectedKind,
           primary_body_parts: [selectedBodyPart as BodyPart],
           secondary_body_parts: [] as BodyPart[],
-          category: selectedCategory as any,
+          category: selectedCategory,
           is_custom: true,
           image: imageBase64 || null,
           instructions: instructions.trim() || null,
-          muscle_loads: []
+          muscle_loads: [],
         })
       ).data as Exercise;
 
@@ -207,26 +212,52 @@ export default function CreateExerciseModal({
             </View>
           </View>
 
-          {/* Category Selection */}
+          {/* Kind Selection */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Category</Text>
+            <Text style={styles.sectionTitle}>Kind</Text>
             <View style={styles.optionsGrid}>
               {EXERCISE_KINDS.map(kind => (
                 <TouchableOpacity
                   key={kind}
                   style={[
                     styles.optionChip,
-                    selectedCategory === kind && styles.optionChipSelected,
+                    selectedKind === kind && styles.optionChipSelected,
                   ]}
-                  onPress={() => setSelectedCategory(kind)}
+                  onPress={() => setSelectedKind(kind)}
                 >
                   <Text
                     style={[
                       styles.optionText,
-                      selectedCategory === kind && styles.optionTextSelected,
+                      selectedKind === kind && styles.optionTextSelected,
                     ]}
                   >
                     {kind}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* Category Selection */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Category</Text>
+            <View style={styles.optionsGrid}>
+              {EXERCISE_CATEGORYS.map(cat => (
+                <TouchableOpacity
+                  key={cat}
+                  style={[
+                    styles.optionChip,
+                    selectedCategory === cat && styles.optionChipSelected,
+                  ]}
+                  onPress={() => setSelectedCategory(cat)}
+                >
+                  <Text
+                    style={[
+                      styles.optionText,
+                      selectedCategory === cat && styles.optionTextSelected,
+                    ]}
+                  >
+                    {cat}
                   </Text>
                 </TouchableOpacity>
               ))}

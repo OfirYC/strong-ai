@@ -5,6 +5,7 @@ const fs = require("fs");
 require("dotenv").config({ path: path.join(__dirname, "../.env") });
 
 const apiUrl = process.env.EXPO_PUBLIC_BACKEND_URL || "http://localhost:8000";
+
 const typesDir = path.join(__dirname, "../types");
 const modelsOutputPath = path.join(typesDir, "models.ts");
 const genOutputPath = path.join(typesDir, "gen.ts");
@@ -18,17 +19,15 @@ if (!fs.existsSync(typesDir)) {
 
 execSync(
   `npx openapi-typescript ${apiUrl}/openapi.json -o ${modelsOutputPath}`,
-  {
-    stdio: "inherit",
-  },
+  { stdio: "inherit" },
 );
 
 console.log("✓ Generated types/models.ts");
 
-// ---- Step 2: Parse models.ts and extract schema names ----
+// ---- Step 2: Parse models.ts ----
 const apiContent = fs.readFileSync(modelsOutputPath, "utf8");
 
-// Find the schemas block using brace counting for accuracy
+// Locate schemas block
 const schemasStart = apiContent.indexOf("    schemas: {");
 if (schemasStart === -1) {
   console.error("Could not find schemas block in models.ts");
@@ -38,6 +37,7 @@ if (schemasStart === -1) {
 let depth = 0;
 let inSchemas = false;
 let schemasEnd = -1;
+
 for (let i = schemasStart; i < apiContent.length; i++) {
   if (apiContent[i] === "{") {
     depth++;
@@ -58,20 +58,19 @@ if (schemasEnd === -1) {
 
 const schemasBlock = apiContent.slice(schemasStart, schemasEnd);
 
-// Top-level schema keys are at exactly 8-space indent
+// ---- Extract schema names ----
 const topLevelKeyRegex = /^        ([\w]+):/gm;
 const rawNames = [];
 let match;
+
 while ((match = topLevelKeyRegex.exec(schemasBlock)) !== null) {
   rawNames.push(match[1]);
 }
 
 const allNames = [...new Set(rawNames)];
 
-// These are exported as aliases pointing to *Response variants — skip generating
-// a direct export for them to avoid duplicate identifier errors
+// ---- Aliases (skip generating direct types) ----
 const aliasedNames = new Set([
-  // These get manually exported in the ALIASES section with explicit components['schemas'] refs
   "User",
   "UserResponse",
   "Exercise",
@@ -92,21 +91,47 @@ const aliasedNames = new Set([
   "Conversation",
 ]);
 
-// Detect enums by presence of `@enum` in their JSDoc
-const enumNames = [];
+// ---- Extract enums + types ----
+const enumDetails = [];
 const typeNames = [];
 
 for (const name of allNames) {
   if (aliasedNames.has(name)) continue;
-  const enumCheck = new RegExp(
-    `\\/\\*\\*[^*]*@enum[^*]*\\*\\/\\s*${name}:`,
-    "s",
-  );
-  if (enumCheck.test(schemasBlock)) {
-    enumNames.push(name);
+
+  const unionRegex = new RegExp(`${name}:\\s*([^;]+);`, "s");
+  const match = unionRegex.exec(schemasBlock);
+
+  if (!match) {
+    typeNames.push(name);
+    continue;
+  }
+
+  const raw = match[1].trim();
+
+  // ---- STRICT ENUM DETECTION ----
+  const isStringUnion =
+    raw.includes("|") &&
+    !raw.includes("{") &&
+    !raw.includes("components") &&
+    !raw.includes("[") &&
+    raw.split("|").every(v => /^["'][^"']+["']$/.test(v.trim()));
+
+  if (isStringUnion) {
+    const values = raw.split("|").map(v => v.trim().replace(/['"]/g, ""));
+
+    enumDetails.push({ name, values });
   } else {
     typeNames.push(name);
   }
+}
+// ---- Helper: PascalCase → SCREAMING_SNAKE_CASE + plural ----
+function toConstName(name) {
+  return (
+    name
+      .replace(/([A-Z])/g, "_$1")
+      .toUpperCase()
+      .replace(/^_/, "") + "S"
+  );
 }
 
 // ---- Step 3: Generate gen.ts ----
@@ -118,48 +143,66 @@ const lines = [
   `import type { components } from './models';`,
   ``,
   `// ============= UTILITY TYPES =============`,
-  `// Pydantic Optional[X] serializes as X | null, but frontend uses undefined.`,
-  `// Use DeNull<T> to convert null -> undefined for local state.`,
   `export type DeNull<T> = T extends null ? undefined : T extends object ? { [K in keyof T]: DeNull<T[K]> } : T;`,
   ``,
   `// ============= ENUMS =============`,
 ];
 
-for (const name of enumNames) {
+// ---- Emit enums (type + const) ----
+for (const { name, values } of enumDetails) {
+  const constName = toConstName(name);
+
   lines.push(`export type ${name} = components['schemas']['${name}'];`);
+
+  lines.push(
+    `export const ${constName} = ${JSON.stringify(
+      values,
+      null,
+      2,
+    )} as const satisfies readonly ${name}[];`,
+  );
+
+  lines.push("");
 }
 
-lines.push(``);
+// ---- Emit normal types ----
 lines.push(`// ============= MODELS =============`);
 
 for (const name of typeNames) {
   lines.push(`export type ${name} = components['schemas']['${name}'];`);
 }
 
+// ---- Aliases ----
 lines.push(``);
 lines.push(`// ============= ALIASES =============`);
 lines.push(`export type UserResponse = components['schemas']['UserResponse'];`);
 lines.push(`export type User = UserResponse;`);
+
 lines.push(
   `export type ExerciseResponse = components['schemas']['ExerciseResponse'];`,
 );
 lines.push(`export type Exercise = ExerciseResponse;`);
+
 lines.push(
   `export type WorkoutSessionResponse = components['schemas']['WorkoutSessionResponse'];`,
 );
 lines.push(`export type WorkoutSession = WorkoutSessionResponse;`);
+
 lines.push(
   `export type WorkoutTemplateResponse = components['schemas']['WorkoutTemplateResponse'];`,
 );
 lines.push(`export type WorkoutTemplate = WorkoutTemplateResponse;`);
+
 lines.push(
   `export type PlannedWorkoutResponse = components['schemas']['PlannedWorkoutResponse'];`,
 );
 lines.push(`export type PlannedWorkout = PlannedWorkoutResponse;`);
+
 lines.push(
   `export type PRRecordResponse = components['schemas']['PRRecordResponse'];`,
 );
 lines.push(`export type PRRecord = PRRecordResponse;`);
+
 lines.push(`export type WorkoutSet = WorkoutSetItem;`);
 lines.push(`export type TemplateSet = TemplateSetItem;`);
 lines.push(`export type WorkoutExercise = WorkoutExerciseItem;`);
@@ -170,7 +213,10 @@ lines.push(`export type Conversation = components['schemas']['Conversation'];`);
 const genContent = lines.join("\n") + "\n";
 fs.writeFileSync(genOutputPath, genContent, "utf8");
 
+// ---- Done ----
 console.log("✓ Generated types/gen.ts");
-console.log(`  → ${enumNames.length} enums: ${enumNames.join(", ")}`);
+console.log(
+  `  → ${enumDetails.length} enums: ${enumDetails.map(e => e.name).join(", ")}`,
+);
 console.log(`  → ${typeNames.length} types`);
-console.log("\nDone! Import from '@/types/gen' to use your types.");
+console.log("\nDone! Import from '@/types/gen'");

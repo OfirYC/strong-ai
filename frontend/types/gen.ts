@@ -5,22 +5,130 @@ export type { components, operations, paths } from './models';
 import type { components } from './models';
 
 // ============= UTILITY TYPES =============
-// Pydantic Optional[X] serializes as X | null, but frontend uses undefined.
-// Use DeNull<T> to convert null -> undefined for local state.
 export type DeNull<T> = T extends null ? undefined : T extends object ? { [K in keyof T]: DeNull<T[K]> } : T;
 
 // ============= ENUMS =============
+export type BodyPart = components['schemas']['BodyPart'];
+export const BODY_PARTS = [
+  "Chest",
+  "Back",
+  "Shoulders",
+  "Biceps",
+  "Triceps",
+  "Forearms",
+  "Core",
+  "Abs",
+  "Obliques",
+  "Legs",
+  "Quads",
+  "Hamstrings",
+  "Glutes",
+  "Glute Medius",
+  "Calves",
+  "Hips",
+  "Traps",
+  "Full Body",
+  "Feet",
+  "Ankles",
+  "Shins",
+  "Other"
+] as const satisfies readonly BodyPart[];
+
+export type ExerciseCategory = components['schemas']['ExerciseCategory'];
+export const EXERCISE_CATEGORYS = [
+  "Strength",
+  "Cardio",
+  "Mobility",
+  "Plyometric",
+  "Isometric Strength",
+  "Stability",
+  "Recovery",
+  "Control"
+] as const satisfies readonly ExerciseCategory[];
+
+export type ExerciseKind = components['schemas']['ExerciseKind'];
+export const EXERCISE_KINDS = [
+  "Barbell",
+  "Dumbbell",
+  "Machine/Other",
+  "Weighted Bodyweight",
+  "Assisted Bodyweight",
+  "Reps Only",
+  "Duration",
+  "Cardio",
+  "Weighted Cardio",
+  "Weighted Duration",
+  "Band",
+  "Cable",
+  "Kettlebell",
+  "EMOM (Every Minute On The Minute)",
+  "ETOT (Every Thirty Seconds on Thirty Seconds)"
+] as const satisfies readonly ExerciseKind[];
+
+export type PRType = components['schemas']['PRType'];
+export const P_R_TYPES = [
+  "1rm",
+  "weight",
+  "reps",
+  "volume",
+  "duration"
+] as const satisfies readonly PRType[];
+
+export type PlannedWorkoutStatus = components['schemas']['PlannedWorkoutStatus'];
+export const PLANNED_WORKOUT_STATUSS = [
+  "planned",
+  "in_progress",
+  "completed",
+  "skipped"
+] as const satisfies readonly PlannedWorkoutStatus[];
+
+export type PlannedWorkoutType = components['schemas']['PlannedWorkoutType'];
+export const PLANNED_WORKOUT_TYPES = [
+  "strength",
+  "run",
+  "mobility",
+  "cardio",
+  "hiit",
+  "other"
+] as const satisfies readonly PlannedWorkoutType[];
+
+export type RecurrenceType = components['schemas']['RecurrenceType'];
+export const RECURRENCE_TYPES = [
+  "daily",
+  "weekly",
+  "monthly"
+] as const satisfies readonly RecurrenceType[];
+
+export type SetType = components['schemas']['SetType'];
+export const SET_TYPES = [
+  "normal",
+  "warmup",
+  "cooldown",
+  "failure"
+] as const satisfies readonly SetType[];
+
+export type Sex = components['schemas']['Sex'];
+export const SEXS = [
+  "male",
+  "female",
+  "other"
+] as const satisfies readonly Sex[];
+
+export type TrainingAge = components['schemas']['TrainingAge'];
+export const TRAINING_AGES = [
+  "new",
+  "1-2y",
+  "2-5y",
+  "5y+"
+] as const satisfies readonly TrainingAge[];
 
 // ============= MODELS =============
 export type ActiveJobResponse = components['schemas']['ActiveJobResponse'];
-export type BodyPart = components['schemas']['BodyPart'];
 export type ConversationListResponse = components['schemas']['ConversationListResponse'];
-export type ExerciseCategory = components['schemas']['ExerciseCategory'];
 export type ExerciseCreate = components['schemas']['ExerciseCreate'];
 export type ExerciseHistoryEntry = components['schemas']['ExerciseHistoryEntry'];
 export type ExerciseHistoryResponse = components['schemas']['ExerciseHistoryResponse'];
 export type ExerciseHistorySet = components['schemas']['ExerciseHistorySet'];
-export type ExerciseKind = components['schemas']['ExerciseKind'];
 export type ExerciseUpdate = components['schemas']['ExerciseUpdate'];
 export type HTTPValidationError = components['schemas']['HTTPValidationError'];
 export type InsightsResponse = components['schemas']['InsightsResponse'];
@@ -31,20 +139,17 @@ export type MuscleLoad = components['schemas']['MuscleLoad'];
 export type MuscleTopExercise = components['schemas']['MuscleTopExercise'];
 export type MuscleVolumeEntry = components['schemas']['MuscleVolumeEntry'];
 export type MuscleVolumeResponse = components['schemas']['MuscleVolumeResponse'];
-export type PRType = components['schemas']['PRType'];
+export type NoteCreate = components['schemas']['NoteCreate'];
+export type NoteEntry = components['schemas']['NoteEntry'];
+export type NoteUpdate = components['schemas']['NoteUpdate'];
+export type NotesResponse = components['schemas']['NotesResponse'];
 export type PlannedWorkoutCreate = components['schemas']['PlannedWorkoutCreate'];
-export type PlannedWorkoutStatus = components['schemas']['PlannedWorkoutStatus'];
-export type PlannedWorkoutType = components['schemas']['PlannedWorkoutType'];
 export type PlannedWorkoutUpdate = components['schemas']['PlannedWorkoutUpdate'];
 export type ProfileInsights = components['schemas']['ProfileInsights'];
 export type ProfileUpdate = components['schemas']['ProfileUpdate'];
-export type RecurrenceType = components['schemas']['RecurrenceType'];
-export type SetType = components['schemas']['SetType'];
-export type Sex = components['schemas']['Sex'];
 export type StartChatResponse = components['schemas']['StartChatResponse'];
 export type TemplateExerciseItem = components['schemas']['TemplateExerciseItem'];
 export type TemplateSetItem = components['schemas']['TemplateSetItem'];
-export type TrainingAge = components['schemas']['TrainingAge'];
 export type TrainingPhase = components['schemas']['TrainingPhase'];
 export type UserContext = components['schemas']['UserContext'];
 export type UserCreate = components['schemas']['UserCreate'];
