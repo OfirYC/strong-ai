@@ -1,170 +1,100 @@
-│   ├── (tabs)/             # Main tabbed interface
-│   │   ├── workout.tsx     # Active workout session
-│   │   ├── exercises.tsx   # Exercise library
-│   │   ├── routines.tsx    # Templates
-│   │   ├── history.tsx     # Workout history
-│   │   └── profile.tsx     # User profile
-│   ├── onboarding.tsx
-│   ├── profile-settings.tsx
-│   └── workout-detail.tsx
-├── components/             # Reusable UI components
-├── store/                  # Zustand stores (one per domain)
-├── realtime/               # WebSocket client manager
-├── hooks/                  # Custom React hooks
-├── utils/                  # API client, helpers
-└── types/                  # Shared TypeScript types
+# Here are your Instructions
+# Strong AI — AI-Powered Workout Tracker
+
+Strong AI is a cross-platform fitness tracking app with a built-in AI coach. It lets you log workouts, track personal records, schedule routines, and have real-time conversations with an AI that knows your actual training history, goals, and injury context.
+
+---
+
+## Features
+
+### Workout Tracking
+- Log sets, reps, weight, duration, and distance for any exercise
+- 13 exercise kinds (Barbell, Dumbbell, Machine, Weighted Bodyweight, Cardio, etc.) with per-kind field rules — no irrelevant inputs
+- Live workout timer and session management
+- Automatic personal record detection on completion
+
+### Exercise Library
+- Global exercise database seeded with categorized movements
+- Create custom exercises with body part tags and category
+- Filter by category, body part, and kind
+- 20+ body part targets across 8 training categories (Strength, Cardio, Mobility, Plyometric, etc.)
+
+### Templates & Planning
+- Save workouts as reusable templates with default sets
+- Schedule planned workouts on specific dates
+- Recurring workout patterns (daily, weekly, etc.)
+- One-tap "start from template" to pre-fill a session
+
+### Personal Records
+- Tracks PRs per exercise: 1RM, max weight, max reps, max volume, best duration/distance
+- PR history over time, queryable by the AI coach
+
+### AI Coaching Chat
+- Conversational AI coach with full access to your training data via tool calls
+- Tools cover: exercise lookup, workout history analysis, PR queries, schedule inspection, profile/goal context
+- Responses are grounded in your real data — not generic advice
+- Streaming output delivered token-by-token over WebSocket
+- Multi-turn conversations with persistent history
+- Auto-named conversation threads
+- AI extracts structured insights (injuries, strengths, training phase) from your profile narrative
+
+### User Profile & Onboarding
+- Onboarding flow captures training background, goals, injuries, and experience level
+- Profile settings editable at any time
+- AI reads profile insights when building coaching context
+
+### Authentication
+- Email + password registration and login
+- Apple Sign-In
+- JWT access tokens with silent refresh
+
+### Real-Time Sync
+- WebSocket connection pushes database changes to all connected clients
+- Edits on one device appear instantly on another
+- Stores re-fetch reactively on relevant change events
+
+---
+
+## Design & Style
+
+The app uses a dark, high-contrast aesthetic suited for gym environments — readable under bright lights with a single hand. The UI prioritizes fast input: adding a set is a single tap, weight/reps update inline with minimal chrome. Navigation is tab-based with no deep nesting for the most-used flows. The AI chat interface sits alongside the tracker as a peer feature, not an afterthought.
+
+Tone in the AI responses is direct and data-informed. The coach cites your actual numbers rather than speaking in generalities.
+
+---
+
+## Goals
+
+- Make workout logging fast enough that you actually do it between sets
+- Give the AI coach real context (your history, PRs, schedule, injuries) so its advice is actionable
+- Support a full training lifecycle: plan → execute → review → adjust
+- Run natively on iOS and Android with a shared codebase, no capability compromise
+
+---
+
+## Architecture
+
+### Overview
+
 ```
-
-**State management (Zustand stores):**
-| Store | Responsibility |
-|---|---|
-| `authStore` | Credentials, token refresh, login/logout |
-| `workoutsStore` | Paginated workout history with smart caching |
-| `exercisesStore` | Exercise library (global + user exercises) |
-| `templatesStore` | Workout templates |
-| `plannedWorkoutsStore` | Scheduled workouts and recurrence |
-| `prsStore` | Personal records per exercise |
-| `convesationsStore` | AI chat threads |
-| `workoutStore` | Current active workout session |
-
-`workoutsStore` maintains a canonical ID-keyed cache alongside a contiguous pagination index. Batch hydration (e.g. from the AI tools) populates the cache without disrupting the pagination cursor.
-
-**Real-time client:** A single persistent WebSocket connection receives change events from the backend. Each store subscribes to relevant event types and re-fetches or patches local state accordingly.
-
----
-
-### Backend
-
-**Stack:** FastAPI · Python · MongoDB (Motor async driver) · Pydantic v2 · JWT · bcrypt
-
-**File structure:**
-```
-backend/
-├── server.py               # All route definitions (~1900 lines)
-├── models.py               # Pydantic request/response models
-├── auth.py                 # JWT creation, verification, Apple Sign-In
-├── constants.py            # Exercise kind → valid field rules
-├── observable_db.py        # MongoDB wrapper with change stream emission
-├── ws_manager.py           # WebSocket connection pool
-├── services/
-│   └── ai/                 # AI coaching subsystem
-│       ├── runner.py       # Tool-calling orchestration loop
-│       ├── openai_client.py
-│       ├── store.py        # Conversation persistence
-│       ├── jobs.py         # Async job state
-│       ├── emitter.py      # Streaming event emitter
-│       ├── profile_insights.py
-│       ├── chat_name.py
-│       ├── prompts/
-│       │   └── system.py   # System prompt builder
-│       └── tools/          # Tool implementations
-│           ├── exercise.py
-│           ├── history.py
-│           ├── profile.py
-│           ├── schedule.py
-│           ├── template.py
-│           ├── shared.py
-│           └── registry.py
-├── seed_exercises.py
-└── requirements.txt
-```
-
-**API surface:**
-| Prefix | Domain |
-|---|---|
-| `/auth/*` | Register, login, Apple Sign-In, token refresh |
-| `/profile/*` | Profile CRUD, insight extraction |
-| `/exercises/*` | Exercise library management |
-| `/templates/*` | Template CRUD |
-| `/workouts/*` | Workout session logging |
-| `/planned-workouts/*` | Schedule and recurrence |
-| `/prs/*` | Personal record queries |
-| `/ai/chat/*` | Conversation management and streaming |
-| `/ws` | WebSocket endpoint |
-
-**Real-time architecture:** `ObservableDB` wraps Motor collection calls and emits change events after mutations. `ws_manager.py` fans out those events to all WebSocket clients subscribed to the affected user's data.
-
----
-
-### AI Coaching Subsystem
-
-The AI service lives in `backend/services/ai/` and is the most architecturally distinct part of the system.
-
-**Flow:**
-1. Client sends a message to `/ai/chat/{conversation_id}/message`
-2. Backend creates an async job and immediately returns a job ID
-3. `runner.py` starts the tool-calling loop:
-   - Builds a system prompt from the user's profile, injuries, recent history, and PRs
-   - Calls OpenAI with the conversation history and available tools
-   - If the model requests tool calls, executes them against MongoDB and appends results
-   - Repeats up to 6 rounds until no further tool calls are made
-   - Streams each token to the frontend via WebSocket as it arrives
-4. Final message and all tool call records are persisted to MongoDB
-
-**Available tools:**
-| Tool module | Capabilities |
-|---|---|
-| `exercise.py` | Look up exercises by name, kind, body part |
-| `history.py` | Query workout history, aggregate volume/frequency |
-| `profile.py` | Read profile narrative and extracted insights |
-| `schedule.py` | Inspect planned workouts and recurrence |
-| `template.py` | Browse saved templates |
-| `shared.py` | Utility helpers shared across tools |
-
-**Profile insights:** When a user saves their profile narrative, `profile_insights.py` runs a separate LLM call to extract structured tags — injuries, training strengths, current phase, experience level. These tags are injected into the system prompt on every chat turn.
-
-**System prompt construction (`prompts/system.py`):** Assembles a context block per request containing the current date, user profile summary, extracted insights, recent PR snapshots, and any upcoming planned workouts. This grounds the model without requiring it to call a tool for basic context.
-
----
-
-### Data Models
-
-Core entities (defined in `backend/models.py`):
-
-| Entity | Key fields |
-|---|---|
-| `User` | email, password hash, Apple sub, profile data |
-| `Exercise` | name, kind, body parts, category, owner (null = global) |
-| `WorkoutTemplate` | name, exercises with default sets |
-| `WorkoutSession` | date, duration, exercises → sets (weight/reps/duration/distance) |
-| `PlannedWorkout` | date, template ref, recurrence rule |
-| `PRRecord` | exercise ref, PR type, value, achieved date |
-| `Conversation` | user ref, name, message thread |
-| `ChatMessage` | role, content, tool calls, tool results |
-| `ProfileInsight` | injuries, strengths, phase, goals (extracted by AI) |
-
-**Exercise kind system:** `constants.py` maps each of the 13 `ExerciseKind` values to the set of valid tracking fields (weight, reps, duration, distance). The frontend uses this mapping to show only relevant inputs per set.
-
----
-
-## Getting Started
-
-### Backend
-
-```bash
-cd backend
-pip install -r requirements.txt
-cp .env.example .env   # fill in MONGO_URL, OPENAI_API_KEY, JWT_SECRET
-python seed_exercises.py
-uvicorn server:app --reload
+┌─────────────────────────────────┐     WebSocket / REST
+│   React Native + Expo (Frontend)│ ◄──────────────────► ┌──────────────────────────┐
+│   iOS · Android · Web           │                       │   FastAPI Backend         │
+└─────────────────────────────────┘                       │   Python · MongoDB        │
+                                                          └──────────────────────────┘
+                                                                      │
+                                                          ┌──────────────────────────┐
+                                                          │   AI Service (services/ai)│
+                                                          │   OpenAI · Tool Loop      │
+                                                          └──────────────────────────┘
 ```
 
 ### Frontend
 
-```bash
-cd frontend
-yarn install
-yarn start            # Expo dev server
-yarn ios              # iOS simulator
-yarn android          # Android emulator
-yarn web              # Browser
+**Stack:** React Native · Expo 54 · TypeScript · Expo Router · Zustand · Axios
+
+**File structure:**
 ```
-
----
-
-## Testing
-
-```bash
-# Backend integration tests
-python backend_test.py
-```
+frontend/
+├── app/                    # Expo Router screens (file-based routing)
+│   ├── (auth)/             # Login, registration
