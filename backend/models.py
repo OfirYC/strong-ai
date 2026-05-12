@@ -699,3 +699,30 @@ class MessageResponse(Message):
 
 class MessagesResponse(BaseModel):
     messages: List[MessageResponse]
+
+
+# =============== NOTES ===============+ #
+
+
+class NoteCreate(BaseModel):
+    content: str
+    writer: str = "user"  # "user" | "ai"
+    tag: Optional[str] = None  # e.g. "injury", "goal", "preference", "observation"
+
+
+class NoteUpdate(BaseModel):
+    content: Optional[str] = None
+    tag: Optional[str] = None
+
+
+class NoteEntry(BaseModel):
+    id: str
+    content: str
+    writer: str
+    tag: Optional[str]
+    created_at: str
+    updated_at: str
+
+
+class NotesResponse(BaseModel):
+    notes: List[NoteEntry]

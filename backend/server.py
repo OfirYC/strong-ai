@@ -82,6 +82,10 @@ from models import (
     ConversationListResponse,
     ActiveJobResponse,
     Job,
+    NoteEntry,
+    NotesResponse,
+    NoteCreate,
+    NoteUpdate,
     Message,
     MessageResponse,
     MessagesResponse,
@@ -462,6 +466,158 @@ async def start_ai_chat(payload: dict, user_id=Depends(get_current_user)):
 async def get_messages(conversation_id: str, user_id: str = Depends(get_current_user)):
     msgs = await fetch_messages_formatted(db, user_id, conversation_id, limit=500)
     return MessagesResponse(messages=msgs)
+
+
+# ============= NOTES ROUTES ============== #
+
+
+def _serialize_note(doc: dict) -> NoteEntry:
+    return NoteEntry(
+        id=str(doc["_id"]),
+        content=doc.get("content", ""),
+        writer=doc.get("writer", "user"),
+        tag=doc.get("tag"),
+        created_at=(
+            doc.get("created_at", datetime.utcnow()).isoformat()
+            if isinstance(doc.get("created_at"), datetime)
+            else str(doc.get("created_at", ""))
+        ),
+        updated_at=(
+            doc.get("updated_at", datetime.utcnow()).isoformat()
+            if isinstance(doc.get("updated_at"), datetime)
+            else str(doc.get("updated_at", ""))
+        ),
+    )
+
+
+@api_router.get("/notes", response_model=NotesResponse)
+async def get_notes(user_id: str = Depends(get_current_user)):
+    """Fetch all notes for the user, sorted newest first."""
+    docs = (
+        await db.notes.find({"user_id": user_id})
+        .sort("created_at", -1)
+        .to_list(length=None)
+    )
+
+    return NotesResponse(notes=[_serialize_note(d) for d in docs])
+
+
+@api_router.post("/notes", response_model=NoteEntry)
+async def create_note(
+    payload: NoteCreate,
+    user_id: str = Depends(get_current_user),
+):
+    """Create a new note. writer='user' for user-written, writer='ai' for AI-written."""
+    now = datetime.utcnow()
+    doc = {
+        "user_id": user_id,
+        "content": payload.content.strip(),
+        "writer": payload.writer if payload.writer in ("user", "ai") else "user",
+        "tag": payload.tag,
+        "created_at": now,
+        "updated_at": now,
+    }
+    result = await db.notes.insert_one(doc)
+    doc["_id"] = result.inserted_id
+    return _serialize_note(doc)
+
+
+@api_router.patch("/notes/{note_id}", response_model=NoteEntry)
+async def update_note(
+    note_id: str,
+    payload: NoteUpdate,
+    user_id: str = Depends(get_current_user),
+):
+    if not ObjectId.is_valid(note_id):
+        raise HTTPException(status_code=400, detail="Invalid note ID")
+
+    doc = await db.notes.find_one({"_id": ObjectId(note_id), "user_id": user_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Note not found")
+
+    updates: dict = {"updated_at": datetime.utcnow()}
+    if payload.content is not None:
+        updates["content"] = payload.content.strip()
+    if payload.tag is not None:
+        updates["tag"] = payload.tag
+
+    await db.notes.update_one({"_id": ObjectId(note_id)}, {"$set": updates})
+    updated = await db.notes.find_one({"_id": ObjectId(note_id)})
+    return _serialize_note(updated)
+
+
+@api_router.delete("/notes/{note_id}")
+async def delete_note(
+    note_id: str,
+    user_id: str = Depends(get_current_user),
+):
+    if not ObjectId.is_valid(note_id):
+        raise HTTPException(status_code=400, detail="Invalid note ID")
+
+    result = await db.notes.delete_one({"_id": ObjectId(note_id), "user_id": user_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Note not found")
+
+    return {"deleted": note_id}
+
+
+# ── Context builder (call this from AIRunner / system prompt builder) ─────────
+# Import and call build_notes_context(db, user_id) to get a compact string
+# to inject into the AI system prompt.
+
+
+async def build_notes_context(db, user_id: str, max_chars: int = 1200) -> str:
+    """
+    Returns a compact notes block for injection into the AI system prompt.
+
+    Strategy:
+    - AI notes first (they contain the AI's own observations — highest signal)
+    - User notes second
+    - Within each group: newest first
+    - Hard cap at max_chars to avoid blowing context
+    - Each note truncated at 300 chars individually
+    - Tagged notes get the tag prepended for quick scanning
+
+    Returns empty string if no notes exist.
+    """
+    docs = (
+        await db.notes.find({"user_id": user_id})
+        .sort("created_at", -1)
+        .to_list(length=100)
+    )
+
+    if not docs:
+        return ""
+
+    ai_notes = [d for d in docs if d.get("writer") == "ai"]
+    user_notes = [d for d in docs if d.get("writer") == "user"]
+
+    lines = []
+
+    def fmt(doc: dict) -> str:
+        tag = f"[{doc['tag']}] " if doc.get("tag") else ""
+        content = doc.get("content", "").strip()
+        if len(content) > 300:
+            content = content[:297] + "…"
+        return f"• {tag}{content}"
+
+    if ai_notes:
+        lines.append("AI observations:")
+        for d in ai_notes:
+            lines.append(fmt(d))
+
+    if user_notes:
+        lines.append("User notes:")
+        for d in user_notes:
+            lines.append(fmt(d))
+
+    block = "\n".join(lines)
+
+    # Hard cap
+    if len(block) > max_chars:
+        block = block[: max_chars - 3] + "…"
+
+    return f"<user_notes>\n{block}\n</user_notes>"
 
 
 # ============= PROFILE ROUTES =============

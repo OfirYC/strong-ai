@@ -59,6 +59,9 @@ ENTITY_CONFIG: Dict[str, EntityConfig] = {
     "ai_jobs": EntityConfig(
         entity="ai_job", owner_field="user_id", scope="user", emit=False
     ),
+    "notes": EntityConfig(
+        entity="note", owner_field="user_id", scope="user", emit=True
+    ),
 }
 
 
@@ -269,6 +272,7 @@ class ObservableDB:
         self.conversations = self._wrap("conversations")
         self.chat_messages = self._wrap("chat_messages")
         self.ai_jobs = self._wrap("ai_jobs")
+        self.notes = self._wrap("notes")
 
     def _wrap(self, collection_name: str) -> ObservableCollection:
         cfg = ENTITY_CONFIG.get(collection_name)

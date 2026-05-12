@@ -3,7 +3,7 @@
 // workoutsStore is the source of truth for workout sessions (name/notes/status), and we
 // only fetch what is missing. We also patch stores on local actions instead of refetching
 // on every activeWorkout change.
-
+import NotesModal from "../../components/NotesModal";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -98,6 +98,7 @@ export default function WorkoutScreen() {
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const { setIsExpanded: setIsActiveWorkoutSheetExpanded } =
     useActiveWorkoutSheetUIStore();
+  const [showNotesModal, setShowNotesModal] = useState(false);
 
   // Derive the set of workout session ids that we need for enrichment
   const todaysWorkoutSessionIds = useMemo(() => {
@@ -546,14 +547,30 @@ export default function WorkoutScreen() {
       >
         <View style={styles.header}>
           <Text style={styles.title}>Start Workout</Text>
-          <TouchableOpacity
-            style={styles.calendarButton}
-            onPress={() => setShowCalendarModal(true)}
-          >
-            <Ionicons name="calendar-outline" size={24} color="#007AFF" />
-          </TouchableOpacity>
+          <View style={styles.headerIcons}>
+            <TouchableOpacity
+              style={styles.headerIconBtn}
+              onPress={() => setShowNotesModal(true)}
+            >
+              <Ionicons
+                name="document-text-outline"
+                size={24}
+                color="#007AFF"
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.headerIconBtn}
+              onPress={() => setShowCalendarModal(true)}
+            >
+              <Ionicons name="calendar-outline" size={24} color="#007AFF" />
+            </TouchableOpacity>
+          </View>
         </View>
 
+        <NotesModal
+          visible={showNotesModal}
+          onClose={() => setShowNotesModal(false)}
+        />
         {(plannedLoading || todaysWorkouts.length > 0) && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Today's Workouts</Text>
@@ -642,14 +659,12 @@ export default function WorkoutScreen() {
             )}
           </View>
         )}
-
         <Button
           title="Quick Start"
           onPress={handleStartEmptyWorkout}
           loading={loading}
           style={styles.quickStartButton}
         />
-
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Recent Routines</Text>
           {templatesList.length === 0 ? (
@@ -718,6 +733,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F5F5F7",
+  },
+  headerIcons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  headerIconBtn: {
+    padding: 8,
+    marginLeft: 4,
   },
   scrollContent: {
     paddingHorizontal: 20,

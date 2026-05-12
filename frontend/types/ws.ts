@@ -8,7 +8,8 @@ export type DbEntity =
   | "planned_workout"
   | "workout_session"
   | "pr_record"
-  | "conversation";
+  | "conversation"
+  | "note";
 
 export type DbChangeAction = "upsert" | "delete";
 

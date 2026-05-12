@@ -12,8 +12,9 @@ import {
   usePlannedWorkoutsStoreInternal,
 } from "../store/plannedWorkoutsStore";
 import { useWorkoutsStoreInternal } from "../store/workoutsStore";
-import {  useConversationsStoreInternal } from "../store/convesationsStore";
-import { Conversation } from "../types/gen";
+import { useConversationsStoreInternal } from "../store/convesationsStore";
+import { useNotesStoreInternal } from "../store/notesStore";
+import { Conversation, NoteEntry } from "../types/gen";
 // import { useUserStore } from "../store/userStore";
 // import { usePrRecords } from "../store/prRecordsStore";
 
@@ -81,7 +82,7 @@ function handleDbChange(e: DbChangeEvent) {
     //   else if (hasPayload) usePrRecords.getState().upsert(payload);
     //   else usePrRecords.getState().refetchById?.(id);
     //   return;
-    case "conversation":  
+    case "conversation":
       if (action === "delete") {
         useConversationsStoreInternal.getState().remove(id);
       } else if (hasPayload) {
@@ -92,6 +93,15 @@ function handleDbChange(e: DbChangeEvent) {
         useConversationsStoreInternal.getState().refetchById?.(id);
       }
       return;
+
+    case "note":
+      if (action === "delete") {
+        useNotesStoreInternal.getState().remove(id);
+      } else if (hasPayload) {
+        useNotesStoreInternal.getState().upsert(payload as unknown as NoteEntry);
+      }
+      return;
+
     default:
       console.warn(`[WS] Unknown entity type in db_change event: ${entity}`);
       return;

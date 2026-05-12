@@ -103,3 +103,32 @@ async def fetch_messages_formatted(
         .limit(limit)
     )
     return format_messages_for_api(await cur.to_list(length=limit))
+
+
+async def build_notes_context(db, user_id: str, max_chars: int = 400) -> str:
+    """
+    Inject only always-relevant notes (injuries + active goals) into every
+    system prompt. Everything else is retrieved on demand via search_notes.
+    """
+    docs = await db.notes.find(
+        {"user_id": user_id, "tag": {"$in": ["injury", "goal"]}}
+    ).sort("created_at", -1).to_list(30)
+
+    if not docs:
+        return ""
+
+    lines = []
+    for d in docs:
+        tag = d.get("tag", "")
+        content = d.get("content", "").strip()
+        writer = d.get("writer", "user")
+        prefix = "AI" if writer == "ai" else "User"
+        if len(content) > 200:
+            content = content[:197] + "…"
+        lines.append(f"[{tag}][{prefix}] {content}")
+
+    block = "\n".join(lines)
+    if len(block) > max_chars:
+        block = block[: max_chars - 3] + "…"
+
+    return f"<critical_notes>\n{block}\n</critical_notes>"

@@ -7,10 +7,16 @@ from bson import ObjectId
 
 from .jobs import mark_completed, mark_failed
 from .emitter import AIEmitter
-from .openai_client import stream_chat
-from .tools.registry import OPENAI_TOOLS, execute_tool
+from .openai_client import stream_chat, client as openai_client
+from .config import DEFAULT_MODEL
+from .tools.registry import OPENAI_TOOLS, TOOL_REGISTRY, execute_tool
 from .prompts.system import build_system_prompt
-from services.ai.store import add_message, list_messages, touch_conversation
+from services.ai.store import (
+    add_message,
+    list_messages,
+    touch_conversation,
+    build_notes_context,
+)
 
 MAX_TOOL_ROUNDS = 6
 
@@ -49,8 +55,17 @@ class AIRunner:
             # we prepend our own system message below.
 
             user_doc = await effective_db.users.find_one({"_id": ObjectId(user_id)})
-            user_context = {"profile": user_doc or {}}
+            profile_dict = (user_doc or {}).get("profile", {}) or {}
+            user_context = {
+                "profile": profile_dict,
+                "insights": profile_dict.get("insights", {}),
+                "recent_workouts": await _fetch_recent_workouts(effective_db, user_id),
+            }
             system_prompt = build_system_prompt(user_context)
+
+            notes_block = await build_notes_context(effective_db, user_id)
+            if notes_block:
+                system_prompt += f"\n\n{notes_block}"
 
             openai_messages = [{"role": "system", "content": system_prompt}]
             history = await list_messages(
@@ -222,6 +237,9 @@ class AIRunner:
 
             await emitter.emit(job_id, "done", {})
             await mark_completed(effective_db, job_id)
+            asyncio.create_task(
+                _run_summary_pass(effective_db, user_id, conversation_id)
+            )
 
         except Exception as e:
             import traceback
@@ -242,3 +260,100 @@ class AIRunner:
             await mark_failed(effective_db, job_id)
 
         return job_id
+
+
+async def _fetch_recent_workouts(db, user_id: str, n: int = 3) -> list:
+    docs = await (
+        db.workouts.find({"user_id": user_id, "ended_at": {"$ne": None}})
+        .sort("ended_at", -1)
+        .limit(n)
+        .to_list(n)
+    )
+    return docs
+
+
+_NOTES_TOOL_NAMES = {
+    "search_notes",
+    "create_note",
+    "update_note",
+    "delete_note",
+    "list_notes",
+}
+_SUMMARY_SYSTEM = """\
+You are a memory extraction agent. Review the conversation and persist any meaningful new facts
+about the user using the notes tools. Focus on:
+- Injuries, pain, or physical complaints
+- Goals mentioned or updated
+- Preferences, constraints, or training habits
+
+Rules:
+1. Call search_notes BEFORE creating a note to avoid duplicates.
+2. UPDATE existing notes rather than creating new ones when the topic overlaps.
+3. Only persist things the user actually stated — do not invent.
+4. Skip anything already captured accurately in existing notes.
+5. If nothing new was revealed, call no tools."""
+
+
+async def _run_summary_pass(db, user_id: str, conversation_id: str) -> None:
+    try:
+        history = await list_messages(db, user_id, conversation_id, limit=200)
+        if not history:
+            return
+
+        notes_tools = [
+            t for t in OPENAI_TOOLS if t["function"]["name"] in _NOTES_TOOL_NAMES
+        ]
+        messages = [{"role": "system", "content": _SUMMARY_SYSTEM}, *history]
+
+        for _ in range(3):
+            resp = await openai_client.chat.completions.create(
+                model=DEFAULT_MODEL,
+                messages=messages,
+                tools=notes_tools,
+                temperature=0.2,
+                stream=False,
+            )
+            msg = resp.choices[0].message
+
+            if not msg.tool_calls:
+                break
+
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": msg.content,
+                    "tool_calls": [
+                        {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {
+                                "name": tc.function.name,
+                                "arguments": tc.function.arguments,
+                            },
+                        }
+                        for tc in msg.tool_calls
+                    ],
+                }
+            )
+
+            for tc in msg.tool_calls:
+                try:
+                    args = json.loads(tc.function.arguments or "{}")
+                    tool = TOOL_REGISTRY.get(tc.function.name)
+                    result = (
+                        await tool.execute(args, {"db": db, "user_id": user_id})
+                        if tool
+                        else json.dumps({"error": "unknown tool"})
+                    )
+                except Exception as e:
+                    result = json.dumps({"error": str(e)})
+                messages.append(
+                    {"role": "tool", "tool_call_id": tc.id, "content": result}
+                )
+
+    except Exception:
+        import traceback
+
+        print("\n\n===== SUMMARY PASS ERROR =====")
+        traceback.print_exc()
+        print("===========================\n\n")

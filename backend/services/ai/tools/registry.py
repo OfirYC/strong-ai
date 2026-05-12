@@ -19,6 +19,7 @@ from .schedule import (
     ScheduleDeleteWorkout,
 )
 from .history import WorkoutHistoryGetAll, WorkoutHistoryGetByExercise
+from .notes import CreateNoteTool, UpdateNoteTool, DeleteNoteTool, ListNotesTool, SearchNotesTool
 
 # All tools in order
 ALL_TOOLS: List[BaseTool] = [
@@ -40,6 +41,11 @@ ALL_TOOLS: List[BaseTool] = [
     ScheduleDeleteWorkout(),
     WorkoutHistoryGetAll(),
     WorkoutHistoryGetByExercise(),
+    SearchNotesTool(),
+    CreateNoteTool(),
+    UpdateNoteTool(),
+    DeleteNoteTool(),
+    ListNotesTool(),
 ]
 
 # name -> tool instance
