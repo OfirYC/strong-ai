@@ -1,4 +1,5 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Header
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from services.ai.types import ChatRequest
 from dotenv import load_dotenv
@@ -2356,6 +2357,58 @@ async def revenuecat_webhook(
 @api_router.get("/")
 async def root():
     return {"message": "Strong Workout Tracker API", "version": "1.0.0"}
+
+
+@app.get("/privacy", response_class=HTMLResponse)
+async def privacy_policy():
+    return """<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy – Stronger</title>
+<style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:700px;margin:40px auto;padding:0 20px;color:#1c1c1e;line-height:1.7}h1{font-size:28px;margin-bottom:4px}h2{font-size:18px;margin-top:32px}p,li{font-size:15px;color:#3a3a3c}ul{padding-left:20px}a{color:#007aff}</style>
+</head>
+<body>
+<h1>Privacy Policy</h1>
+<p><em>Last updated: May 2026</em></p>
+<p>Stronger ("we", "our", or "us") is committed to protecting your privacy. This policy explains what data we collect, how we use it, and your rights.</p>
+
+<h2>1. Data We Collect</h2>
+<ul>
+<li><strong>Account data:</strong> Email address and name (or Apple ID token for Sign in with Apple users).</li>
+<li><strong>Workout data:</strong> Exercises, sets, reps, weights, and workout sessions you log.</li>
+<li><strong>AI conversations:</strong> Messages you send to the AI coach and responses generated.</li>
+<li><strong>Notes:</strong> Any notes saved by you or the AI during sessions.</li>
+<li><strong>Device data:</strong> Basic device identifiers used by RevenueCat for purchase validation.</li>
+</ul>
+
+<h2>2. How We Use Your Data</h2>
+<ul>
+<li>To provide and improve the app experience.</li>
+<li>To power AI coaching responses personalized to your history.</li>
+<li>To validate in-app subscriptions via RevenueCat.</li>
+<li>We do not sell your data to third parties.</li>
+</ul>
+
+<h2>3. Third-Party Services</h2>
+<ul>
+<li><strong>RevenueCat:</strong> Handles subscription and purchase management.</li>
+<li><strong>OpenRouter / OpenAI:</strong> Powers AI coaching responses. Conversation content may be processed on their servers.</li>
+<li><strong>Apple Sign In:</strong> Used for authentication. We receive only a user token and email.</li>
+</ul>
+
+<h2>4. Data Storage</h2>
+<p>Your data is stored in MongoDB Atlas on servers in the United States. We retain your data as long as your account is active.</p>
+
+<h2>5. Your Rights</h2>
+<p>You may request deletion of your account and all associated data by emailing us. Once deleted, data cannot be recovered.</p>
+
+<h2>6. Children</h2>
+<p>Stronger is not directed at children under 13. We do not knowingly collect data from children.</p>
+
+<h2>7. Contact</h2>
+<p>Questions? Email us at <a href="mailto:ofiryieldchain@gmail.com">ofiryieldchain@gmail.com</a></p>
+</body>
+</html>"""
 
 
 # Include the router in the main app
