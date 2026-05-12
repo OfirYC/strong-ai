@@ -7,12 +7,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useAuthStore } from "../store/authStore";
 import { registerRealtime } from "../realtime/registerRealtime";
+import { configurePurchases } from "../utils/purchases";
 
 export default function RootLayout() {
   const loadUser = useAuthStore(state => state.loadUser);
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
+    configurePurchases();
     loadUser();
   }, []);
 

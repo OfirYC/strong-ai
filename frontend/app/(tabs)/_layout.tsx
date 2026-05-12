@@ -8,7 +8,7 @@ if (__DEV__) {
 
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import ActiveWorkoutSheet from "../../components/ActiveWorkoutSheet";
 import AIChatModal from "../../components/AIChatModal";
@@ -16,20 +16,34 @@ import WorkoutCompleteModal from "../../components/WorkoutCompleteModal";
 import { useAuthStore } from "../../store/authStore";
 import { useActiveWorkoutSheetUIStore } from "../../store/workoutCompleteUIStore";
 import { useWorkoutStore } from "../../store/workoutStore";
+import { useSubscriptionStore } from "../../store/subscriptionStore";
+import { identifyUser } from "../../utils/purchases";
+import PaywallModal from "../../components/PaywallModal";
 
 export default function TabLayout() {
   const { user } = useAuthStore();
+  const {
+    isPro,
+    isLoading: subLoading,
+    refresh: refreshSub,
+  } = useSubscriptionStore();
+
+  useEffect(() => {
+    if (user?.id) {
+      identifyUser(user.id).then(() => refreshSub());
+    }
+  }, [user?.id]);
 
   const [showAIChat, setShowAIChat] = useState(false);
 
   const workoutCompleteVisible = useActiveWorkoutSheetUIStore(
-    s => s.workoutCompleteVisible
+    s => s.workoutCompleteVisible,
   );
   const workoutCompleteSummary = useActiveWorkoutSheetUIStore(
-    s => s.workoutCompleteSummary
+    s => s.workoutCompleteSummary,
   );
   const closeWorkoutComplete = useActiveWorkoutSheetUIStore(
-    s => s.closeWorkoutComplete
+    s => s.closeWorkoutComplete,
   );
 
   return (
@@ -123,6 +137,11 @@ export default function TabLayout() {
       )}
 
       <AIChatModal visible={showAIChat} onClose={() => setShowAIChat(false)} />
+
+      {/* Paywall gate — shown until user subscribes */}
+      {user && !subLoading && !isPro && (
+        <PaywallModal visible onSubscribed={refreshSub} />
+      )}
     </View>
   );
 }

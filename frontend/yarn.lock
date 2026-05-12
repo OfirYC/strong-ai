@@ -2606,6 +2606,29 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@revenuecat/purchases-js-hybrid-mappings@npm:18.4.0":
+  version: 18.4.0
+  resolution: "@revenuecat/purchases-js-hybrid-mappings@npm:18.4.0"
+  dependencies:
+    "@revenuecat/purchases-js": "npm:1.38.0"
+  checksum: 10c0/4ea6051f3e5ac1bc654ca5a386356039ad1a02aa1bcff1689c5158197961fc9d82e7ccd425a2da57ad1d93a9511202df83e5914aa5eec0e6a4713ace07625103
+  languageName: node
+  linkType: hard
+
+"@revenuecat/purchases-js@npm:1.38.0":
+  version: 1.38.0
+  resolution: "@revenuecat/purchases-js@npm:1.38.0"
+  checksum: 10c0/733fc90943a5de73af1dae28fa8f8d246a2edd74761023d11754bc9829b8f2b5b4328e2ad915a042fba933f009ad1176a13496fce6a1bc49f41110f537a9a452
+  languageName: node
+  linkType: hard
+
+"@revenuecat/purchases-typescript-internal@npm:18.4.0":
+  version: 18.4.0
+  resolution: "@revenuecat/purchases-typescript-internal@npm:18.4.0"
+  checksum: 10c0/a5e2131b4b16fcf00158c109c76f15d7b4c1da9d72fa5b4a9499222ef16b8962b490749871962a5fbe3b1b2f3c979b73e96f59af06525cf66ef50bd237d096b0
+  languageName: node
+  linkType: hard
+
 "@rtsao/scc@npm:^1.1.0":
   version: 1.1.0
   resolution: "@rtsao/scc@npm:1.1.0"
@@ -5724,6 +5747,7 @@ __metadata:
     react-native-gesture-handler: "npm:~2.28.0"
     react-native-gifted-charts: "npm:^1.4.73"
     react-native-markdown-display: "npm:^7.0.2"
+    react-native-purchases: "npm:^10.1.0"
     react-native-reanimated: "npm:~4.1.1"
     react-native-safe-area-context: "npm:~5.6.2"
     react-native-screens: "npm:~4.16.0"
@@ -8406,6 +8430,23 @@ __metadata:
     react: ">=16.2.0"
     react-native: ">=0.50.4"
   checksum: 10c0/b90b75401340cd79c42e07e6e8961551e8b98acfbc53bc0b651174aea2a86b92430be767da7c813e54b08e7bbd8af6c09dbeb4f9369d925984979cc28b6ba8fb
+  languageName: node
+  linkType: hard
+
+"react-native-purchases@npm:^10.1.0":
+  version: 10.1.0
+  resolution: "react-native-purchases@npm:10.1.0"
+  dependencies:
+    "@revenuecat/purchases-js-hybrid-mappings": "npm:18.4.0"
+    "@revenuecat/purchases-typescript-internal": "npm:18.4.0"
+  peerDependencies:
+    react: ">= 16.6.3"
+    react-native: ">= 0.73.0"
+    react-native-web: "*"
+  peerDependenciesMeta:
+    react-native-web:
+      optional: true
+  checksum: 10c0/de7c2bef51f899c1aa77ab5d290f3d803b30ff5dcbf75d0a7513f47282a13bfa304fa6385b9e9609892f2035ab8fb4d6e4df52d859a434879ba880b3d17a6a33
   languageName: node
   linkType: hard
 

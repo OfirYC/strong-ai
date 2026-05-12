@@ -2312,6 +2312,44 @@ async def delete_planned_workout(
     return {"message": "Planned workout deleted"}
 
 
+# ============= REVENUECAT WEBHOOK =============
+
+REVENUECAT_WEBHOOK_SECRET = os.getenv("REVENUECAT_WEBHOOK_SECRET", "")
+
+_RC_GRANT_EVENTS = {"INITIAL_PURCHASE", "RENEWAL", "UNCANCELLATION", "SUBSCRIPTION_EXTENDED"}
+_RC_REVOKE_EVENTS = {"EXPIRATION", "BILLING_ISSUE"}
+
+
+@api_router.post("/webhooks/revenuecat")
+async def revenuecat_webhook(
+    request_body: dict,
+    authorization: Optional[str] = Header(None),
+):
+    if REVENUECAT_WEBHOOK_SECRET:
+        expected = f"Bearer {REVENUECAT_WEBHOOK_SECRET}"
+        if authorization != expected:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
+    event = request_body.get("event", {})
+    event_type = event.get("type", "")
+    app_user_id = event.get("app_user_id", "")
+
+    if not app_user_id:
+        return {"ok": True}
+
+    try:
+        user_filter = {"_id": ObjectId(app_user_id)}
+    except Exception:
+        return {"ok": True}
+
+    if event_type in _RC_GRANT_EVENTS:
+        await db.users.update_one(user_filter, {"$set": {"is_pro": True}})
+    elif event_type in _RC_REVOKE_EVENTS:
+        await db.users.update_one(user_filter, {"$set": {"is_pro": False}})
+
+    return {"ok": True}
+
+
 # ============= ROOT =============
 
 

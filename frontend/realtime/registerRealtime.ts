@@ -98,7 +98,9 @@ function handleDbChange(e: DbChangeEvent) {
       if (action === "delete") {
         useNotesStoreInternal.getState().remove(id);
       } else if (hasPayload) {
-        useNotesStoreInternal.getState().upsert(payload as unknown as NoteEntry);
+        useNotesStoreInternal
+          .getState()
+          .upsert(payload as unknown as NoteEntry);
       }
       return;
 
