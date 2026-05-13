@@ -246,6 +246,7 @@ class UserResponse(BaseModel):
     id: str
     email: str
     token: str
+    is_pro: bool = False
 
 
 class ProfileUpdate(BaseModel):

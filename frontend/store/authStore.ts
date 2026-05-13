@@ -67,6 +67,9 @@ export const useAuthStore = create<AuthState>(set => ({
             const res = await api.post("/auth/refresh");
             if (res?.data?.token) {
               tempUser.token = res.data.token;
+              if (res.data.is_pro !== undefined) {
+                tempUser.is_pro = res.data.is_pro;
+              }
               await AsyncStorage.setItem(USER_KEY, JSON.stringify(tempUser));
               userData = JSON.stringify(tempUser);
             }

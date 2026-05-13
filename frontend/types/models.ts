@@ -1322,6 +1322,8 @@ export interface components {
             email: string;
             /** Token */
             token: string;
+            /** Is Pro */
+            is_pro: boolean;
         };
         /** ValidationError */
         ValidationError: {

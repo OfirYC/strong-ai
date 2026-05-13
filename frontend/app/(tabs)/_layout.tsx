@@ -139,7 +139,7 @@ export default function TabLayout() {
       <AIChatModal visible={showAIChat} onClose={() => setShowAIChat(false)} />
 
       {/* Paywall gate — shown until user subscribes */}
-      {user && !subLoading && !isPro && (
+      {user && !subLoading && !isPro && !user.is_pro && (
         <PaywallModal visible onSubscribed={refreshSub} />
       )}
     </View>

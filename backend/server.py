@@ -200,7 +200,7 @@ async def register(user_data: UserCreate):
     user_id = str(result.inserted_id)
 
     token = create_access_token({"user_id": user_id})
-    return UserResponse(id=user_id, email=user.email, token=token)
+    return UserResponse(id=user_id, email=user.email, token=token, is_pro=False)
 
 
 @api_router.post("/auth/login", response_model=UserResponse)
@@ -214,7 +214,7 @@ async def login(credentials: UserLogin):
 
     user_id = str(user_doc["_id"])
     token = create_access_token({"user_id": user_id})
-    return UserResponse(id=user_id, email=user_doc["email"], token=token)
+    return UserResponse(id=user_id, email=user_doc["email"], token=token, is_pro=user_doc.get("is_pro", False))
 
 
 @api_router.post("/auth/refresh", response_model=UserResponse)
@@ -228,7 +228,7 @@ async def refresh_token(current_user: str = Depends(get_current_user)):
         raise HTTPException(status_code=401, detail="User not found")
 
     new_token = create_access_token({"user_id": user_id})
-    return UserResponse(id=user_id, email=user_doc.get("email"), token=new_token)
+    return UserResponse(id=user_id, email=user_doc.get("email"), token=new_token, is_pro=user_doc.get("is_pro", False))
 
 
 @api_router.post("/auth/apple", response_model=UserResponse)
@@ -303,7 +303,9 @@ async def apple_signin(payload: dict):
             )
 
     token = create_access_token({"user_id": user_id})
-    return UserResponse(id=user_id, email=email, token=token)
+    apple_user_doc = await db.users.find_one({"_id": ObjectId(user_id)})
+    is_pro = apple_user_doc.get("is_pro", False) if apple_user_doc else False
+    return UserResponse(id=user_id, email=email, token=token, is_pro=is_pro)
 
 
 # ============= WEBSOCKET =============
