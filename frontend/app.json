@@ -12,9 +12,11 @@
       "bundleIdentifier": "com.ofirsmol.strongai",
       "icon": "./assets/images/icon.png",
       "usesAppleSignIn": true,
+      "supportsTablet": false,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSSupportsLiveActivities": true
+        "NSSupportsLiveActivities": true,
+        "NSPhotoLibraryUsageDescription": "Stronger uses your photo library to let you add a custom image when creating a personal exercise (e.g. a photo of the movement or equipment)."
       }
     },
 

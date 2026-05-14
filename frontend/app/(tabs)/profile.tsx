@@ -6,8 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "../../store/authStore";
 import Button from "../../components/Button";
 import MuscleVolumeModal from "../../components/MuscleVolumeModal";
-import * as Updates from "expo-updates";
-const isDev = __DEV__;
+import api from "../../utils/api";
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -26,6 +25,42 @@ export default function ProfileScreen() {
         },
       },
     ]);
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      "Delete Account",
+      "This will permanently delete your account and all your data including workouts, templates, and progress. This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete Account",
+          style: "destructive",
+          onPress: () => {
+            Alert.alert(
+              "Are you sure?",
+              "All your data will be permanently deleted.",
+              [
+                { text: "Cancel", style: "cancel" },
+                {
+                  text: "Yes, Delete Everything",
+                  style: "destructive",
+                  onPress: async () => {
+                    try {
+                      await api.delete("/auth/account");
+                      await logout();
+                      router.replace("/(auth)/login");
+                    } catch {
+                      Alert.alert("Error", "Failed to delete account. Please try again.");
+                    }
+                  },
+                },
+              ],
+            );
+          },
+        },
+      ],
+    );
   };
 
   return (
@@ -74,22 +109,16 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.section}>
-          <Text>Is Dev: {isDev ? "Yes" : "No"}</Text>
-          <Text>Update ID: {Updates.updateId ?? "N/A"}</Text>
-          <Text>Channel: {Updates.channel ?? "N/A"}</Text>
-          <Text>Runtime: {Updates.runtimeVersion ?? "N/A"}</Text>
-          <Text>
-            Embedded Launch: {Updates.isEmbeddedLaunch ? "Yes" : "No"}
-          </Text>
-        </View>
-
         <Button
           title="Logout"
           onPress={handleLogout}
           variant="outline"
           style={styles.logoutButton}
         />
+
+        <TouchableOpacity style={styles.deleteAccountButton} onPress={handleDeleteAccount}>
+          <Text style={styles.deleteAccountText}>Delete Account</Text>
+        </TouchableOpacity>
       </View>
 
       <MuscleVolumeModal
@@ -164,5 +193,13 @@ const styles = StyleSheet.create({
   },
   logoutButton: {
     marginTop: "auto",
+  },
+  deleteAccountButton: {
+    alignItems: "center",
+    paddingVertical: 16,
+  },
+  deleteAccountText: {
+    fontSize: 14,
+    color: "#FF3B30",
   },
 });

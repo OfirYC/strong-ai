@@ -217,6 +217,20 @@ async def login(credentials: UserLogin):
     return UserResponse(id=user_id, email=user_doc["email"], token=token, is_pro=user_doc.get("is_pro", False))
 
 
+@api_router.delete("/auth/account")
+async def delete_account(user_id: str = Depends(get_current_user)):
+    """Permanently delete the authenticated user's account and all their data."""
+    oid = ObjectId(user_id)
+    collections_to_purge = [
+        "workouts", "templates", "planned_workouts", "prs",
+        "conversations", "chat_messages", "ai_jobs", "notes", "exercises",
+    ]
+    for col in collections_to_purge:
+        await db[col].delete_many({"user_id": user_id})
+    await db.users.delete_one({"_id": oid})
+    return {"deleted": True}
+
+
 @api_router.post("/auth/refresh", response_model=UserResponse)
 async def refresh_token(current_user: str = Depends(get_current_user)):
     if not current_user:
