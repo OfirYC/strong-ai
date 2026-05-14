@@ -236,12 +236,6 @@ class User(BaseModel):
         json_encoders = {ObjectId: str}
 
 
-class User(BaseModel):
-    id: str
-    email: str
-    token: str
-
-
 class UserResponse(BaseModel):
     id: str
     email: str

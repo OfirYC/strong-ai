@@ -53,7 +53,6 @@ from models import (
     User,
     UserCreate,
     UserLogin,
-    User,
     UserProfile,
     ProfileUpdate,
     UserContext,
