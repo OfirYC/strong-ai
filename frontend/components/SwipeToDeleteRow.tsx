@@ -93,7 +93,10 @@ export default function SwipeToDeleteRow({
     <Swipeable
       ref={swipeableRef}
       renderRightActions={renderRightActions}
-      onSwipeableOpen={onDelete}
+      onSwipeableOpen={() => {
+        swipeableRef.current?.reset();
+        onDelete();
+      }}
       rightThreshold={Math.abs(DELETE_THRESHOLD)}
       // 0.4 = High sensitivity. Row moves ~2.5x faster than your finger.
       friction={0.8}
