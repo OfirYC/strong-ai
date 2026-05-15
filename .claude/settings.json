@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "revenuecat": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "revenuecat-mcp"],
+      "env": {
+        "REVENUECAT_API_KEY": "sk_zdVSxgUalcBowhZjuVYxeZjrkHFkK"
+      }
+    }
+  }
+}

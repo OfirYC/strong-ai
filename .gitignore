@@ -180,3 +180,4 @@ android-sdk/ -e
 
 frontend/ios
 frontend/android
+.claude
