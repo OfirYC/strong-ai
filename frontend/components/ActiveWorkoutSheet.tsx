@@ -156,6 +156,10 @@ export default function ActiveWorkoutSheet({
     !!activeWorkout?.notes,
   );
 
+  useEffect(() => {
+    if (workoutNotes) setShowDescription(true);
+  }, [workoutNotes]);
+
   const elapsedSecondsRef = useRef(0);
   const [saving, setSaving] = useState(false);
   const [showExercisePicker, setShowExercisePicker] = useState(false);

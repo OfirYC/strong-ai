@@ -379,6 +379,7 @@ export default function WorkoutScreen() {
       const payload: any = {
         planned_workout_id: plannedWorkout.id,
         name: plannedWorkout.name,
+        notes: plannedWorkout.notes,
       };
 
       if (plannedWorkout.inline_exercises?.length) {
