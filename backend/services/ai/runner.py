@@ -56,9 +56,11 @@ class AIRunner:
 
             user_doc = await effective_db.users.find_one({"_id": ObjectId(user_id)})
             profile_dict = (user_doc or {}).get("profile", {}) or {}
+            insights = await effective_db.profile_insights.find_one({"user_id": user_id}) or {}
+            insights.pop("_id", None)
             user_context = {
                 "profile": profile_dict,
-                "insights": profile_dict.get("insights", {}),
+                "insights": insights,
                 "recent_workouts": await _fetch_recent_workouts(effective_db, user_id),
             }
             system_prompt = build_system_prompt(user_context)

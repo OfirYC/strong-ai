@@ -88,10 +88,12 @@ class ProfileUpdateInsights(BaseTool):
                 "weak_point_tags": [],
                 "training_phases": [],
                 "psych_profile": "",
+                "goals": "",
+                "background_story": "",
             }
 
         update_fields: Dict[str, Any] = {}
-        for field in ["injury_tags", "current_issues", "strength_tags", "weak_point_tags", "psych_profile"]:
+        for field in ["injury_tags", "current_issues", "strength_tags", "weak_point_tags", "psych_profile", "goals", "background_story"]:
             if field in args:
                 update_fields[field] = args[field]
 

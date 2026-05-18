@@ -642,11 +642,20 @@ async def build_notes_context(db, user_id: str, max_chars: int = 1200) -> str:
 @api_router.get("/profile", response_model=UserProfile)
 async def get_profile(user_id: str = Depends(get_current_user)):
     """Get user profile"""
-    user_doc = await get_db(user_id).users.find_one({"_id": ObjectId(user_id)})
+    db = get_db(user_id)
+    user_doc = await db.users.find_one({"_id": ObjectId(user_id)})
     if not user_doc:
         raise HTTPException(status_code=404, detail="User not found")
 
-    profile_data = user_doc.get("profile", {})
+    profile_data = dict(user_doc.get("profile", {}))
+
+    insights_doc = await db.profile_insights.find_one({"user_id": user_id})
+    if insights_doc:
+        if insights_doc.get("goals"):
+            profile_data["goals"] = insights_doc["goals"]
+        if insights_doc.get("background_story"):
+            profile_data["background_story"] = insights_doc["background_story"]
+
     return UserProfile(**profile_data)
 
 
@@ -655,42 +664,52 @@ async def update_profile(
     profile_data: ProfileUpdate, user_id: str = Depends(get_current_user)
 ):
     """Update user profile and auto-generate insights"""
-    update_dict = {}
-    for field, value in profile_data.dict(exclude_unset=True).items():
-        if value is not None:
-            update_dict[f"profile.{field}"] = value
+    db = get_db(user_id)
+    submitted = profile_data.dict(exclude_unset=True)
 
-    if update_dict:
-        await get_db(user_id).users.update_one(
-            {"_id": ObjectId(user_id)}, {"$set": update_dict}
+    insights_update = {}
+    profile_update_dict = {}
+    for field, value in submitted.items():
+        if value is None:
+            continue
+        if field in ("goals", "background_story"):
+            insights_update[field] = value
+        else:
+            profile_update_dict[f"profile.{field}"] = value
+
+    if profile_update_dict:
+        await db.users.update_one(
+            {"_id": ObjectId(user_id)}, {"$set": profile_update_dict}
         )
 
-    user_doc = await get_db(user_id).users.find_one({"_id": ObjectId(user_id)})
-    profile_dict = user_doc.get("profile", {})
-    profile = UserProfile(**profile_dict)
-
-    try:
-        insights = await generate_profile_insights(profile)
-        await get_db(user_id).users.update_one(
-            {"_id": ObjectId(user_id)}, {"$set": {"profile.insights": insights.dict()}}
+    if insights_update:
+        await db.profile_insights.update_one(
+            {"user_id": user_id}, {"$set": insights_update}, upsert=True
         )
-        profile.insights = insights
-    except ValueError:
-        pass
-    except Exception as e:
-        print(f"Failed to auto-generate insights: {e}")
 
-    return profile
+    user_doc = await db.users.find_one({"_id": ObjectId(user_id)})
+    profile_dict = dict(user_doc.get("profile", {}))
+
+    insights_doc = await db.profile_insights.find_one({"user_id": user_id})
+    if insights_doc:
+        if insights_doc.get("goals"):
+            profile_dict["goals"] = insights_doc["goals"]
+        if insights_doc.get("background_story"):
+            profile_dict["background_story"] = insights_doc["background_story"]
+
+    return UserProfile(**profile_dict)
 
 
 @api_router.get("/profile/context", response_model=UserContext)
 async def get_user_context(user_id: str = Depends(get_current_user)):
     """Get aggregated user context for AI and UI logic"""
-    user_doc = await get_db(user_id).users.find_one({"_id": ObjectId(user_id)})
+    db = get_db(user_id)
+    user_doc = await db.users.find_one({"_id": ObjectId(user_id)})
     if not user_doc:
         raise HTTPException(status_code=404, detail="User not found")
 
     profile = user_doc.get("profile", {})
+    insights_doc = await db.profile_insights.find_one({"user_id": user_id}) or {}
 
     age = None
     if profile.get("date_of_birth"):
@@ -708,7 +727,7 @@ async def get_user_context(user_id: str = Depends(get_current_user)):
 
     training_context = {
         "training_age": profile.get("training_age"),
-        "goals": profile.get("goals"),
+        "goals": insights_doc.get("goals"),
     }
 
     physiology = {
@@ -726,14 +745,14 @@ async def get_user_context(user_id: str = Depends(get_current_user)):
         ]
     )
 
-    insights_data = profile.get("insights")
+    insights_data = {k: v for k, v in insights_doc.items() if k not in ("_id", "user_id")}
     insights = ProfileInsights(**insights_data) if insights_data else None
 
     return UserContext(
         basic_info=basic_info,
         training_context=training_context,
         physiology=physiology,
-        background_story=profile.get("background_story"),
+        background_story=insights_doc.get("background_story"),
         is_profile_complete=is_complete,
         insights=insights,
     )
@@ -745,18 +764,22 @@ class InsightsResponse(BaseModel):
 
 @api_router.post("/profile/insights/generate", response_model=InsightsResponse)
 async def generate_insights(user_id: str = Depends(get_current_user)):
-    """Generate AI-powered insights from user's profile"""
-    user_doc = await get_db(user_id).users.find_one({"_id": ObjectId(user_id)})
+    """Generate AI-powered insights from user's profile and save to profile_insights"""
+    db = get_db(user_id)
+    user_doc = await db.users.find_one({"_id": ObjectId(user_id)})
     if not user_doc:
         raise HTTPException(status_code=404, detail="User not found")
 
     profile_data = user_doc.get("profile", {})
+    existing_insights = await db.profile_insights.find_one({"user_id": user_id}) or {}
+    profile_data["goals"] = existing_insights.get("goals") or profile_data.get("goals")
+    profile_data["background_story"] = existing_insights.get("background_story") or profile_data.get("background_story")
     profile = UserProfile(**profile_data)
 
     try:
         insights = await generate_profile_insights(profile)
-        await get_db(user_id).users.update_one(
-            {"_id": ObjectId(user_id)}, {"$set": {"profile.insights": insights.dict()}}
+        await db.profile_insights.update_one(
+            {"user_id": user_id}, {"$set": insights.dict()}, upsert=True
         )
         return InsightsResponse(insights=insights.dict())
     except ValueError as e:

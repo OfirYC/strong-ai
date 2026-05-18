@@ -60,13 +60,14 @@ def build_system_prompt(user_context: Dict[str, Any]) -> str:
     height_weight = f"{height}cm / {weight}kg" if height and weight else "not specified"
 
     training_age = profile.get("training_age", "not specified")
-    goals = profile.get("goals", "not specified")
+    goals = insights.get("goals") or "not specified"
 
     injury_tags = insights.get("injury_tags", []) or []
     current_issues = insights.get("current_issues", []) or []
     strength_tags = insights.get("strength_tags", []) or []
     weak_point_tags = insights.get("weak_point_tags", []) or []
     psych_profile = insights.get("psych_profile", "") or ""
+    background_story = insights.get("background_story", "") or ""
 
     recent_workouts_block = _format_recent_workouts(recent_workouts)
 
@@ -94,6 +95,7 @@ USER CONTEXT:
 - Height/Weight: {height_weight}
 - Training Age: {training_age}
 - Goals: {goals}
+- Background: {background_story if background_story else "Not specified"}
 - Injuries: {", ".join(injury_tags) if injury_tags else "None"}
 - Current Issues: {", ".join(current_issues) if current_issues else "None"}
 - Strengths: {", ".join(strength_tags) if strength_tags else "Not specified"}
