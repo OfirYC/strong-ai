@@ -722,9 +722,8 @@ export default function WorkoutScreen() {
       <CalendarModal
         visible={showCalendarModal}
         onClose={() => setShowCalendarModal(false)}
-        onDateSelect={() => {
-          // no-op; CalendarModal handles internal rendering
-        }}
+        onDateSelect={() => {}}
+        onStartWorkout={handleStartWorkoutFromRoutine}
       />
     </SafeAreaView>
   );

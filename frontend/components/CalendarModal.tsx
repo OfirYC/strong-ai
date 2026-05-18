@@ -37,6 +37,7 @@ interface CalendarModalProps {
   visible: boolean;
   onClose: () => void;
   onDateSelect?: (date: string, workouts: PlannedWorkout[]) => void;
+  onStartWorkout?: (routine: WorkoutTemplate) => void;
 }
 
 const toLocalYMD = (d: Date) => d.toLocaleDateString("en-CA"); // YYYY-MM-DD
@@ -53,6 +54,7 @@ export default function CalendarModal({
   visible,
   onClose,
   onDateSelect,
+  onStartWorkout,
 }: CalendarModalProps) {
   const router = useRouter();
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -583,9 +585,12 @@ export default function CalendarModal({
         routine={selectedRoutine}
         onRoutineEdited={setSelectedRoutine}
         onClose={() => setShowRoutineModal(false)}
-        onStartWorkout={() => {
+        onStartWorkout={(routine) => {
           setShowRoutineModal(false);
-          onClose();
+          setTimeout(() => {
+            onClose();
+            onStartWorkout?.(routine);
+          }, 300);
         }}
       />
     </Modal>
