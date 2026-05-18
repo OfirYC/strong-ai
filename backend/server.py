@@ -2138,10 +2138,6 @@ async def enrich_planned_workouts_with_sessions(
                 pw["status"] = "planned"
 
             pw["workout_session_id"] = str(session["_id"])
-            if session.get("name"):
-                pw["name"] = session["name"]
-            if session.get("notes"):
-                pw["notes"] = session["notes"]
         else:
             pw.setdefault("status", "planned")
 
