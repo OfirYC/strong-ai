@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -69,7 +69,7 @@ export default function ProfileScreen() {
         <Text style={styles.title}>Profile</Text>
       </View>
 
-      <View style={styles.content}>
+      <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
         <View style={styles.profileCard}>
           <View style={styles.avatarContainer}>
             <Ionicons name="person" size={48} color="#4A90E2" />
@@ -119,7 +119,7 @@ export default function ProfileScreen() {
         <TouchableOpacity style={styles.deleteAccountButton} onPress={handleDeleteAccount}>
           <Text style={styles.deleteAccountText}>Delete Account</Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
 
       <MuscleVolumeModal
         visible={muscleVolumeVisible}
@@ -146,8 +146,10 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  contentContainer: {
     paddingHorizontal: 20,
-    paddingBottom: 24,
+    paddingBottom: 40,
   },
   profileCard: {
     backgroundColor: "#FFFFFF",
@@ -192,7 +194,7 @@ const styles = StyleSheet.create({
     marginLeft: 16,
   },
   logoutButton: {
-    marginTop: "auto",
+    marginTop: 16,
   },
   deleteAccountButton: {
     alignItems: "center",
