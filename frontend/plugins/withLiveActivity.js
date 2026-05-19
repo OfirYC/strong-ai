@@ -43,15 +43,30 @@ function withLiveActivityiPhoneOnly(config) {
       }
 
       let plist = await fs.promises.readFile(infoPlistPath, 'utf8');
+      let changed = false;
 
-      // Only inject if not already present
       if (!plist.includes('UIDeviceFamily')) {
         plist = plist.replace(
           '</dict>\n</plist>',
           '\t<key>UIDeviceFamily</key>\n\t<array>\n\t\t<integer>1</integer>\n\t</array>\n</dict>\n</plist>'
         );
-        await fs.promises.writeFile(infoPlistPath, plist, 'utf8');
+        changed = true;
         console.log('✅ LiveActivity extension restricted to iPhone only (UIDeviceFamily=1).');
+      }
+
+      // Sync CFBundleVersion with main app build number
+      const buildNumber = config.ios?.buildNumber;
+      if (buildNumber && plist.includes('<key>CFBundleVersion</key>')) {
+        plist = plist.replace(
+          /<key>CFBundleVersion<\/key>\s*<string>[^<]*<\/string>/,
+          `<key>CFBundleVersion</key>\n\t<string>${buildNumber}</string>`
+        );
+        changed = true;
+        console.log(`✅ LiveActivity CFBundleVersion synced to ${buildNumber}.`);
+      }
+
+      if (changed) {
+        await fs.promises.writeFile(infoPlistPath, plist, 'utf8');
       }
 
       return config;
