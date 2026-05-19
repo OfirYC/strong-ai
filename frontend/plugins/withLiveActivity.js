@@ -29,11 +29,43 @@ function withSwiftOverride(config) {
   });
 }
 
+function withLiveActivityiPhoneOnly(config) {
+  return withMod(config, {
+    platform: 'ios',
+    mod: 'xcodeproj',
+    action: async config => {
+      const iosRoot = config.modRequest.platformProjectRoot;
+      const infoPlistPath = path.join(iosRoot, 'LiveActivity', 'Info.plist');
+
+      if (!fs.existsSync(infoPlistPath)) {
+        console.warn('LiveActivity Info.plist not found, skipping UIDeviceFamily patch.');
+        return config;
+      }
+
+      let plist = await fs.promises.readFile(infoPlistPath, 'utf8');
+
+      // Only inject if not already present
+      if (!plist.includes('UIDeviceFamily')) {
+        plist = plist.replace(
+          '</dict>\n</plist>',
+          '\t<key>UIDeviceFamily</key>\n\t<array>\n\t\t<integer>1</integer>\n\t</array>\n</dict>\n</plist>'
+        );
+        await fs.promises.writeFile(infoPlistPath, plist, 'utf8');
+        console.log('✅ LiveActivity extension restricted to iPhone only (UIDeviceFamily=1).');
+      }
+
+      return config;
+    },
+  });
+}
+
 module.exports = function withLiveActivityAll(config, props) {
   return withPlugins(config, [
     // Register override FIRST
     withSwiftOverride,
     // Then apply expo-live-activity
     ['expo-live-activity', props],
+    // Restrict extension to iPhone only (prevents iPad widget picker rejection)
+    withLiveActivityiPhoneOnly,
   ]);
 };
