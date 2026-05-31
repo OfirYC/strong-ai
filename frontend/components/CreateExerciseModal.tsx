@@ -22,13 +22,8 @@ import {
   ExerciseCategory,
 } from "../types";
 
-import {
-  BODY_PARTS,
-  EXERCISE_CATEGORYS,
-  type BodyPart,
-  type ExerciseCreate,
-} from "../types/gen";
-import { useExercises } from "../store/exercisesStore"; // ✅ NEW
+import { EXERCISE_CATEGORYS } from "../types/gen";
+import { useExercises } from "../store/exercisesStore";
 
 interface CreateExerciseModalProps {
   visible: boolean;
@@ -45,9 +40,6 @@ export default function CreateExerciseModal({
   const { loading: exercisesLoading, upsert } = useExercises();
 
   const [name, setName] = useState("");
-  const [selectedBodyPart, setSelectedBodyPart] = useState<BodyPart | null>(
-    null,
-  );
   const [selectedKind, setSelectedKind] = useState<ExerciseKind | null>(null);
   const [selectedCategory, setSelectedCategory] =
     useState<ExerciseCategory | null>(null);
@@ -57,7 +49,6 @@ export default function CreateExerciseModal({
 
   const resetForm = () => {
     setName("");
-    setSelectedBodyPart(null);
     setSelectedKind(null);
     setSelectedCategory(null);
     setImageBase64(null);
@@ -101,10 +92,6 @@ export default function CreateExerciseModal({
       Alert.alert("Error", "Please enter an exercise name");
       return;
     }
-    if (!selectedBodyPart) {
-      Alert.alert("Error", "Please select a body part");
-      return;
-    }
     if (!selectedKind) {
       Alert.alert("Error", "Please select a kind");
       return;
@@ -121,8 +108,6 @@ export default function CreateExerciseModal({
         await api.post("/exercises", {
           name: name.trim(),
           exercise_kind: selectedKind,
-          primary_body_parts: [selectedBodyPart as BodyPart],
-          secondary_body_parts: [] as BodyPart[],
           category: selectedCategory,
           is_custom: true,
           image: imageBase64 || null,
@@ -184,32 +169,6 @@ export default function CreateExerciseModal({
               onChangeText={setName}
               autoFocus
             />
-          </View>
-
-          {/* Body Part Selection */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Body Part</Text>
-            <View style={styles.optionsGrid}>
-              {BODY_PARTS.map(part => (
-                <TouchableOpacity
-                  key={part}
-                  style={[
-                    styles.optionChip,
-                    selectedBodyPart === part && styles.optionChipSelected,
-                  ]}
-                  onPress={() => setSelectedBodyPart(part)}
-                >
-                  <Text
-                    style={[
-                      styles.optionText,
-                      selectedBodyPart === part && styles.optionTextSelected,
-                    ]}
-                  >
-                    {part}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
           </View>
 
           {/* Kind Selection */}

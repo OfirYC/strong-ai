@@ -21,6 +21,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Exercise, ExerciseHistoryResponse } from "../types";
 import type { ExerciseHistoryEntry as ExerciseHistory } from "../types/gen";
 import api from "../utils/api";
+import { getGroupsFromLoads } from "../utils/muscleUtils";
 import { SetNumber } from "./SetNumber";
 import { useExercises } from "../store/exercisesStore";
 
@@ -326,7 +327,7 @@ export default function ExerciseDetailModal({
           </View>
           <View style={styles.infoBadge}>
             <Text style={styles.infoBadgeText}>
-              {exercise?.primary_body_parts?.join(", ")}
+              {getGroupsFromLoads(exercise?.muscle_loads).join(", ") || "—"}
             </Text>
           </View>
         </View>

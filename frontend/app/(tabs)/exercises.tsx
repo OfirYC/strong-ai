@@ -15,20 +15,10 @@ import ExerciseDetailModal from "../../components/ExerciseDetailModal";
 import { LoadingData } from "../../components/LoadingData";
 import { useExercises } from "../../store/exercisesStore";
 import { Exercise } from "../../types";
+import { MUSCLE_FILTER_GROUPS, getGroupsFromLoads, matchesGroup } from "../../utils/muscleUtils";
 
 const PLACEHOLDER_IMAGE =
   "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=100&h=100&fit=crop";
-
-const MUSCLE_GROUPS = [
-  "All",
-  "Chest",
-  "Back",
-  "Shoulders",
-  "Arms",
-  "Legs",
-  "Abs",
-  "Full Body",
-];
 
 export default function ExercisesScreen() {
   // Store
@@ -56,9 +46,7 @@ export default function ExercisesScreen() {
     let filtered = exercises;
 
     if (selectedMuscleGroup !== "All") {
-      filtered = filtered.filter(ex =>
-        ex.primary_body_parts?.some(p => p === selectedMuscleGroup)
-      );
+      filtered = filtered.filter(ex => matchesGroup(ex.muscle_loads, selectedMuscleGroup));
     }
 
     if (searchQuery) {
@@ -95,7 +83,7 @@ export default function ExercisesScreen() {
       <View style={styles.exerciseInfo}>
         <Text style={styles.exerciseName}>{item.name}</Text>
         <Text style={styles.exerciseDetail}>
-          {item.exercise_kind} • {item.primary_body_parts.join(", ")}
+          {item.exercise_kind}{getGroupsFromLoads(item.muscle_loads).length > 0 ? ` • ${getGroupsFromLoads(item.muscle_loads).join(", ")}` : ""}
         </Text>
       </View>
       <Ionicons name="chevron-forward" size={24} color="#8E8E93" />
@@ -130,7 +118,7 @@ export default function ExercisesScreen() {
         <FlatList
           horizontal
           showsHorizontalScrollIndicator={false}
-          data={MUSCLE_GROUPS}
+          data={MUSCLE_FILTER_GROUPS}
           keyExtractor={item => item}
           renderItem={({ item }) => (
             <TouchableOpacity

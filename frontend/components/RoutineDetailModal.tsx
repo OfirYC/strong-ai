@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useExercises } from "../store/exercisesStore";
 import { useWorkouts } from "../store/workoutsStore";
 import { Exercise, WorkoutTemplate } from "../types";
+import { getGroupsFromLoads } from "../utils/muscleUtils";
 import { EditRoutineModal, EditRoutineModalProps } from "./EditRoutineModal";
 import ExerciseDetailModal from "./ExerciseDetailModal";
 
@@ -235,7 +236,7 @@ export default function RoutineDetailModal({
                           {setCount} × {detail?.name || "Loading..."}
                         </Text>
                         <Text style={styles.exerciseMuscle}>
-                          {detail?.primary_body_parts?.[0] || ""}
+                          {getGroupsFromLoads(detail?.muscle_loads)[0] || ""}
                         </Text>
                       </View>
 

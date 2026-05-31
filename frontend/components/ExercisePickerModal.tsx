@@ -15,17 +15,7 @@ import api from "../utils/api";
 import { Exercise } from "../types";
 import { LoadingData } from "./LoadingData";
 import { useExercises } from "../store/exercisesStore";
-
-const MUSCLE_GROUPS = [
-  "All",
-  "Chest",
-  "Back",
-  "Shoulders",
-  "Arms",
-  "Legs",
-  "Abs",
-  "Full Body",
-];
+import { MUSCLE_FILTER_GROUPS, getGroupsFromLoads, matchesGroup } from "../utils/muscleUtils";
 
 interface ExercisePickerModalProps {
   visible: boolean;
@@ -50,9 +40,7 @@ export default function ExercisePickerModal({
         const matchesSearch =
           !searchQuery ||
           exercise.name.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesMuscleGroup =
-          selectedMuscleGroup === "All" ||
-          exercise.primary_body_parts.some(p => p == selectedMuscleGroup);
+        const matchesMuscleGroup = matchesGroup(exercise.muscle_loads, selectedMuscleGroup);
         return matchesSearch && matchesMuscleGroup;
       }),
     [searchQuery, selectedMuscleGroup, list, list.length]
@@ -106,7 +94,7 @@ export default function ExercisePickerModal({
           <FlatList
             horizontal
             showsHorizontalScrollIndicator={false}
-            data={MUSCLE_GROUPS}
+            data={MUSCLE_FILTER_GROUPS}
             keyExtractor={item => item}
             renderItem={({ item }) => (
               <TouchableOpacity
@@ -154,7 +142,7 @@ export default function ExercisePickerModal({
               <View style={styles.exerciseInfo}>
                 <Text style={styles.exerciseName}>{item.name}</Text>
                 <Text style={styles.exerciseDetail}>
-                  {item.exercise_kind} • {item.primary_body_parts?.join(", ")}
+                  {item.exercise_kind}{getGroupsFromLoads(item.muscle_loads).length > 0 ? ` • ${getGroupsFromLoads(item.muscle_loads).join(", ")}` : ""}
                 </Text>
               </View>
             </TouchableOpacity>

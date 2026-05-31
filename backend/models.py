@@ -498,27 +498,14 @@ class MuscleVolumeEntry(BaseModel):
     top_exercises: List[MuscleTopExercise]
 
 
-def _coerce_body_parts(v: Any) -> Any:
-    if not isinstance(v, list):
-        return v
-    return [normalize_body_part(item) if isinstance(item, str) else item for item in v]
-
-
 class ExerciseCreate(BaseModel):
     name: str
     exercise_kind: ExerciseKind
-    primary_body_parts: List[BodyPart]
-    secondary_body_parts: List[BodyPart] = []
     muscle_loads: List[MuscleLoad] = []
     category: ExerciseCategory = ExerciseCategory.STRENGTH
     is_custom: bool = False
     instructions: Optional[str] = None
     image: Optional[str] = None
-
-    @field_validator("primary_body_parts", "secondary_body_parts", mode="before")
-    @classmethod
-    def normalize_body_parts(cls, v: Any) -> Any:
-        return _coerce_body_parts(v)
 
     @field_validator("category", mode="before")
     @classmethod
@@ -532,14 +519,7 @@ class Exercise(BaseModel):
     id: Optional[str] = Field(default=None)
     name: str
     exercise_kind: ExerciseKind
-    primary_body_parts: List[BodyPart]
-    secondary_body_parts: List[BodyPart] = []
     muscle_loads: List[MuscleLoad] = []
-
-    @field_validator("primary_body_parts", "secondary_body_parts", mode="before")
-    @classmethod
-    def normalize_body_parts(cls, v: Any) -> Any:
-        return _coerce_body_parts(v)
 
     @field_validator("category", mode="before")
     @classmethod
@@ -550,7 +530,6 @@ class Exercise(BaseModel):
 
     @property
     def is_tagged(self) -> bool:
-        """False = still on legacy body parts. Use to track tagging progress."""
         return len(self.muscle_loads) > 0
 
     category: ExerciseCategory = ExerciseCategory.STRENGTH

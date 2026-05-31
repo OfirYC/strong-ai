@@ -803,10 +803,14 @@ async def get_exercises(
     query = {}
 
     if body_part:
-        query["$or"] = [
-            {"primary_body_parts": body_part},
-            {"secondary_body_parts": body_part},
-        ]
+        from body_parts import MUSCLE_MAP, get_all_descendants
+        # body_part is a display name like "Chest" — find its slug
+        slug = next(
+            (s for s, n in MUSCLE_MAP.items() if n["name"].lower() == body_part.lower()),
+            body_part.lower(),
+        )
+        matching_slugs = [slug] + get_all_descendants(slug)
+        query["muscle_loads"] = {"$elemMatch": {"slug": {"$in": matching_slugs}}}
 
     if exercise_kind:
         query["exercise_kind"] = exercise_kind.value
