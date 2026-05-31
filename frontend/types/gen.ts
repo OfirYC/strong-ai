@@ -8,32 +8,6 @@ import type { components } from './models';
 export type DeNull<T> = T extends null ? undefined : T extends object ? { [K in keyof T]: DeNull<T[K]> } : T;
 
 // ============= ENUMS =============
-export type BodyPart = components['schemas']['BodyPart'];
-export const BODY_PARTS = [
-  "Chest",
-  "Back",
-  "Shoulders",
-  "Biceps",
-  "Triceps",
-  "Forearms",
-  "Core",
-  "Abs",
-  "Obliques",
-  "Legs",
-  "Quads",
-  "Hamstrings",
-  "Glutes",
-  "Glute Medius",
-  "Calves",
-  "Hips",
-  "Traps",
-  "Full Body",
-  "Feet",
-  "Ankles",
-  "Shins",
-  "Other"
-] as const satisfies readonly BodyPart[];
-
 export type ExerciseCategory = components['schemas']['ExerciseCategory'];
 export const EXERCISE_CATEGORYS = [
   "Strength",

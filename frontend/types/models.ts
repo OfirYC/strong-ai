@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/privacy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Privacy Policy */
+        get: operations["privacy_policy_privacy_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/register": {
         parameters: {
             query?: never;
@@ -33,6 +50,26 @@ export interface paths {
         /** Login */
         post: operations["login_api_auth_login_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Account
+         * @description Permanently delete the authenticated user's account and all their data.
+         */
+        delete: operations["delete_account_api_auth_account_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -243,7 +280,7 @@ export interface paths {
         put?: never;
         /**
          * Generate Insights
-         * @description Generate AI-powered insights from user's profile
+         * @description Generate AI-powered insights from user's profile and save to profile_insights
          */
         post: operations["generate_insights_api_profile_insights_generate_post"];
         delete?: never;
@@ -563,6 +600,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/webhooks/revenuecat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revenuecat Webhook */
+        post: operations["revenuecat_webhook_api_webhooks_revenuecat_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/": {
         parameters: {
             query?: never;
@@ -588,11 +642,6 @@ export interface components {
         ActiveJobResponse: {
             job?: components["schemas"]["Job"] | null;
         };
-        /**
-         * BodyPart
-         * @enum {string}
-         */
-        BodyPart: "Chest" | "Back" | "Shoulders" | "Biceps" | "Triceps" | "Forearms" | "Core" | "Abs" | "Obliques" | "Legs" | "Quads" | "Hamstrings" | "Glutes" | "Glute Medius" | "Calves" | "Hips" | "Traps" | "Full Body" | "Feet" | "Ankles" | "Shins" | "Other";
         /** Conversation */
         Conversation: {
             /** Id */
@@ -634,13 +683,6 @@ export interface components {
             /** Name */
             name: string;
             exercise_kind: components["schemas"]["ExerciseKind"];
-            /** Primary Body Parts */
-            primary_body_parts: components["schemas"]["BodyPart"][];
-            /**
-             * Secondary Body Parts
-             * @default []
-             */
-            secondary_body_parts: components["schemas"]["BodyPart"][];
             /**
              * Muscle Loads
              * @default []
@@ -720,13 +762,6 @@ export interface components {
             /** Name */
             name: string;
             exercise_kind: components["schemas"]["ExerciseKind"];
-            /** Primary Body Parts */
-            primary_body_parts: components["schemas"]["BodyPart"][];
-            /**
-             * Secondary Body Parts
-             * @default []
-             */
-            secondary_body_parts: components["schemas"]["BodyPart"][];
             /**
              * Muscle Loads
              * @default []
@@ -1322,7 +1357,10 @@ export interface components {
             email: string;
             /** Token */
             token: string;
-            /** Is Pro */
+            /**
+             * Is Pro
+             * @default false
+             */
             is_pro: boolean;
         };
         /** ValidationError */
@@ -1570,6 +1608,26 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    privacy_policy_privacy_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+        };
+    };
     register_api_auth_register_post: {
         parameters: {
             query?: never;
@@ -1623,6 +1681,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_account_api_auth_account_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -3013,6 +3102,43 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revenuecat_webhook_api_webhooks_revenuecat_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

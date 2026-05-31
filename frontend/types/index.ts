@@ -7,7 +7,6 @@ export type {
   Exercise,
   ExerciseKind,
   ExerciseCategory,
-  BodyPart,
   SetType,
   WorkoutSet,
   WorkoutSetItem,
