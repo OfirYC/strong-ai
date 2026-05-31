@@ -92,7 +92,6 @@ from models import (
     # Enums
     ExerciseKind,
     ExerciseCategory,
-    BodyPart,
     SetType,
     PlannedWorkoutStatus,
     PlannedWorkoutType,

@@ -24,11 +24,27 @@ load_dotenv(Path(__file__).parent / ".env")
 
 sys.path.insert(0, str(Path(__file__).parent))
 from models import (
-    normalize_body_part, normalize_exercise_category, normalize_planned_workout_type,
+    normalize_exercise_category, normalize_planned_workout_type,
     BodyPart, ExerciseCategory, PlannedWorkoutType,
 )
 
 VALID_BODY_PARTS = {bp.value for bp in BodyPart}
+
+_BP_ALIASES = {
+    "arms": "Biceps", "deltoids": "Shoulders", "pecs": "Chest", "lats": "Back",
+    "lower back": "Back", "abdominals": "Abs", "glute": "Glutes", "quad": "Quads",
+    "hamstring": "Hamstrings", "calf": "Calves", "gastrocnemius": "Calves",
+    "trapezius": "Traps", "full body": "Full Body",
+}
+
+def normalize_body_part(value: str) -> str:
+    if value in VALID_BODY_PARTS:
+        return value
+    lower = value.lower().strip()
+    for v in VALID_BODY_PARTS:
+        if v.lower() == lower:
+            return v
+    return _BP_ALIASES.get(lower, "Other")
 VALID_CATEGORIES = {c.value for c in ExerciseCategory}
 VALID_PLANNED_TYPES = {t.value for t in PlannedWorkoutType}
 

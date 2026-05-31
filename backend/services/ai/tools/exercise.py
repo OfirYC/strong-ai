@@ -7,9 +7,30 @@ from bson import ObjectId
 from .base import BaseTool
 from constants import EXERCISE_KIND_RULES
 from models import ExerciseCreate
+from body_parts import MUSCLE_MAP, get_all_descendants
 
 
 EXERCISE_KIND_ENUM: List[str] = list(EXERCISE_KIND_RULES.keys())
+
+# Precomputed: slug display name (lower) → list of matching slugs (slug + all descendants)
+# Used to match a search query like "chest" or "quads" against muscle_loads
+_SLUG_SEARCH_MAP: Dict[str, List[str]] = {}
+for _slug, _node in MUSCLE_MAP.items():
+    _key = _node["name"].lower()
+    _slugs = [_slug] + get_all_descendants(_slug)
+    _SLUG_SEARCH_MAP.setdefault(_key, []).extend(_slugs)
+    # also index by slug itself
+    _SLUG_SEARCH_MAP.setdefault(_slug, []).extend(_slugs)
+
+
+def _muscle_slugs_for_query(query: str) -> List[str]:
+    """Return all muscle slugs that match a query string (name or slug prefix)."""
+    q = query.lower().strip()
+    matches: List[str] = []
+    for key, slugs in _SLUG_SEARCH_MAP.items():
+        if q in key or key in q:
+            matches.extend(slugs)
+    return list(set(matches))
 DEFAULT_EXERCISE_KIND = (
     "Machine/Other"
     if "Machine/Other" in EXERCISE_KIND_RULES
@@ -67,8 +88,7 @@ class ExerciseSearch(BaseTool):
                 {
                     "$or": [
                         {"name": {"$regex": query, "$options": "i"}},
-                        {"primary_body_parts": {"$regex": query, "$options": "i"}},
-                        {"secondary_body_parts": {"$regex": query, "$options": "i"}},
+                        {"muscle_loads.slug": {"$in": _muscle_slugs_for_query(query)}},
                     ]
                 },
             ]
@@ -82,8 +102,11 @@ class ExerciseSearch(BaseTool):
                 "name": ex.get("name"),
                 "exercise_kind": ex.get("exercise_kind"),
                 "category": ex.get("category"),
-                "primary_body_parts": (ex.get("primary_body_parts") or [])[:3],
-                "secondary_body_parts": (ex.get("secondary_body_parts") or [])[:3],
+                "muscle_loads": [
+                    {"slug": ml["slug"], "role": ml["role"]}
+                    for ml in (ex.get("muscle_loads") or [])[:5]
+                    if ml.get("slug")
+                ],
             }
             for ex in exercises
         ]
@@ -151,8 +174,11 @@ class ExerciseGetByIds(BaseTool):
                 "name": ex.get("name"),
                 "exercise_kind": ex.get("exercise_kind"),
                 "category": ex.get("category"),
-                "primary_body_parts": (ex.get("primary_body_parts") or [])[:3],
-                "secondary_body_parts": (ex.get("secondary_body_parts") or [])[:3],
+                "muscle_loads": [
+                    {"slug": ml["slug"], "role": ml["role"]}
+                    for ml in (ex.get("muscle_loads") or [])[:5]
+                    if ml.get("slug")
+                ],
             }
 
             if include_instructions:
