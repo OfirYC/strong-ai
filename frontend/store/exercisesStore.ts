@@ -8,13 +8,13 @@ import { matchesGroup } from "../utils/muscleUtils";
 type ExercisesStore = {
   byId: Record<string, Exercise>;
   loading: boolean;
+  allFetched: boolean;
 
   refetchAll: () => Promise<void>;
   refetchById: (id: string) => Promise<void>;
 
   getAll: (opts?: {
     force?: boolean;
-    minCount?: number;
   }) => Promise<Record<string, Exercise>>;
   getById: (id: string) => Promise<Exercise | undefined>;
 
@@ -29,6 +29,7 @@ const inflightById = new Map<string, Promise<Exercise | undefined>>();
 export const useExercisesStoreInternal = create<ExercisesStore>((set, get) => ({
   byId: {},
   loading: false,
+  allFetched: false,
 
   refetchAll: async () => {
     set({ loading: true });
@@ -36,7 +37,7 @@ export const useExercisesStoreInternal = create<ExercisesStore>((set, get) => ({
       const res = await api.get("/exercises");
       const next: Record<string, Exercise> = {};
       for (const ex of res.data) next[ex.id] = ex;
-      set({ byId: next });
+      set({ byId: next, allFetched: true });
     } finally {
       set({ loading: false });
     }
@@ -49,10 +50,10 @@ export const useExercisesStoreInternal = create<ExercisesStore>((set, get) => ({
 
   getAll: async opts => {
     const force = !!opts?.force;
-    const minCount = opts?.minCount ?? 1;
 
-    const cached = get().byId;
-    if (!force && Object.keys(cached).length >= minCount) return cached;
+    // Only skip if we've already fetched the full list — individual getById
+    // calls do NOT count, they only add to byId without setting allFetched
+    if (!force && get().allFetched) return get().byId;
 
     if (inFlightAll) return inFlightAll;
 
@@ -62,7 +63,7 @@ export const useExercisesStoreInternal = create<ExercisesStore>((set, get) => ({
         const res = await api.get("/exercises");
         const next: Record<string, Exercise> = {};
         for (const ex of res.data) next[ex.id] = ex;
-        set({ byId: next });
+        set({ byId: next, allFetched: true });
         return next;
       } finally {
         set({ loading: false });

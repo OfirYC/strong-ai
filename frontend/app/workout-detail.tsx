@@ -196,7 +196,7 @@ export default function WorkoutDetailScreen() {
   useEffect(() => {
     if (!workoutId) return;
     getPRsByWorkoutId(workoutId, { minCount: 1 }).catch(() => {});
-    getAllExercises({ minCount: 1 }).catch(() => {});
+    getAllExercises().catch(() => {});
   }, [workoutId, getPRsByWorkoutId, getAllExercises]);
 
   const summary = useMemo(() => {
