@@ -127,6 +127,205 @@ class BodyPart(str, Enum):
     OTHER = "Other"
 
 
+_BODY_PART_VALUES: set[str] = {bp.value for bp in BodyPart}
+
+# Maps common AI-generated or legacy strings → canonical BodyPart value
+_BODY_PART_ALIASES: dict[str, str] = {
+    "arms": "Biceps",
+    "upper arms": "Biceps",
+    "arm": "Biceps",
+    "deltoids": "Shoulders",
+    "deltoid": "Shoulders",
+    "delts": "Shoulders",
+    "delt": "Shoulders",
+    "pecs": "Chest",
+    "pec": "Chest",
+    "pectorals": "Chest",
+    "pectoral": "Chest",
+    "lat": "Back",
+    "lats": "Back",
+    "latissimus": "Back",
+    "upper back": "Back",
+    "lower back": "Back",
+    "mid back": "Back",
+    "rhomboids": "Back",
+    "abdominals": "Abs",
+    "abdominal": "Abs",
+    "ab": "Abs",
+    "stomach": "Abs",
+    "glute": "Glutes",
+    "gluteus": "Glutes",
+    "buttocks": "Glutes",
+    "butt": "Glutes",
+    "quad": "Quads",
+    "quadriceps": "Quads",
+    "quadricep": "Quads",
+    "hamstring": "Hamstrings",
+    "calf": "Calves",
+    "gastrocnemius": "Calves",
+    "soleus": "Calves",
+    "hip": "Hips",
+    "hip flexors": "Hips",
+    "hip flexor": "Hips",
+    "trapezius": "Traps",
+    "trap": "Traps",
+    "full body": "Full Body",
+    "total body": "Full Body",
+    "whole body": "Full Body",
+    "shin": "Shins",
+    "tibialis": "Shins",
+    "ankle": "Ankles",
+    "foot": "Feet",
+    "wrists": "Forearms",
+    "wrist": "Forearms",
+    "forearm": "Forearms",
+    "lower legs": "Calves",
+    "inner thigh": "Legs",
+    "outer thigh": "Legs",
+    "adductors": "Legs",
+    "abductors": "Legs",
+    "erector spinae": "Back",
+    "erectors": "Back",
+    "serratus": "Core",
+    "serratus anterior": "Core",
+    "transverse abdominis": "Core",
+    "brachialis": "Biceps",
+    "brachioradialis": "Forearms",
+    "rear delt": "Shoulders",
+    "rear delts": "Shoulders",
+    "front delt": "Shoulders",
+    "front delts": "Shoulders",
+    "side delt": "Shoulders",
+    "side delts": "Shoulders",
+    "rotator cuff": "Shoulders",
+    "teres": "Back",
+    "infraspinatus": "Back",
+    "supraspinatus": "Shoulders",
+}
+
+
+def normalize_body_part(value: str) -> str:
+    """Coerce an arbitrary body-part string to a valid BodyPart enum value."""
+    if value in _BODY_PART_VALUES:
+        return value
+    lower = value.lower().strip()
+    # Try case-insensitive exact match against enum values
+    for bp_val in _BODY_PART_VALUES:
+        if bp_val.lower() == lower:
+            return bp_val
+    # Try alias table
+    alias = _BODY_PART_ALIASES.get(lower)
+    if alias:
+        return alias
+    return "Other"
+
+
+# ---------------------------------------------------------------------------
+# ExerciseCategory normalization
+# ---------------------------------------------------------------------------
+
+_CATEGORY_VALUES: set[str] = {c.value for c in ExerciseCategory} if False else set()  # filled below
+_CATEGORY_ALIASES: dict[str, str] = {
+    "balance": "Stability",
+    "flexibility": "Mobility",
+    "stretch": "Mobility",
+    "stretching": "Mobility",
+    "yoga": "Mobility",
+    "pilates": "Mobility",
+    "rehab": "Recovery",
+    "rehabilitation": "Recovery",
+    "warm-up": "Mobility",
+    "warmup": "Mobility",
+    "cool-down": "Recovery",
+    "cooldown": "Recovery",
+    "endurance": "Cardio",
+    "aerobic": "Cardio",
+    "hiit": "Cardio",
+    "circuit": "Strength",
+    "powerlifting": "Strength",
+    "olympic lifting": "Strength",
+    "crossfit": "Strength",
+    "calisthenics": "Strength",
+    "bodyweight": "Strength",
+    "functional": "Control",
+    "coordination": "Control",
+    "agility": "Control",
+    "plyometrics": "Plyometric",
+    "jumping": "Plyometric",
+    "explosive": "Plyometric",
+    "isometric": "Isometric Strength",
+}
+
+
+def normalize_exercise_category(value: str) -> str:
+    """Coerce an arbitrary category string to a valid ExerciseCategory value."""
+    global _CATEGORY_VALUES
+    if not _CATEGORY_VALUES:
+        _CATEGORY_VALUES = {c.value for c in ExerciseCategory}
+    if value in _CATEGORY_VALUES:
+        return value
+    lower = value.lower().strip()
+    for cv in _CATEGORY_VALUES:
+        if cv.lower() == lower:
+            return cv
+    alias = _CATEGORY_ALIASES.get(lower)
+    if alias:
+        return alias
+    return "Strength"
+
+
+# ---------------------------------------------------------------------------
+# PlannedWorkoutType normalization
+# ---------------------------------------------------------------------------
+
+_PLANNED_TYPE_VALUES: set[str] = set()
+_PLANNED_TYPE_ALIASES: dict[str, str] = {
+    "recovery": "other",
+    "rest": "other",
+    "yoga": "mobility",
+    "stretching": "mobility",
+    "flexibility": "mobility",
+    "rehab": "mobility",
+    "swim": "cardio",
+    "swimming": "cardio",
+    "bike": "cardio",
+    "cycling": "cardio",
+    "rowing": "cardio",
+    "walk": "cardio",
+    "walking": "cardio",
+    "ruck": "cardio",
+    "hike": "cardio",
+    "hiking": "cardio",
+    "run": "run",
+    "running": "run",
+    "sprint": "run",
+    "intervals": "hiit",
+    "circuit": "hiit",
+    "lift": "strength",
+    "lifting": "strength",
+    "weights": "strength",
+    "powerlifting": "strength",
+    "crossfit": "hiit",
+}
+
+
+def normalize_planned_workout_type(value: str) -> str:
+    """Coerce an arbitrary planned workout type string to a valid PlannedWorkoutType value."""
+    global _PLANNED_TYPE_VALUES
+    if not _PLANNED_TYPE_VALUES:
+        _PLANNED_TYPE_VALUES = {t.value for t in PlannedWorkoutType}
+    if value in _PLANNED_TYPE_VALUES:
+        return value
+    lower = value.lower().strip()
+    for tv in _PLANNED_TYPE_VALUES:
+        if tv.lower() == lower:
+            return tv
+    alias = _PLANNED_TYPE_ALIASES.get(lower)
+    if alias:
+        return alias
+    return "other"
+
+
 class SetType(str, Enum):
     NORMAL = "normal"
     WARMUP = "warmup"
@@ -299,6 +498,12 @@ class MuscleVolumeEntry(BaseModel):
     top_exercises: List[MuscleTopExercise]
 
 
+def _coerce_body_parts(v: Any) -> Any:
+    if not isinstance(v, list):
+        return v
+    return [normalize_body_part(item) if isinstance(item, str) else item for item in v]
+
+
 class ExerciseCreate(BaseModel):
     name: str
     exercise_kind: ExerciseKind
@@ -310,6 +515,18 @@ class ExerciseCreate(BaseModel):
     instructions: Optional[str] = None
     image: Optional[str] = None
 
+    @field_validator("primary_body_parts", "secondary_body_parts", mode="before")
+    @classmethod
+    def normalize_body_parts(cls, v: Any) -> Any:
+        return _coerce_body_parts(v)
+
+    @field_validator("category", mode="before")
+    @classmethod
+    def normalize_category(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return normalize_exercise_category(v)
+        return v
+
 
 class Exercise(BaseModel):
     id: Optional[str] = Field(default=None)
@@ -318,6 +535,18 @@ class Exercise(BaseModel):
     primary_body_parts: List[BodyPart]
     secondary_body_parts: List[BodyPart] = []
     muscle_loads: List[MuscleLoad] = []
+
+    @field_validator("primary_body_parts", "secondary_body_parts", mode="before")
+    @classmethod
+    def normalize_body_parts(cls, v: Any) -> Any:
+        return _coerce_body_parts(v)
+
+    @field_validator("category", mode="before")
+    @classmethod
+    def normalize_category(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return normalize_exercise_category(v)
+        return v
 
     @property
     def is_tagged(self) -> bool:
@@ -584,6 +813,13 @@ class PlannedWorkout(BaseModel):
     type: Optional[PlannedWorkoutType] = None
     notes: Optional[str] = None
     status: PlannedWorkoutStatus = PlannedWorkoutStatus.PLANNED
+
+    @field_validator("type", mode="before")
+    @classmethod
+    def normalize_type(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return normalize_planned_workout_type(v)
+        return v
     workout_session_id: Optional[str] = None
     order: int = 0
     created_at: datetime = Field(default_factory=datetime.utcnow)

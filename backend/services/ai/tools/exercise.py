@@ -6,9 +6,11 @@ from bson import ObjectId
 
 from .base import BaseTool
 from constants import EXERCISE_KIND_RULES
+from models import ExerciseCreate, BodyPart
 
 
 EXERCISE_KIND_ENUM: List[str] = list(EXERCISE_KIND_RULES.keys())
+BODY_PART_ENUM: List[str] = [bp.value for bp in BodyPart]
 DEFAULT_EXERCISE_KIND = (
     "Machine/Other"
     if "Machine/Other" in EXERCISE_KIND_RULES
@@ -183,8 +185,8 @@ class ExerciseCreateBatch(BaseTool):
                     "properties": {
                         "name": {"type": "string"},
                         "exercise_kind": {"type": "string", "enum": EXERCISE_KIND_ENUM},
-                        "primary_body_parts": {"type": "array", "items": {"type": "string"}},
-                        "secondary_body_parts": {"type": "array", "items": {"type": "string"}},
+                        "primary_body_parts": {"type": "array", "items": {"type": "string", "enum": BODY_PART_ENUM}},
+                        "secondary_body_parts": {"type": "array", "items": {"type": "string", "enum": BODY_PART_ENUM}},
                         "category": {"type": "string"},
                         "instructions": {"type": "string"},
                     },
@@ -226,17 +228,19 @@ class ExerciseCreateBatch(BaseTool):
                 })
                 continue
 
-            exercise_doc = {
-                "name": name,
-                "exercise_kind": exercise_kind,
-                "primary_body_parts": ex_data.get("primary_body_parts", []) or [],
-                "secondary_body_parts": ex_data.get("secondary_body_parts", []) or [],
-                "category": ex_data.get("category", "Strength"),
-                "instructions": ex_data.get("instructions"),
-                "is_custom": True,
-                "user_id": user_id,
-                "created_at": datetime.utcnow(),
-            }
+            # Route through ExerciseCreate so field_validators handle normalization
+            exercise_create = ExerciseCreate(
+                name=name,
+                exercise_kind=exercise_kind,
+                primary_body_parts=ex_data.get("primary_body_parts", []) or [],
+                secondary_body_parts=ex_data.get("secondary_body_parts", []) or [],
+                category=ex_data.get("category", "Strength"),
+                instructions=ex_data.get("instructions"),
+                is_custom=True,
+            )
+            exercise_doc = exercise_create.model_dump(exclude={"id"})
+            exercise_doc["user_id"] = user_id
+            exercise_doc["created_at"] = datetime.utcnow()
 
             insert_res = await db.exercises.insert_one(exercise_doc)
 
