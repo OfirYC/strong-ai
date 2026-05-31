@@ -173,9 +173,12 @@ async def _resolve_template_or_exercises(
                 ),
             )
 
-        template_exercises = await build_template_exercises_from_compact(
-            exercises, db, user_id
-        )
+        try:
+            template_exercises = await build_template_exercises_from_compact(
+                exercises, db, user_id
+            )
+        except ValueError as e:
+            return None, None, None, str(e)
 
         if create_template:
             label = f"{workout_name} (Modified)" if is_update else workout_name

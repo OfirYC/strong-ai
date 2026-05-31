@@ -134,6 +134,14 @@ async def build_template_exercises_from_compact(
     ex_ids = [e.get("exercise_id") for e in exercises if e.get("exercise_id")]
     kind_map = await get_exercise_kind_map(ex_ids, db, user_id)
 
+    # Reject any exercise_id not found in the DB — catches hallucinated IDs
+    missing = [eid for eid in ex_ids if eid not in kind_map]
+    if missing:
+        raise ValueError(
+            f"Unknown exercise_id(s): {missing}. "
+            "Use exercise__search to find valid IDs before referencing them."
+        )
+
     template_exercises: List[Dict[str, Any]] = []
 
     for i, ex in enumerate(exercises):
@@ -274,9 +282,12 @@ class TemplateCreate(BaseTool):
         if not name or not exercises:
             return json.dumps({"error": "name and exercises are required"})
 
-        template_exercises = await build_template_exercises_from_compact(
-            exercises, db, user_id
-        )
+        try:
+            template_exercises = await build_template_exercises_from_compact(
+                exercises, db, user_id
+            )
+        except ValueError as e:
+            return json.dumps({"error": str(e)})
         if not template_exercises:
             return json.dumps({"error": "No valid exercises provided"})
 
@@ -336,9 +347,12 @@ class TemplateUpdate(BaseTool):
         if args.get("notes") is not None:
             update_fields["notes"] = args["notes"]
         if args.get("exercises"):
-            update_fields["exercises"] = await build_template_exercises_from_compact(
-                args["exercises"], db, user_id
-            )
+            try:
+                update_fields["exercises"] = await build_template_exercises_from_compact(
+                    args["exercises"], db, user_id
+                )
+            except ValueError as e:
+                return json.dumps({"error": str(e)})
 
         if len(update_fields) == 1:
             return json.dumps({"error": "No fields to update"})
@@ -436,7 +450,10 @@ class TemplateInsertExercises(BaseTool):
 
         existing = doc.get("exercises", [])
 
-        built = await build_template_exercises_from_compact(new_exercises, db, user_id)
+        try:
+            built = await build_template_exercises_from_compact(new_exercises, db, user_id)
+        except ValueError as e:
+            return json.dumps({"error": str(e)})
 
         # Clamp insert position
         insert_at = min(insert_at, len(existing))
