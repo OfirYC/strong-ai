@@ -3,8 +3,21 @@
 from datetime import datetime
 from typing import Dict, Any
 from constants import EXERCISE_KIND_RULES
+from body_parts import MUSCLE_TREE_FLAT
 
 EXERCISE_KIND_ENUM = list(EXERCISE_KIND_RULES.keys())
+
+# Build a compact slug reference for the system prompt (top-level groups + their direct muscles)
+def _format_muscle_tree() -> str:
+    groups = [n for n in MUSCLE_TREE_FLAT if n["level"] == 0]
+    muscles = [n for n in MUSCLE_TREE_FLAT if n["level"] == 1]
+    lines = []
+    for g in groups:
+        children = [m["slug"] for m in muscles if m["parent_slug"] == g["slug"]]
+        lines.append(f"  {g['slug']} ({g['name']}): {', '.join(children)}")
+    return "\n".join(lines)
+
+_MUSCLE_TREE_SUMMARY = _format_muscle_tree()
 
 
 def _format_kind_rules(rules):
@@ -86,6 +99,21 @@ exercise_kind must be one of:
 
 Per-kind rules:
 {kind_rules}
+
+MUSCLE LOADS:
+Exercises use muscle_loads (not body parts) to track which muscles are targeted.
+Each load has: slug (muscle identifier), role (primary/secondary/stabilizer), load_pct (0–100).
+Always set muscle_loads when creating exercises. Use role=primary for the main muscles,
+role=secondary for synergists, role=stabilizer for stabilisers. load_pct should reflect
+relative contribution within that role (primary loads typically sum to ~100).
+
+Valid slugs by group:
+{_MUSCLE_TREE_SUMMARY}
+
+Example for Bench Press:
+  {{slug: "pec-major", role: "primary", load_pct: 70}}
+  {{slug: "deltoid-front", role: "primary", load_pct: 30}}
+  {{slug: "triceps", role: "secondary", load_pct: 40}}
 
 TODAY: {today}
 

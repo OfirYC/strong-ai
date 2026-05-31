@@ -21,9 +21,18 @@ import {
   ExerciseKind,
   ExerciseCategory,
 } from "../types";
-
 import { EXERCISE_CATEGORYS } from "../types/gen";
 import { useExercises } from "../store/exercisesStore";
+import { MUSCLE_FILTER_GROUPS, SLUG_TO_GROUP, GROUP_DISPLAY } from "../utils/muscleUtils";
+import type { MuscleLoad } from "../types/gen";
+
+// Muscle groups available for selection (exclude "All")
+const MUSCLE_GROUPS = MUSCLE_FILTER_GROUPS.filter(g => g !== "All");
+
+// Map group display name → top-level slug
+const GROUP_TO_SLUG: Record<string, string> = Object.fromEntries(
+  Object.entries(GROUP_DISPLAY).map(([slug, name]) => [name, slug])
+);
 
 interface CreateExerciseModalProps {
   visible: boolean;
@@ -36,13 +45,12 @@ export default function CreateExerciseModal({
   onClose,
   onExerciseCreated,
 }: CreateExerciseModalProps) {
-  // ✅ This will trigger lazy hydration (via the new hook behavior)
   const { loading: exercisesLoading, upsert } = useExercises();
 
   const [name, setName] = useState("");
   const [selectedKind, setSelectedKind] = useState<ExerciseKind | null>(null);
-  const [selectedCategory, setSelectedCategory] =
-    useState<ExerciseCategory | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<ExerciseCategory | null>(null);
+  const [selectedMuscleGroups, setSelectedMuscleGroups] = useState<string[]>([]);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [instructions, setInstructions] = useState("");
   const [saving, setSaving] = useState(false);
@@ -51,20 +59,23 @@ export default function CreateExerciseModal({
     setName("");
     setSelectedKind(null);
     setSelectedCategory(null);
+    setSelectedMuscleGroups([]);
     setImageBase64(null);
     setInstructions("");
+  };
+
+  const toggleMuscleGroup = (group: string) => {
+    setSelectedMuscleGroups(prev =>
+      prev.includes(group) ? prev.filter(g => g !== group) : [...prev, group]
+    );
   };
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert(
-        "Permission needed",
-        "Please grant camera roll permissions to upload images",
-      );
+      Alert.alert("Permission needed", "Please grant camera roll permissions to upload images");
       return;
     }
-
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       allowsEditing: true,
@@ -72,14 +83,9 @@ export default function CreateExerciseModal({
       quality: 0.7,
       base64: true,
     });
-
     if (!result.canceled && result.assets[0].base64) {
       setImageBase64(`data:image/jpeg;base64,${result.assets[0].base64}`);
     }
-  };
-
-  const removeImage = () => {
-    setImageBase64(null);
   };
 
   const handleClose = () => {
@@ -101,9 +107,15 @@ export default function CreateExerciseModal({
       return;
     }
 
+    // Build muscle_loads from selected groups: first group = primary, rest = secondary
+    const muscle_loads: MuscleLoad[] = selectedMuscleGroups.map((group, i) => ({
+      slug: GROUP_TO_SLUG[group] ?? group.toLowerCase(),
+      role: i === 0 ? "primary" : "secondary",
+      load_pct: i === 0 ? 100 : 50,
+    }));
+
     try {
       setSaving(true);
-
       const exercise = (
         await api.post("/exercises", {
           name: name.trim(),
@@ -112,21 +124,16 @@ export default function CreateExerciseModal({
           is_custom: true,
           image: imageBase64 || null,
           instructions: instructions.trim() || null,
-          muscle_loads: [],
+          muscle_loads,
         })
       ).data as Exercise;
 
-      // ✅ update global cache immediately
       upsert(exercise);
-
       resetForm();
       onExerciseCreated(exercise);
       onClose();
     } catch (error: any) {
-      Alert.alert(
-        "Error",
-        error.response?.data?.detail || "Failed to create exercise",
-      );
+      Alert.alert("Error", error.response?.data?.detail || "Failed to create exercise");
     } finally {
       setSaving(false);
     }
@@ -135,19 +142,13 @@ export default function CreateExerciseModal({
   const disableCreate = saving || exercisesLoading;
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-    >
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={handleClose}>
             <Text style={styles.cancelText}>Cancel</Text>
           </TouchableOpacity>
-
           <Text style={styles.title}>New Exercise</Text>
-
           <TouchableOpacity onPress={handleCreate} disabled={disableCreate}>
             {disableCreate ? (
               <ActivityIndicator size="small" color="#007AFF" />
@@ -158,7 +159,7 @@ export default function CreateExerciseModal({
         </View>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Name Input */}
+          {/* Name */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Name</Text>
             <TextInput
@@ -171,25 +172,45 @@ export default function CreateExerciseModal({
             />
           </View>
 
-          {/* Kind Selection */}
+          {/* Primary Muscles */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Primary Muscles</Text>
+            <Text style={styles.sectionHint}>Select all that apply — first = primary mover</Text>
+            <View style={styles.optionsGrid}>
+              {MUSCLE_GROUPS.map(group => (
+                <TouchableOpacity
+                  key={group}
+                  style={[
+                    styles.optionChip,
+                    selectedMuscleGroups.includes(group) && styles.optionChipSelected,
+                    selectedMuscleGroups[0] === group && styles.optionChipPrimary,
+                  ]}
+                  onPress={() => toggleMuscleGroup(group)}
+                >
+                  <Text
+                    style={[
+                      styles.optionText,
+                      selectedMuscleGroups.includes(group) && styles.optionTextSelected,
+                    ]}
+                  >
+                    {group}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* Kind */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Kind</Text>
             <View style={styles.optionsGrid}>
               {EXERCISE_KINDS.map(kind => (
                 <TouchableOpacity
                   key={kind}
-                  style={[
-                    styles.optionChip,
-                    selectedKind === kind && styles.optionChipSelected,
-                  ]}
+                  style={[styles.optionChip, selectedKind === kind && styles.optionChipSelected]}
                   onPress={() => setSelectedKind(kind)}
                 >
-                  <Text
-                    style={[
-                      styles.optionText,
-                      selectedKind === kind && styles.optionTextSelected,
-                    ]}
-                  >
+                  <Text style={[styles.optionText, selectedKind === kind && styles.optionTextSelected]}>
                     {kind}
                   </Text>
                 </TouchableOpacity>
@@ -197,25 +218,17 @@ export default function CreateExerciseModal({
             </View>
           </View>
 
-          {/* Category Selection */}
+          {/* Category */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Category</Text>
             <View style={styles.optionsGrid}>
               {EXERCISE_CATEGORYS.map(cat => (
                 <TouchableOpacity
                   key={cat}
-                  style={[
-                    styles.optionChip,
-                    selectedCategory === cat && styles.optionChipSelected,
-                  ]}
+                  style={[styles.optionChip, selectedCategory === cat && styles.optionChipSelected]}
                   onPress={() => setSelectedCategory(cat)}
                 >
-                  <Text
-                    style={[
-                      styles.optionText,
-                      selectedCategory === cat && styles.optionTextSelected,
-                    ]}
-                  >
+                  <Text style={[styles.optionText, selectedCategory === cat && styles.optionTextSelected]}>
                     {cat}
                   </Text>
                 </TouchableOpacity>
@@ -223,19 +236,13 @@ export default function CreateExerciseModal({
             </View>
           </View>
 
-          {/* Optional: Image Upload */}
+          {/* Image */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Image (Optional)</Text>
             {imageBase64 ? (
               <View style={styles.imagePreviewContainer}>
-                <Image
-                  source={{ uri: imageBase64 }}
-                  style={styles.imagePreview}
-                />
-                <TouchableOpacity
-                  style={styles.removeImageButton}
-                  onPress={removeImage}
-                >
+                <Image source={{ uri: imageBase64 }} style={styles.imagePreview} />
+                <TouchableOpacity style={styles.removeImageButton} onPress={() => setImageBase64(null)}>
                   <Ionicons name="close-circle" size={28} color="#FF3B30" />
                 </TouchableOpacity>
               </View>
@@ -247,7 +254,7 @@ export default function CreateExerciseModal({
             )}
           </View>
 
-          {/* Optional: Instructions */}
+          {/* Instructions */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Instructions (Optional)</Text>
             <TextInput
@@ -291,6 +298,11 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#8E8E93",
     textTransform: "uppercase",
+    marginBottom: 4,
+  },
+  sectionHint: {
+    fontSize: 12,
+    color: "#AEAEB2",
     marginBottom: 12,
   },
   textInput: {
@@ -303,7 +315,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E5E5EA",
   },
-  optionsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  optionsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 8 },
   optionChip: {
     backgroundColor: "#FFFFFF",
     paddingHorizontal: 16,
@@ -313,6 +325,7 @@ const styles = StyleSheet.create({
     borderColor: "#E5E5EA",
   },
   optionChipSelected: { backgroundColor: "#007AFF", borderColor: "#007AFF" },
+  optionChipPrimary: { backgroundColor: "#005EC4", borderColor: "#005EC4" },
   optionText: { fontSize: 15, color: "#1C1C1E" },
   optionTextSelected: { color: "#FFFFFF", fontWeight: "600" },
   uploadButton: {
@@ -325,17 +338,8 @@ const styles = StyleSheet.create({
     borderColor: "#007AFF",
     borderStyle: "dashed",
   },
-  uploadButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#007AFF",
-    marginTop: 8,
-  },
-  imagePreviewContainer: {
-    position: "relative",
-    borderRadius: 12,
-    overflow: "hidden",
-  },
+  uploadButtonText: { fontSize: 16, fontWeight: "600", color: "#007AFF", marginTop: 8 },
+  imagePreviewContainer: { position: "relative", borderRadius: 12, overflow: "hidden" },
   imagePreview: { width: "100%", height: 180, borderRadius: 12 },
   removeImageButton: {
     position: "absolute",

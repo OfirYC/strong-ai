@@ -212,6 +212,19 @@ class ExerciseCreateBatch(BaseTool):
                         "exercise_kind": {"type": "string", "enum": EXERCISE_KIND_ENUM},
                         "category": {"type": "string"},
                         "instructions": {"type": "string"},
+                        "muscle_loads": {
+                            "type": "array",
+                            "description": "Muscle loads for this exercise. Use slugs from the MUSCLE LOADS section in your system prompt.",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "slug": {"type": "string", "description": "Muscle slug from the MUSCLE_TREE"},
+                                    "role": {"type": "string", "enum": ["primary", "secondary", "stabilizer"]},
+                                    "load_pct": {"type": "number", "description": "0–100, contribution within this role"},
+                                },
+                                "required": ["slug", "role", "load_pct"],
+                            },
+                        },
                     },
                     "required": ["name", "exercise_kind"],
                 },
@@ -256,6 +269,7 @@ class ExerciseCreateBatch(BaseTool):
                 exercise_kind=exercise_kind,
                 category=ex_data.get("category", "Strength"),
                 instructions=ex_data.get("instructions"),
+                muscle_loads=ex_data.get("muscle_loads") or [],
                 is_custom=True,
             )
             exercise_doc = exercise_create.model_dump(exclude={"id"})
