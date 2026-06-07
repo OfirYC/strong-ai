@@ -76,22 +76,27 @@ export default function PaywallModal({
   const [packages, setPackages] = useState<PurchasesPackage[]>([]);
   const [selected, setSelected] = useState<PurchasesPackage | null>(null);
   const [loadingPkgs, setLoadingPkgs] = useState(true);
+  const [pkgError, setPkgError] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
   const [restoring, setRestoring] = useState(false);
 
-  useEffect(() => {
-    if (!visible) return;
+  const loadPackages = useCallback(() => {
     setLoadingPkgs(true);
+    setPkgError(false);
     fetchPackages()
       .then(pkgs => {
         setPackages(pkgs);
-        // Default select annual if present, else first
         const annual = pkgs.find(p => p.packageType === PACKAGE_TYPE.ANNUAL);
         setSelected(annual ?? pkgs[0] ?? null);
       })
-      .catch(() => {})
+      .catch(() => setPkgError(true))
       .finally(() => setLoadingPkgs(false));
-  }, [visible]);
+  }, []);
+
+  useEffect(() => {
+    if (!visible) return;
+    loadPackages();
+  }, [visible, loadPackages]);
 
   const annual = packages.find(p => p.packageType === PACKAGE_TYPE.ANNUAL);
   const monthly = packages.find(p => p.packageType === PACKAGE_TYPE.MONTHLY);
@@ -167,6 +172,13 @@ export default function PaywallModal({
           {/* Packages */}
           {loadingPkgs ? (
             <ActivityIndicator size="large" color="#007AFF" style={{ marginVertical: 32 }} />
+          ) : pkgError ? (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorSub}>Couldn't load pricing. Check your connection.</Text>
+              <TouchableOpacity onPress={loadPackages} style={styles.retryBtn}>
+                <Text style={styles.retryText}>Try Again</Text>
+              </TouchableOpacity>
+            </View>
           ) : (
             <View style={styles.packages}>
               {annual && (
@@ -299,6 +311,18 @@ const styles = StyleSheet.create({
   featureText: { fontSize: 15, color: "#1C1C1E", fontWeight: "500" },
 
   packages: { gap: 12, marginBottom: 28 },
+
+  errorBox: {
+    backgroundColor: "#FFF",
+    borderRadius: 16,
+    padding: 24,
+    alignItems: "center",
+    marginBottom: 28,
+    gap: 12,
+  },
+  errorSub: { fontSize: 14, color: "#8E8E93", textAlign: "center" },
+  retryBtn: { paddingVertical: 8, paddingHorizontal: 20, backgroundColor: "#EAF2FF", borderRadius: 10 },
+  retryText: { fontSize: 14, color: "#007AFF", fontWeight: "600" },
   packageCard: {
     backgroundColor: "#FFF",
     borderRadius: 14,
