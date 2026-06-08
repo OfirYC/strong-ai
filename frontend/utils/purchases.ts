@@ -1,9 +1,11 @@
+import { Platform } from "react-native";
 import Purchases, {
   LOG_LEVEL,
   type PurchasesPackage,
 } from "react-native-purchases";
 
 const IOS_KEY = process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY ?? "";
+const ANDROID_KEY = process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY ?? "";
 
 export const PRO_ENTITLEMENT = "pro";
 
@@ -11,9 +13,18 @@ let _configured = false;
 
 export function configurePurchases() {
   if (_configured) return;
+  const apiKey = Platform.OS === "android" ? ANDROID_KEY : IOS_KEY;
+  if (!apiKey) {
+    // Misconfigured build (env var not baked in). Don't mark configured so a
+    // later launch with a correct bundle can retry; warn loudly in logs.
+    console.warn(
+      `[purchases] Missing RevenueCat API key for ${Platform.OS} — purchases disabled`,
+    );
+    return;
+  }
   _configured = true;
   Purchases.setLogLevel(__DEV__ ? LOG_LEVEL.DEBUG : LOG_LEVEL.WARN);
-  Purchases.configure({ apiKey: IOS_KEY });
+  Purchases.configure({ apiKey });
 }
 
 export async function identifyUser(userId: string): Promise<void> {

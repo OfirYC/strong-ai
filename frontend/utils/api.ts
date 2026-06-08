@@ -2,6 +2,7 @@ import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { storageKey } from "../env";
 import type { paths } from "../types/models";
+import { useSubscriptionStore } from "../store/subscriptionStore";
 
 const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || "";
 
@@ -207,6 +208,16 @@ axiosInstance.interceptors.response.use(
     if (reqId) Metrics.clearInflight(k, reqId);
 
     const status: number | null = err?.response?.status ?? null;
+
+    // 402 = backend require_pro gate rejected a non-Pro user. Reflect it in the
+    // subscription store so the paywall renders instead of a generic error.
+    if (status === 402) {
+      try {
+        useSubscriptionStore.getState().setIsPro(false);
+      } catch {
+        // store not ready / unavailable — ignore
+      }
+    }
 
     Metrics.push({
       t: new Date().toISOString(),

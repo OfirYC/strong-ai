@@ -30,7 +30,11 @@ export default function TabLayout() {
 
   useEffect(() => {
     if (user?.id) {
-      identifyUser(user.id).then(() => refreshSub());
+      // Always resolve subscription state, even if RevenueCat login fails.
+      // Otherwise subLoading stays true forever and the paywall silently
+      // never renders (which would hand out free access). Fail toward showing
+      // the paywall; server-side `require_pro` is the real entitlement gate.
+      identifyUser(user.id).then(refreshSub).catch(refreshSub);
     }
   }, [user?.id]);
 
