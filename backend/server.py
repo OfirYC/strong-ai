@@ -164,6 +164,17 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> str:
     return payload["user_id"]
 
 
+async def require_pro(user_id: str = Depends(get_current_user)) -> str:
+    """Gate pro-only endpoints. is_pro is the server-side source of truth,
+    synced from RevenueCat via the webhook. Client UI is not trusted."""
+    user_doc = await db.users.find_one(
+        {"_id": ObjectId(user_id)}, {"is_pro": 1}
+    )
+    if not user_doc or not user_doc.get("is_pro", False):
+        raise HTTPException(status_code=402, detail="Pro subscription required")
+    return user_id
+
+
 async def get_current_user_ws(ws: WebSocket) -> str:
     """
     WS can't use Header() dependency the same way.
@@ -432,7 +443,7 @@ class StartChatResponse(BaseModel):
 
 
 @api_router.post("/ai/chat/start", response_model=StartChatResponse)
-async def start_ai_chat(payload: dict, user_id=Depends(get_current_user)):
+async def start_ai_chat(payload: dict, user_id=Depends(require_pro)):
     conversation_id = payload.get("conversation_id")
     is_new_conversation = False
     if not conversation_id:
@@ -762,7 +773,7 @@ class InsightsResponse(BaseModel):
 
 
 @api_router.post("/profile/insights/generate", response_model=InsightsResponse)
-async def generate_insights(user_id: str = Depends(get_current_user)):
+async def generate_insights(user_id: str = Depends(require_pro)):
     """Generate AI-powered insights from user's profile and save to profile_insights"""
     db = get_db(user_id)
     user_doc = await db.users.find_one({"_id": ObjectId(user_id)})
