@@ -2459,6 +2459,53 @@ async def privacy_policy():
 </html>"""
 
 
+@app.get("/delete-account", response_class=HTMLResponse)
+async def delete_account_info():
+    return """<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Delete Your Account – Stronger</title>
+<style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:700px;margin:40px auto;padding:0 20px;color:#1c1c1e;line-height:1.7}h1{font-size:28px;margin-bottom:4px}h2{font-size:18px;margin-top:32px}p,li{font-size:15px;color:#3a3a3c}ul,ol{padding-left:20px}a{color:#007aff}</style>
+</head>
+<body>
+<h1>Delete Your Account</h1>
+<p><em>Last updated: June 2026</em></p>
+<p>This page explains how to request deletion of your <strong>Stronger</strong> account (developer: Ofir Smolinsky) and all associated data.</p>
+
+<h2>How to request deletion</h2>
+<p><strong>Option 1 — In the app (instant):</strong></p>
+<ol>
+<li>Open the Stronger app and sign in.</li>
+<li>Go to the <strong>Profile</strong> tab.</li>
+<li>Tap <strong>Delete Account</strong> and confirm.</li>
+<li>Your account and data are permanently deleted immediately.</li>
+</ol>
+<p><strong>Option 2 — By email:</strong> Send a request from your account email to
+<a href="mailto:ofiryieldchain@gmail.com">ofiryieldchain@gmail.com</a> with the subject "Delete my account".
+We will verify and complete the deletion within 30 days.</p>
+
+<h2>What is deleted</h2>
+<p>When your account is deleted, we permanently remove all data associated with it, including:</p>
+<ul>
+<li>Your account profile (email, name, and authentication details)</li>
+<li>All workouts, exercises, templates, and planned workouts you logged</li>
+<li>Personal records (PRs) and workout history</li>
+<li>AI coaching conversations, chat messages, and notes</li>
+</ul>
+<p>This deletion is permanent and cannot be undone. Once deleted, data cannot be recovered.</p>
+
+<h2>What is kept, and for how long</h2>
+<ul>
+<li><strong>Subscription / purchase records:</strong> Transaction records held by Apple, Google, or our payment processor (RevenueCat) may be retained by those providers as required for billing, tax, and legal compliance. These are not controlled by us and are not deleted on our request.</li>
+<li><strong>Anonymized or legally required records:</strong> We may retain minimal records where required by law. These contain no usable personal profile or workout content and are purged once the legal retention period expires.</li>
+</ul>
+
+<h2>Contact</h2>
+<p>Questions about deletion? Email <a href="mailto:ofiryieldchain@gmail.com">ofiryieldchain@gmail.com</a></p>
+</body>
+</html>"""
+
+
 # Include the router in the main app
 app.include_router(api_router)
 
