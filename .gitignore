@@ -182,3 +182,6 @@ android-sdk/ -e
 frontend/ios
 frontend/android
 .claude
+
+# Marketing assets (store screenshots, launch video, build artifacts)
+marketing-assets/.mascot_600_backup/

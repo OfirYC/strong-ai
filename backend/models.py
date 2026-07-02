@@ -296,6 +296,67 @@ class UserLogin(BaseModel):
     password: str
 
 
+class DeviceAuthRequest(BaseModel):
+    """Anonymous device login — wall-free onboarding before signup."""
+
+    device_id: str
+
+
+class UpgradeRequest(BaseModel):
+    """Convert the current anonymous device user into a permanent account.
+    Either email + password, OR apple_token. Same user_id is kept."""
+
+    email: Optional[EmailStr] = None
+    password: Optional[str] = None
+    apple_token: Optional[str] = None
+
+
+class SavePlanExercise(BaseModel):
+    name: str
+    sets: int = 3
+    reps: str = ""
+
+
+class SavePlanDay(BaseModel):
+    name: str
+    focus: Optional[str] = None
+    description: Optional[str] = None
+    weekday: Optional[int] = None  # 0=Mon … 6=Sun
+    type: Optional[str] = None
+    exercises: List[SavePlanExercise] = []
+
+
+class SaveOnboardingPlanRequest(BaseModel):
+    """Persist the onboarding plan as one routine (template) per day, and record the profile."""
+
+    title: Optional[str] = None
+    days: List[SavePlanDay] = []
+    sex: Optional[str] = None
+    heightCm: Optional[float] = None
+    weightKg: Optional[float] = None
+    trainingAge: Optional[str] = None
+    goal: Optional[str] = None
+    # Full raw onboarding answers, saved verbatim for personalization / analytics / future display.
+    raw: Optional[Dict[str, Any]] = None
+
+
+class OnboardingPlanRequest(BaseModel):
+    """Onboarding answers sent to the live AI plan-gen endpoint."""
+
+    sex: Optional[str] = None
+    heightCm: Optional[float] = None
+    weightKg: Optional[float] = None
+    currentActivity: Optional[str] = None
+    goal: Optional[str] = None
+    goals: List[str] = []
+    subGoals: List[str] = []
+    trainingAge: Optional[str] = None
+    daysPerWeek: Optional[int] = None
+    equipment: Optional[str] = None
+    limitations: List[str] = []
+    customLimitation: Optional[str] = None
+
+
 class TrainingPhase(BaseModel):
     """A phase in the user's training history"""
 

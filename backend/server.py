@@ -24,6 +24,7 @@ from bson import ObjectId
 from constants import EXERCISE_KIND_RULES
 import json
 import time
+import re
 import secrets
 import requests
 import jwt  # PyJWT
@@ -101,8 +102,15 @@ from models import (
     MuscleVolumeResponse,
     MuscleTopExercise,
     MuscleVolumeEntry,
+    DeviceAuthRequest,
+    UpgradeRequest,
+    OnboardingPlanRequest,
+    SaveOnboardingPlanRequest,
+    TemplateSetItem,
+    TemplateExerciseItem,
 )
 from services.ai.profile_insights import generate_profile_insights
+from services.ai.onboarding_plan import generate_onboarding_plan, GOAL_LABEL
 from auth import (
     get_password_hash,
     verify_password,
@@ -164,15 +172,58 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> str:
     return payload["user_id"]
 
 
+REVENUECAT_API_KEY = os.getenv("REVENUECAT_API_KEY", "")
+PRO_ENTITLEMENT_ID = os.getenv("REVENUECAT_ENTITLEMENT", "pro")
+# LOCAL DEV ONLY: set DEV_BYPASS_PRO=1 in local .env to treat everyone as Pro (so you can test
+# Pro features without fighting simulator/RevenueCat purchase state). NEVER set this on Railway.
+DEV_BYPASS_PRO = os.getenv("DEV_BYPASS_PRO", "") == "1"
+
+
+async def _revenuecat_is_pro(user_id: str) -> bool:
+    """Verify the `pro` entitlement directly with RevenueCat. Fallback for when the webhook
+    hasn't landed yet — the seconds right after purchase in prod, or always in local dev
+    (RC can't reach localhost). No-op if REVENUECAT_API_KEY isn't configured."""
+    if not REVENUECAT_API_KEY:
+        return False
+    try:
+        import httpx
+
+        async with httpx.AsyncClient(timeout=6.0) as client:
+            r = await client.get(
+                f"https://api.revenuecat.com/v1/subscribers/{user_id}",
+                headers={"Authorization": f"Bearer {REVENUECAT_API_KEY}"},
+            )
+        if r.status_code != 200:
+            return False
+        ent = (
+            r.json().get("subscriber", {}).get("entitlements", {}).get(PRO_ENTITLEMENT_ID)
+        )
+        if not ent:
+            return False
+        expires = ent.get("expires_date")
+        if not expires:
+            return True  # lifetime / non-expiring
+        exp = datetime.strptime(expires[:19], "%Y-%m-%dT%H:%M:%S")  # RC returns UTC
+        return exp > datetime.utcnow()
+    except Exception:
+        logging.getLogger(__name__).exception("RevenueCat entitlement check failed")
+        return False
+
+
 async def require_pro(user_id: str = Depends(get_current_user)) -> str:
-    """Gate pro-only endpoints. is_pro is the server-side source of truth,
-    synced from RevenueCat via the webhook. Client UI is not trusted."""
-    user_doc = await db.users.find_one(
-        {"_id": ObjectId(user_id)}, {"is_pro": 1}
-    )
-    if not user_doc or not user_doc.get("is_pro", False):
-        raise HTTPException(status_code=402, detail="Pro subscription required")
-    return user_id
+    """Gate pro-only endpoints. is_pro (webhook-synced) is the fast path; if it's not set we
+    verify live with RevenueCat and cache it, so a paying user is never wrongly 402'd."""
+    if DEV_BYPASS_PRO:
+        return user_id
+    user_doc = await db.users.find_one({"_id": ObjectId(user_id)}, {"is_pro": 1})
+    if user_doc and user_doc.get("is_pro", False):
+        return user_id
+    if await _revenuecat_is_pro(user_id):
+        await db.users.update_one(
+            {"_id": ObjectId(user_id)}, {"$set": {"is_pro": True}}
+        )
+        return user_id
+    raise HTTPException(status_code=402, detail="Pro subscription required")
 
 
 async def get_current_user_ws(ws: WebSocket) -> str:
@@ -224,6 +275,94 @@ async def login(credentials: UserLogin):
     user_id = str(user_doc["_id"])
     token = create_access_token({"user_id": user_id})
     return UserResponse(id=user_id, email=user_doc["email"], token=token, is_pro=user_doc.get("is_pro", False))
+
+
+@api_router.post("/auth/device", response_model=UserResponse)
+async def device_auth(payload: DeviceAuthRequest):
+    """Anonymous device login for the wall-free onboarding funnel. Idempotent per device_id;
+    can be linked to a real account (email / Apple) later."""
+    device_id = (payload.device_id or "").strip()
+    if not device_id:
+        raise HTTPException(status_code=400, detail="device_id is required")
+
+    existing = await db.users.find_one({"device_id": device_id})
+    if existing:
+        user_id = str(existing["_id"])
+        is_pro = existing.get("is_pro", False)
+    else:
+        doc = {
+            "email": f"device:{device_id}",  # placeholder, never a real address
+            "password_hash": "",
+            "device_id": device_id,
+            "is_device": True,
+            "created_at": datetime.utcnow(),
+            "profile": {},
+        }
+        result = await db.users.insert_one(doc)
+        user_id = str(result.inserted_id)
+        is_pro = False
+
+    token = create_access_token({"user_id": user_id})
+    return UserResponse(id=user_id, email=f"device:{device_id}", token=token, is_pro=is_pro)
+
+
+@api_router.post("/auth/upgrade", response_model=UserResponse)
+async def upgrade_device_account(
+    payload: UpgradeRequest, current_user: str = Depends(get_current_user)
+):
+    """Convert the current anonymous device user into a permanent account (email/password or Apple),
+    KEEPING the same user_id — so the onboarding plan, data and any purchase carry over untouched."""
+    oid = ObjectId(current_user)
+    user_doc = await db.users.find_one({"_id": oid})
+    if not user_doc:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    update: dict = {"is_device": False}
+
+    if payload.apple_token:
+        expected_aud = os.environ.get("APPLE_CLIENT_ID")
+        if not expected_aud:
+            raise HTTPException(status_code=500, detail="Server missing APPLE_CLIENT_ID env")
+        try:
+            jwks = fetch_apple_jwks()
+            hdr = jwt.get_unverified_header(payload.apple_token)
+            jwk = next((k for k in jwks.get("keys", []) if k.get("kid") == hdr.get("kid")), None)
+            if not jwk:
+                raise ValueError("No matching Apple JWK found")
+            public_key = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(jwk))
+            decoded = jwt.decode(
+                payload.apple_token, public_key, algorithms=["RS256"],
+                audience=expected_aud, issuer="https://appleid.apple.com",
+            )
+        except Exception as e:
+            raise HTTPException(status_code=401, detail=f"Invalid Apple identity token: {e}")
+        apple_sub = decoded.get("sub")
+        email = decoded.get("email") or payload.email
+        if apple_sub:
+            other = await db.users.find_one({"apple_sub": apple_sub, "_id": {"$ne": oid}})
+            if other:
+                raise HTTPException(status_code=409, detail="This Apple ID is already linked to another account.")
+            update["apple_sub"] = apple_sub
+        if email:
+            update["email"] = email
+    else:
+        if not payload.email or not payload.password:
+            raise HTTPException(status_code=400, detail="email and password are required")
+        if len(payload.password) < 6:
+            raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+        other = await db.users.find_one({"email": payload.email, "_id": {"$ne": oid}})
+        if other:
+            raise HTTPException(status_code=400, detail="Email already registered")
+        update["email"] = payload.email
+        update["password_hash"] = get_password_hash(payload.password)
+
+    await db.users.update_one({"_id": oid}, {"$set": update})
+    updated = await db.users.find_one({"_id": oid})
+    token = create_access_token({"user_id": current_user})
+    return UserResponse(
+        id=current_user, email=updated.get("email") or "", token=token,
+        is_pro=updated.get("is_pro", False),
+    )
 
 
 @api_router.delete("/auth/account")
@@ -334,7 +473,12 @@ async def apple_signin(payload: dict):
 # ============= WEBSOCKET =============
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
-    user_id = await get_current_user_ws(ws)
+    try:
+        user_id = await get_current_user_ws(ws)
+    except WebSocketDisconnect:
+        # Auth rejected (bad/expired token) — socket already closed with 1008.
+        # Return quietly instead of letting it bubble into a full ASGI traceback.
+        return
     await ws_manager.connect(user_id, ws)
 
     try:
@@ -484,6 +628,192 @@ async def start_ai_chat(payload: dict, user_id=Depends(require_pro)):
         )
     )
     return StartChatResponse(job_id=str(job_id), conversation_id=conversation_id)
+
+
+async def _persist_onboarding_profile(user_id: str, a: dict):
+    """Write ALL onboarding answers into the structured profile + the profile_insights collection
+    (goals, sub-goals, injuries incl. custom, activity, equipment…) so the app UI and the main-app
+    AI have full context — not just the raw blob."""
+    goals_list = a.get("goals") or ([a.get("goal")] if a.get("goal") else [])
+    goals_text = ", ".join(GOAL_LABEL.get(g, g) for g in goals_list if g)
+    subs = a.get("subGoals") or []
+    injuries = [l for l in (a.get("limitations") or []) if l not in ("none", "other")]
+    custom = (a.get("customLimitation") or "").strip()
+    if custom:
+        injuries.append(custom)
+    injury_history = ", ".join(injuries)
+    try:
+        await db.users.update_one(
+            {"_id": ObjectId(user_id)},
+            {
+                "$set": {
+                    "profile.sex": a.get("sex"),
+                    "profile.height_cm": a.get("heightCm"),
+                    "profile.weight_kg": a.get("weightKg"),
+                    "profile.training_age": a.get("trainingAge"),
+                    "profile.current_activity": a.get("currentActivity"),
+                    "profile.days_per_week": a.get("daysPerWeek"),
+                    "profile.equipment": a.get("equipment"),
+                    "profile.goals": goals_text,        # human-readable (physiology/context)
+                    "profile.goal_tags": goals_list,    # structured multi-goal
+                    "profile.sub_goals": subs,
+                    "profile.injury_history": injury_history,
+                    "onboarding": a,                    # full raw
+                }
+            },
+        )
+        # profile_insights is what the main-app AI (runner) + /profile/context read.
+        await db.profile_insights.update_one(
+            {"user_id": user_id},
+            {"$set": {
+                "user_id": user_id,
+                "goals": goals_text,
+                "sub_goals": subs,
+                "injury_tags": injuries,
+            }},
+            upsert=True,
+        )
+    except Exception:
+        logging.getLogger(__name__).exception("Failed to persist onboarding profile")
+
+
+@api_router.post("/ai/onboarding/plan")
+async def onboarding_plan(
+    payload: OnboardingPlanRequest, user_id: str = Depends(get_current_user)
+):
+    """Live AI plan preview for onboarding. Device-token auth (pre-signup). Reuses the
+    tool-equipped coaching AI to order days by relevance + write per-day descriptions."""
+    answers = payload.dict()
+    await _persist_onboarding_profile(user_id, answers)
+    plan = await generate_onboarding_plan(db, user_id, answers)
+    return plan
+
+
+def _first_int(s: str, default=None):
+    m = re.search(r"\d+", s or "")
+    return int(m.group()) if m else default
+
+
+@api_router.post("/ai/onboarding/save-plan")
+async def save_onboarding_plan(
+    payload: SaveOnboardingPlanRequest, user_id: str = Depends(get_current_user)
+):
+    """Persist the onboarding plan into the account as one routine (template) per day.
+    Resolves exercise NAMES -> exercise IDs, parses reps ranges -> ints. Best-effort:
+    unresolved exercises are skipped; empty days are dropped."""
+    udb = get_db(user_id)
+    # Idempotent: clear any prior onboarding-generated plan so re-running onboarding replaces
+    # it instead of stacking duplicate routines / scheduled workouts on the same days.
+    try:
+        await udb.templates.delete_many({"user_id": user_id, "source": "onboarding"})
+        await udb.planned_workouts.delete_many({"user_id": user_id, "source": "onboarding"})
+    except Exception:
+        pass
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    valid_types = {t.value for t in PlannedWorkoutType}
+    created: list = []
+    scheduled: list = []
+    used_weekdays: set = set()
+    n_days = max(1, len(payload.days))
+
+    for i, day in enumerate(payload.days):
+        items = []
+        order = 0
+        for ex in day.exercises:
+            name = (ex.name or "").strip()
+            if not name:
+                continue
+            # exact (case-insensitive) match first, then a contains match
+            doc = await udb.exercises.find_one(
+                {"name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}}
+            )
+            if not doc:
+                doc = await udb.exercises.find_one(
+                    {"name": {"$regex": re.escape(name), "$options": "i"}}
+                )
+            if not doc:
+                continue  # AI used real DB names, so this is rare
+            reps_int = _first_int(ex.reps, None)
+            nsets = max(1, int(ex.sets or 3))
+            items.append(
+                TemplateExerciseItem(
+                    exercise_id=str(doc["_id"]),
+                    order=order,
+                    sets=[TemplateSetItem(reps=reps_int) for _ in range(nsets)],
+                    default_sets=nsets,
+                    default_reps=reps_int if reps_int is not None else 10,
+                )
+            )
+            order += 1
+
+        if not items:
+            continue
+
+        template = WorkoutTemplate(
+            name=day.name or "Workout",
+            notes=day.description,
+            exercises=items,
+            user_id=user_id,
+        )
+        tdoc = template.dict(by_alias=True, exclude={"id"})
+        tdoc["source"] = "onboarding"
+        result = await udb.templates.insert_one(tdoc)
+        template_id = str(result.inserted_id)
+        created.append(template_id)
+
+        # Schedule it as a recurring weekly workout on the AI-assigned weekday
+        # (prefer the AI's choice; dedupe; fall back to an even spread across the week).
+        wd = day.weekday if isinstance(day.weekday, int) and 0 <= day.weekday <= 6 else None
+        if wd is None or wd in used_weekdays:
+            wd = round(i * 7 / n_days) % 7
+            guard = 0
+            while wd in used_weekdays and guard < 7:
+                wd = (wd + 1) % 7
+                guard += 1
+        used_weekdays.add(wd)
+
+        wtype = day.type if day.type in valid_types else (
+            "run" if "run" in (day.name or "").lower() else "strength"
+        )
+        try:
+            pw = PlannedWorkout(
+                user_id=user_id,
+                **PlannedWorkoutCreate(
+                    date=today,
+                    name=day.name or "Workout",
+                    template_id=template_id,
+                    type=wtype,
+                    is_recurring=True,
+                    recurrence_type="weekly",
+                    recurrence_days=[wd],
+                ).dict(),
+            )
+            pwdoc = pw.dict(by_alias=True, exclude={"id"})
+            pwdoc["source"] = "onboarding"
+            pw_res = await udb.planned_workouts.insert_one(pwdoc)
+            scheduled.append(str(pw_res.inserted_id))
+        except Exception:
+            logging.getLogger(__name__).exception("Failed to schedule planned workout")
+
+    # Persist the full structured profile + insights onto the real account (goals, sub-goals,
+    # injuries incl. custom, activity, equipment…) + mark the funnel done.
+    if payload.raw:
+        await _persist_onboarding_profile(user_id, payload.raw)
+    try:
+        await db.users.update_one(
+            {"_id": ObjectId(user_id)}, {"$set": {"onboarding_completed": True}}
+        )
+    except Exception:
+        pass
+
+    return {"templates": created, "scheduled": scheduled, "count": len(created)}
+
+
+@api_router.get("/onboarding/data")
+async def get_onboarding_data(user_id: str = Depends(get_current_user)):
+    """Return the raw onboarding answers saved for this user (goal, subGoals, injuries, etc.)."""
+    doc = await db.users.find_one({"_id": ObjectId(user_id)}, {"onboarding": 1})
+    return {"onboarding": (doc or {}).get("onboarding")}
 
 
 @api_router.get(
@@ -738,6 +1068,11 @@ async def get_user_context(user_id: str = Depends(get_current_user)):
     training_context = {
         "training_age": profile.get("training_age"),
         "goals": insights_doc.get("goals"),
+        "sub_goals": insights_doc.get("sub_goals") or profile.get("sub_goals") or [],
+        "goal_tags": profile.get("goal_tags") or [],
+        "current_activity": profile.get("current_activity"),
+        "days_per_week": profile.get("days_per_week"),
+        "equipment": profile.get("equipment"),
     }
 
     physiology = {
@@ -763,7 +1098,7 @@ async def get_user_context(user_id: str = Depends(get_current_user)):
         training_context=training_context,
         physiology=physiology,
         background_story=insights_doc.get("background_story"),
-        is_profile_complete=is_complete,
+        is_profile_complete=is_complete or bool(user_doc.get("onboarding_completed")),
         insights=insights,
     )
 

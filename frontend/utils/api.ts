@@ -481,7 +481,10 @@ export function createWsClient(
 
       if (!started) return;
 
-      scheduleReconnect();
+      // 1008 = server rejected our token (auth failure). Reconnecting fast with the same
+      // token is pointless and spams the server — back off hard until the token changes
+      // (login / app restart calls reconnect(), which resets and retries immediately).
+      scheduleReconnect(e?.code === 1008 ? 30000 : undefined);
     };
 
     socket.onerror = (e: any) => {
@@ -498,11 +501,11 @@ export function createWsClient(
     };
   }
 
-  function scheduleReconnect() {
+  function scheduleReconnect(fixedDelay?: number) {
     if (!started) return;
     if (reconnectTimer) return;
 
-    const delay = Math.min(8000, 500 * Math.pow(2, retry));
+    const delay = fixedDelay ?? Math.min(8000, 500 * Math.pow(2, retry));
     retry++;
 
     reconnectTimer = setTimeout(() => {

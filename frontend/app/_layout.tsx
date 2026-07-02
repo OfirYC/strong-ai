@@ -2,21 +2,30 @@ import "react-native-gesture-handler"; // 👈 MUST be first
 
 import React, { useEffect } from "react";
 import { View, StyleSheet } from "react-native";
-import { Stack } from "expo-router";
+import { Stack, usePathname } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useAuthStore } from "../store/authStore";
 import { registerRealtime } from "../realtime/registerRealtime";
 import { configurePurchases } from "../utils/purchases";
+import { initAnalytics, captureAttribution, screen } from "../analytics";
 
 export default function RootLayout() {
   const loadUser = useAuthStore(state => state.loadUser);
   const insets = useSafeAreaInsets();
+  const pathname = usePathname();
 
   useEffect(() => {
     configurePurchases();
+    initAnalytics();
+    captureAttribution(); // utm_* → PostHog super-props + RevenueCat attributes (set once)
     loadUser();
   }, []);
+
+  // Auto screen-tracking on every route change.
+  useEffect(() => {
+    if (pathname) screen(pathname);
+  }, [pathname]);
 
   useEffect(() => {
     console.log("Registering realtime...");

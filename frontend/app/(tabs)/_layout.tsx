@@ -18,7 +18,11 @@ import { useActiveWorkoutSheetUIStore } from "../../store/workoutCompleteUIStore
 import { useWorkoutStore } from "../../store/workoutStore";
 import { useSubscriptionStore } from "../../store/subscriptionStore";
 import { identifyUser } from "../../utils/purchases";
-import PaywallModal from "../../components/PaywallModal";
+import { MOCK_PURCHASES } from "../../utils/devFlags";
+import PaywallScreen from "../../onboarding/screens/PaywallScreen";
+import { useOnboardingStore } from "../../onboarding/store";
+import { track } from "../../analytics";
+import api from "../../utils/api";
 
 export default function TabLayout() {
   const { user } = useAuthStore();
@@ -37,6 +41,20 @@ export default function TabLayout() {
       identifyUser(user.id).then(refreshSub).catch(refreshSub);
     }
   }, [user?.id]);
+
+  // Rehydrate the saved onboarding answers (goal, sex, injuries…) so the paywall gate
+  // and any personalization reflect THIS user even on a fresh app launch.
+  const hydrateOnboarding = useOnboardingStore((s) => s.hydrate);
+  const hasOnboarding = useOnboardingStore((s) => !!s.answers.goal);
+  useEffect(() => {
+    if (!user?.id || hasOnboarding) return;
+    api
+      .get("/onboarding/data")
+      .then((r: any) => {
+        if (r?.data?.onboarding) hydrateOnboarding(r.data.onboarding);
+      })
+      .catch(() => {});
+  }, [user?.id, hasOnboarding]);
 
   const [showAIChat, setShowAIChat] = useState(false);
 
@@ -131,7 +149,10 @@ export default function TabLayout() {
       {user && (
         <TouchableOpacity
           style={styles.aiButton}
-          onPress={() => setShowAIChat(true)}
+          onPress={() => {
+            track("ai_chat_opened");
+            setShowAIChat(true);
+          }}
           activeOpacity={0.8}
         >
           <View style={styles.aiButtonGradient}>
@@ -142,9 +163,13 @@ export default function TabLayout() {
 
       <AIChatModal visible={showAIChat} onClose={() => setShowAIChat(false)} />
 
-      {/* Paywall gate — shown until user subscribes */}
-      {user && !subLoading && !isPro && !user.is_pro && (
-        <PaywallModal visible onSubscribed={refreshSub} />
+      {/* Paywall gate — the SAME premium paywall as onboarding, as a hard gate (no "Not now").
+          Full-screen overlay above the tab bar (zIndex beats the navbar's 9999).
+          Bypassed only while MOCK_PURCHASES is on (dev UI iteration). Always active in release. */}
+      {!MOCK_PURCHASES && user && !subLoading && !isPro && !user.is_pro && (
+        <View style={styles.gate}>
+          <PaywallScreen onSubscribed={refreshSub} />
+        </View>
       )}
     </View>
   );
@@ -152,6 +177,12 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  gate: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 10000,
+    elevation: 10000,
+    backgroundColor: "#F4F8FF",
+  },
   aiButton: {
     position: "absolute",
     bottom: 80,

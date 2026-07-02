@@ -4,6 +4,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { WorkoutSession, WorkoutExercise } from "../types";
 import { storageKey } from "../env";
+import { track } from "../analytics";
 
 interface WorkoutState {
   activeWorkout: WorkoutSession | null;
@@ -24,14 +25,21 @@ export const useWorkoutStore = create<WorkoutState>()(
     set => ({
       activeWorkout: null,
       workoutStartTime: null,
-      startWorkout: workout =>
+      startWorkout: workout => {
+        track("workout_started", {
+          name: workout.name || "Workout",
+          exercises: workout.exercises?.length ?? 0,
+          template_id: (workout as any).template_id ?? undefined,
+          from_routine: !!(workout as any).template_id,
+        });
         set({
           activeWorkout: {
             ...workout,
             name: workout.name || "Workout",
           },
           workoutStartTime: Date.now(),
-        }),
+        });
+      },
 
       updateWorkout: (exercises, notes, name) =>
         set(state => ({

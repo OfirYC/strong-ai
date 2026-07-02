@@ -5,6 +5,7 @@ import { User } from "../types";
 import { storageKey } from "../env";
 import api from "../utils/api"; // Import the api client
 import { dbWsClient } from "../realtime/registerRealtime";
+import { identify, resetAnalytics } from "../analytics";
 
 interface AuthState {
   user: User | null;
@@ -25,6 +26,7 @@ export const useAuthStore = create<AuthState>(set => ({
     try {
       if (user) {
         await AsyncStorage.setItem(USER_KEY, JSON.stringify(user));
+        identify(user.id, user.email ? { email: user.email } : undefined);
 
         // Start WS on login if token exists
         if (user.token) {
@@ -32,6 +34,7 @@ export const useAuthStore = create<AuthState>(set => ({
         }
       } else {
         await AsyncStorage.removeItem(USER_KEY);
+        resetAnalytics();
 
         // Stop WS on logout/clear
         dbWsClient.stop();

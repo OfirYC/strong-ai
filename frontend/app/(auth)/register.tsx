@@ -44,8 +44,9 @@ export default function RegisterScreen() {
       setLoading(true);
       const response = await api.post('/auth/register', { email, password });
       await setUser(response.data);
-      // New users need to complete onboarding
-      router.replace('/onboarding');
+      // Direct registration is now authed → go to the app (the value-first funnel is the
+      // pre-auth path for new users; sending an authed user into it would double-create).
+      router.replace('/(tabs)/workout');
     } catch (error: any) {
       Alert.alert('Error', error.response?.data?.detail || 'Registration failed');
     } finally {

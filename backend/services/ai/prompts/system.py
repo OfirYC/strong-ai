@@ -74,6 +74,7 @@ def build_system_prompt(user_context: Dict[str, Any]) -> str:
 
     training_age = profile.get("training_age", "not specified")
     goals = insights.get("goals") or "not specified"
+    sub_goals = insights.get("sub_goals", []) or profile.get("sub_goals", []) or []
 
     injury_tags = insights.get("injury_tags", []) or []
     current_issues = insights.get("current_issues", []) or []
@@ -123,6 +124,7 @@ USER CONTEXT:
 - Height/Weight: {height_weight}
 - Training Age: {training_age}
 - Goals: {goals}
+- Priorities: {", ".join(str(s).replace("_", " ") for s in sub_goals) if sub_goals else "None"}
 - Background: {background_story if background_story else "Not specified"}
 - Injuries: {", ".join(injury_tags) if injury_tags else "None"}
 - Current Issues: {", ".join(current_issues) if current_issues else "None"}
