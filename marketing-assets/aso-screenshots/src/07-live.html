@@ -1,0 +1,78 @@
+<!doctype html><html><head><meta charset="utf-8">
+<style>
+@font-face { font-family:'SFBlack'; src:url('file:///Library/Fonts/SF-Pro-Display-Black.otf'); }
+* { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+html,body { width:1290px; height:2796px; overflow:hidden; }
+body { position:relative; background:#0B5FFF; font-family:system-ui,-apple-system,"Helvetica Neue",sans-serif; }
+
+/* headline */
+.headline { position:absolute; top:150px; left:0; width:1290px; text-align:center; padding:0 150px; z-index:5; }
+.verb { font-family:'SFBlack'; font-size:170px; line-height:0.92; color:#fff; text-transform:uppercase; letter-spacing:-4px; }
+.desc { font-family:'SFBlack'; font-size:74px; line-height:1.0; color:#fff; text-transform:uppercase; letter-spacing:-2px; margin-top:22px; opacity:.96; }
+
+/* phone */
+.phone { position:absolute; top:768px; left:185px; width:920px; height:2049px;
+  background:linear-gradient(135deg,#5a5b62 0%,#17181c 15%,#0c0c0e 50%,#17181c 85%,#5a5b62 100%);
+  border-radius:84px; box-shadow:0 50px 110px rgba(0,0,40,.40), 0 8px 24px rgba(0,0,30,.25);
+  border:1px solid #3a3a40; }
+.bezelhi { position:absolute; inset:0; border-radius:84px; box-shadow:inset 0 2px 3px rgba(255,255,255,.18), inset 0 -2px 6px rgba(0,0,0,.5); pointer-events:none; z-index:30; }
+.screen { position:absolute; top:16px; left:16px; width:888px; height:2033px; border-radius:68px; overflow:hidden; background:#fff; }
+.island { position:absolute; top:34px; left:50%; transform:translateX(-50%); width:118px; height:35px; background:#000; border-radius:20px; z-index:20; }
+
+/* scaled app canvas: 393pt wide -> 888px screen => scale 2.2595; height 900pt -> 2033px */
+.app { position:absolute; top:0; left:0; width:393px; height:900px; transform:scale(2.2595); transform-origin:top left;
+  font-family:system-ui,-apple-system,"Helvetica Neue",sans-serif; color:#1C1C1E; background:#fff; }
+.col { height:100%; display:flex; flex-direction:column; }
+
+/* status bar */
+.sb { height:54px; display:flex; align-items:flex-end; justify-content:space-between; padding:0 30px 8px; }
+.sb .t { font-size:16px; font-weight:700; letter-spacing:.3px; }
+.sb .r { display:flex; align-items:center; gap:6px; }
+.sb ion-icon { font-size:17px; }
+
+ion-icon { color:inherit; }
+</style></head>
+<body>
+  <div class="headline"><div class="verb">LIVE</div><div class="desc">ON YOUR LOCK SCREEN</div></div>
+  <div class="phone">
+    <div class="screen"><div class="app">
+<div style="position:relative;height:100%;overflow:hidden;background:linear-gradient(165deg,#0a1430 0%,#122a52 52%,#0a1430 100%);">
+  <!-- status icons -->
+  <div style="position:absolute;top:16px;right:28px;display:flex;align-items:center;gap:6px;color:#fff;">
+    <ion-icon name="cellular" style="font-size:16px;"></ion-icon>
+    <ion-icon name="wifi" style="font-size:16px;"></ion-icon>
+    <ion-icon name="battery-full" style="font-size:17px;"></ion-icon></div>
+  <div style="display:flex;flex-direction:column;align-items:center;height:100%;padding-top:64px;">
+    <ion-icon name="lock-closed" style="font-size:17px;color:rgba(255,255,255,0.92);"></ion-icon>
+    <div style="margin-top:24px;font-size:16px;font-weight:600;color:rgba(255,255,255,0.88);">Tuesday, 24 June</div>
+    <div style="margin-top:0;font-size:84px;font-weight:700;color:#fff;letter-spacing:-1px;line-height:1.05;">9:41</div>
+    <!-- Live Activity banner -->
+    <div style="margin-top:150px;width:100%;padding:0 16px;">
+      <div style="background:#E8F7E8;border-radius:18px;border:1px solid rgba(0,0,0,0.05);box-shadow:0 12px 30px rgba(0,0,0,0.28);padding:14px 16px;">
+        <div style="display:flex;align-items:center;gap:11px;">
+          <ion-icon name="barbell" style="font-size:19px;color:#0A84FF;"></ion-icon>
+          <div style="flex:1;">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;">
+              <span style="font-size:18px;font-weight:700;color:#111111;">Push Day A</span>
+              <span style="font-size:16px;font-weight:600;color:rgba(17,17,17,0.45);font-variant-numeric:tabular-nums;">24:51</span></div>
+            <div style="font-size:13px;color:rgba(107,114,128,0.95);margin-top:2px;">Rest &bull; 8 / 20 sets</div></div>
+        </div>
+        <div style="margin-top:12px;position:relative;height:28px;border-radius:8px;background:rgba(0,0,0,0.06);overflow:hidden;">
+          <div style="position:absolute;left:0;top:0;bottom:0;width:64%;background:#0A84FF;"></div>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:#fff;font-variant-numeric:tabular-nums;">0:42</div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:auto;display:flex;gap:90px;padding-bottom:26px;">
+      <div style="width:48px;height:48px;border-radius:24px;background:rgba(255,255,255,0.18);display:flex;align-items:center;justify-content:center;"><ion-icon name="flashlight" style="font-size:22px;color:#fff;"></ion-icon></div>
+      <div style="width:48px;height:48px;border-radius:24px;background:rgba(255,255,255,0.18);display:flex;align-items:center;justify-content:center;"><ion-icon name="camera" style="font-size:22px;color:#fff;"></ion-icon></div>
+    </div>
+  </div>
+</div>
+</div></div>
+    <div class="island"></div>
+    <div class="bezelhi"></div>
+  </div>
+  <script type="module" src="https://cdn.jsdelivr.net/npm/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+  <script nomodule src="https://cdn.jsdelivr.net/npm/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+</body></html>

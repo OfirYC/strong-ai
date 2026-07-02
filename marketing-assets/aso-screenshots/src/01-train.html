@@ -1,0 +1,132 @@
+<!doctype html><html><head><meta charset="utf-8">
+<style>
+@font-face { font-family:'SFBlack'; src:url('file:///Library/Fonts/SF-Pro-Display-Black.otf'); }
+* { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+html,body { width:1290px; height:2796px; overflow:hidden; }
+body { position:relative; background:#0B5FFF; font-family:system-ui,-apple-system,"Helvetica Neue",sans-serif; }
+
+/* headline */
+.headline { position:absolute; top:150px; left:0; width:1290px; text-align:center; padding:0 150px; z-index:5; }
+.verb { font-family:'SFBlack'; font-size:170px; line-height:0.92; color:#fff; text-transform:uppercase; letter-spacing:-4px; }
+.desc { font-family:'SFBlack'; font-size:74px; line-height:1.0; color:#fff; text-transform:uppercase; letter-spacing:-2px; margin-top:22px; opacity:.96; }
+
+/* phone */
+.phone { position:absolute; top:768px; left:185px; width:920px; height:2049px;
+  background:#0b0b0d; border-radius:84px; box-shadow:0 50px 110px rgba(0,0,40,.40), 0 8px 24px rgba(0,0,30,.25);
+  border:2px solid #2a2a30; }
+.bezelhi { position:absolute; inset:0; border-radius:84px; box-shadow:inset 0 2px 3px rgba(255,255,255,.18), inset 0 -2px 6px rgba(0,0,0,.5); pointer-events:none; z-index:30; }
+.screen { position:absolute; top:16px; left:16px; width:888px; height:2033px; border-radius:68px; overflow:hidden; background:#fff; }
+.island { position:absolute; top:34px; left:50%; transform:translateX(-50%); width:118px; height:35px; background:#000; border-radius:20px; z-index:20; }
+
+/* scaled app canvas: 393pt wide -> 888px screen => scale 2.2595; height 900pt -> 2033px */
+.app { position:absolute; top:0; left:0; width:393px; height:900px; transform:scale(2.2595); transform-origin:top left;
+  font-family:system-ui,-apple-system,"Helvetica Neue",sans-serif; color:#1C1C1E; background:#fff; }
+.col { height:100%; display:flex; flex-direction:column; }
+
+/* status bar */
+.sb { height:54px; display:flex; align-items:flex-end; justify-content:space-between; padding:0 30px 8px; }
+.sb .t { font-size:16px; font-weight:700; letter-spacing:.3px; }
+.sb .r { display:flex; align-items:center; gap:6px; }
+.sb ion-icon { font-size:17px; }
+
+ion-icon { color:inherit; }
+</style></head>
+<body>
+  <div class="headline"><div class="verb">TRAIN</div><div class="desc">WITH AN AI COACH</div></div>
+  <div class="phone">
+    <div class="screen"><div class="app">
+<div class="col">
+<div class="sb" style="color:#1C1C1E"><div class="t">9:41</div>
+      <div class="r"><ion-icon name="cellular"></ion-icon><ion-icon name="wifi"></ion-icon><ion-icon name="battery-full"></ion-icon></div></div>
+<div style="display:flex;align-items:flex-start;justify-content:space-between;padding:6px 16px 14px;border-bottom:1px solid #F2F2F7;">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <div style="width:22px;display:flex;flex-direction:column;gap:5px;margin-top:4px;">
+      <div style="height:2px;width:80%;background:#1C1C1E;border-radius:2px;"></div>
+      <div style="height:2px;width:60%;background:#1C1C1E;border-radius:2px;"></div>
+      <div style="height:2px;width:100%;background:#1C1C1E;border-radius:2px;"></div>
+    </div>
+    <div>
+      <div style="font-size:18px;font-weight:700;">AI Coach</div>
+      <div style="font-size:12px;color:#8E8E93;margin-top:2px;">Your strength &amp; conditioning assistant</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;color:#1C1C1E;">
+    <ion-icon name="create-outline" style="font-size:23px;"></ion-icon>
+    <ion-icon name="close" style="font-size:26px;"></ion-icon>
+  </div>
+</div>
+
+<div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;padding:14px 14px 8px;">
+  <div style="text-align:center;margin:6px 0 18px;"><span style="font-size:12px;font-weight:600;color:#8E8E93;background:#F2F2F7;border-radius:999px;padding:4px 12px;">Today</span></div>
+  <!-- assistant greeting -->
+  <div style="max-width:85%;align-self:flex-start;margin-bottom:14px;">
+    <div style="font-size:16px;line-height:1.35;color:#1C1C1E;">Hey — what are we training today?</div>
+  </div>
+  <!-- user -->
+  <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+    <div style="max-width:80%;background:#007AFF;color:#fff;border-radius:18px;padding:11px 14px;font-size:16px;line-height:1.35;">
+      Got 45 min and a barbell. Push day?</div>
+  </div>
+  <!-- assistant question -->
+  <div style="max-width:85%;align-self:flex-start;margin-bottom:14px;">
+    <div style="font-size:16px;line-height:1.35;color:#1C1C1E;">On it. Work around your right shoulder, or load it up today?</div>
+  </div>
+  <!-- user -->
+  <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+    <div style="max-width:80%;background:#007AFF;color:#fff;border-radius:18px;padding:11px 14px;font-size:16px;line-height:1.35;">
+      Work around it 🙏</div>
+  </div>
+  <!-- assistant tool card -->
+  <div style="max-width:92%;margin-bottom:14px;">
+    <div style="background:#fff;border:1px solid #E5E5EA;border-radius:16px;padding:12px 13px;box-shadow:0 6px 18px rgba(0,0,0,.06);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:24px;height:24px;border-radius:12px;background:#E8F4FF;display:flex;align-items:center;justify-content:center;">
+            <ion-icon name="sparkles" style="font-size:14px;color:#007AFF;"></ion-icon></div>
+          <div style="font-size:13px;font-weight:700;">Building your plan</div>
+        </div>
+        <div style="background:#EAF8EF;border-radius:999px;padding:3px 9px;font-size:11px;font-weight:700;color:#1F8A3B;">Done</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:11px;">
+        <div style="display:flex;align-items:center;gap:9px;">
+          <ion-icon name="checkmark-circle" style="font-size:18px;color:#34C759;"></ion-icon>
+          <div style="font-size:13px;font-weight:600;color:#3A3A3C;flex:1;">Reviewed your profile &amp; bench PR</div></div>
+        <div style="display:flex;align-items:center;gap:9px;">
+          <ion-icon name="checkmark-circle" style="font-size:18px;color:#34C759;"></ion-icon>
+          <div style="font-size:13px;font-weight:600;color:#3A3A3C;flex:1;">Found matching exercises</div></div>
+        <div style="display:flex;align-items:center;gap:9px;">
+          <ion-icon name="checkmark-circle" style="font-size:18px;color:#34C759;"></ion-icon>
+          <div style="font-size:13px;font-weight:600;color:#3A3A3C;flex:1;">Built your 45-min push session</div></div>
+        <div style="display:flex;align-items:center;gap:9px;">
+          <ion-icon name="checkmark-circle" style="font-size:18px;color:#34C759;"></ion-icon>
+          <div style="font-size:13px;font-weight:600;color:#3A3A3C;flex:1;">Scheduled it for today</div></div>
+      </div>
+    </div>
+  </div>
+  <!-- assistant text + CTA -->
+  <div style="max-width:90%;align-self:flex-start;">
+    <div style="font-size:16px;line-height:1.4;color:#1C1C1E;margin-bottom:12px;">
+      Done 💪 Built a <b>45-min push day</b> around your <b>100 kg</b> bench — bench, overhead press, weighted dips, triceps to finish.</div>
+    <div style="display:inline-flex;align-items:center;gap:8px;background:#007AFF;border-radius:14px;padding:11px 18px;margin-bottom:16px;">
+      <ion-icon name="play" style="font-size:17px;color:#fff;"></ion-icon>
+      <span style="font-size:15px;font-weight:700;color:#fff;">Start Push Day</span></div>
+    <div style="font-size:16px;line-height:1.4;color:#1C1C1E;">Want me to swap anything before you start?</div>
+  </div>
+</div>
+
+<!-- input bar -->
+<div style="background:#fff;border-top:1px solid #E5E5EA;padding:11px 16px 14px;">
+  <div style="background:#F2F2F7;border-radius:24px;padding:7px 7px 7px 16px;display:flex;align-items:center;justify-content:space-between;">
+    <div style="font-size:16px;color:#999;">Ask me anything…</div>
+    <div style="width:36px;height:36px;border-radius:18px;background:#007AFF;display:flex;align-items:center;justify-content:center;">
+      <ion-icon name="arrow-up" style="font-size:18px;color:#fff;"></ion-icon></div>
+  </div>
+</div>
+</div>
+</div></div>
+    <div class="island"></div>
+    <div class="bezelhi"></div>
+  </div>
+  <script type="module" src="https://cdn.jsdelivr.net/npm/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+  <script nomodule src="https://cdn.jsdelivr.net/npm/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+</body></html>

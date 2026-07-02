@@ -6,6 +6,7 @@ import { storageKey } from "../env";
 import api from "../utils/api"; // Import the api client
 import { dbWsClient } from "../realtime/registerRealtime";
 import { identify, resetAnalytics } from "../analytics";
+import { identifyUser, logOutPurchases } from "../utils/purchases";
 
 interface AuthState {
   user: User | null;
@@ -27,6 +28,8 @@ export const useAuthStore = create<AuthState>(set => ({
       if (user) {
         await AsyncStorage.setItem(USER_KEY, JSON.stringify(user));
         identify(user.id, user.email ? { email: user.email } : undefined);
+        // Point RevenueCat at this account so entitlements + the purchase carry over correctly.
+        identifyUser(user.id).catch(() => {});
 
         // Start WS on login if token exists
         if (user.token) {
@@ -35,6 +38,7 @@ export const useAuthStore = create<AuthState>(set => ({
       } else {
         await AsyncStorage.removeItem(USER_KEY);
         resetAnalytics();
+        logOutPurchases().catch(() => {});
 
         // Stop WS on logout/clear
         dbWsClient.stop();
@@ -85,6 +89,8 @@ export const useAuthStore = create<AuthState>(set => ({
         const user: User = JSON.parse(userData);
 
         set({ user, isLoading: false });
+        // Keep RevenueCat identified as this account across relaunches.
+        if (user?.id) identifyUser(user.id).catch(() => {});
 
         // Start WS on boot if token already stored
         if (user?.token) {

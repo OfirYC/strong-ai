@@ -1,0 +1,100 @@
+<!doctype html><html><head><meta charset="utf-8">
+<style>
+@font-face { font-family:'SFBlack'; src:url('file:///Library/Fonts/SF-Pro-Display-Black.otf'); }
+* { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+html,body { width:1290px; height:2796px; overflow:hidden; }
+body { position:relative; background:#0B5FFF; font-family:system-ui,-apple-system,"Helvetica Neue",sans-serif; }
+
+/* headline */
+.headline { position:absolute; top:150px; left:0; width:1290px; text-align:center; padding:0 150px; z-index:5; }
+.verb { font-family:'SFBlack'; font-size:170px; line-height:0.92; color:#fff; text-transform:uppercase; letter-spacing:-4px; }
+.desc { font-family:'SFBlack'; font-size:74px; line-height:1.0; color:#fff; text-transform:uppercase; letter-spacing:-2px; margin-top:22px; opacity:.96; }
+
+/* phone */
+.phone { position:absolute; top:768px; left:185px; width:920px; height:2049px;
+  background:#0b0b0d; border-radius:84px; box-shadow:0 50px 110px rgba(0,0,40,.40), 0 8px 24px rgba(0,0,30,.25);
+  border:2px solid #2a2a30; }
+.bezelhi { position:absolute; inset:0; border-radius:84px; box-shadow:inset 0 2px 3px rgba(255,255,255,.18), inset 0 -2px 6px rgba(0,0,0,.5); pointer-events:none; z-index:30; }
+.screen { position:absolute; top:16px; left:16px; width:888px; height:2033px; border-radius:68px; overflow:hidden; background:#fff; }
+.island { position:absolute; top:34px; left:50%; transform:translateX(-50%); width:118px; height:35px; background:#000; border-radius:20px; z-index:20; }
+
+/* scaled app canvas: 393pt wide -> 888px screen => scale 2.2595; height 900pt -> 2033px */
+.app { position:absolute; top:0; left:0; width:393px; height:900px; transform:scale(2.2595); transform-origin:top left;
+  font-family:system-ui,-apple-system,"Helvetica Neue",sans-serif; color:#1C1C1E; background:#fff; }
+.col { height:100%; display:flex; flex-direction:column; }
+
+/* status bar */
+.sb { height:54px; display:flex; align-items:flex-end; justify-content:space-between; padding:0 30px 8px; }
+.sb .t { font-size:16px; font-weight:700; letter-spacing:.3px; }
+.sb .r { display:flex; align-items:center; gap:6px; }
+.sb ion-icon { font-size:17px; }
+
+ion-icon { color:inherit; }
+</style></head>
+<body>
+  <div class="headline"><div class="verb">PLAN</div><div class="desc">YOUR TRAINING WEEK</div></div>
+  <div class="phone">
+    <div class="screen"><div class="app">
+<div class="col">
+<div class="sb" style="color:#1C1C1E"><div class="t">9:41</div>
+      <div class="r"><ion-icon name="cellular"></ion-icon><ion-icon name="wifi"></ion-icon><ion-icon name="battery-full"></ion-icon></div></div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 20px 18px;">
+  <div style="font-size:32px;font-weight:800;color:#1C1C1E;letter-spacing:-0.5px;">Start Workout</div>
+  <div style="display:flex;gap:14px;color:#007AFF;">
+    <ion-icon name="document-text-outline" style="font-size:24px;"></ion-icon>
+    <ion-icon name="calendar-outline" style="font-size:24px;"></ion-icon></div>
+</div>
+<div style="flex:1;overflow:hidden;padding:0 20px;">
+  <div style="font-size:20px;font-weight:600;color:#1C1C1E;margin-bottom:14px;">Today</div>
+  <div style="background:#fff;border:2px solid #007AFF;border-radius:13px;padding:15px 16px;margin-bottom:11px;display:flex;align-items:center;justify-content:space-between;">
+      <div><div style="font-size:18px;font-weight:600;color:#1C1C1E;">Push Day A</div>
+        <div style="font-size:13px;color:#8E8E93;margin-top:4px;">Chest · Shoulders · Triceps · 6 exercises</div></div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+        <div style="background:#EAF2FF;border-radius:999px;padding:4px 11px;font-size:12px;font-weight:700;color:#007AFF;">Today</div>
+        <ion-icon name="play-circle-outline" style="font-size:30px;color:#007AFF;"></ion-icon></div></div>
+  <div style="font-size:20px;font-weight:600;color:#1C1C1E;margin:22px 0 14px;">This Week</div>
+  <div style="background:#fff;border:1px solid #E5E5EA;border-radius:13px;padding:15px 16px;margin-bottom:11px;display:flex;align-items:center;justify-content:space-between;">
+      <div><div style="font-size:18px;font-weight:600;color:#1C1C1E;">Pull Day A</div>
+        <div style="font-size:13px;color:#8E8E93;margin-top:4px;">Back · Biceps · 6 exercises</div></div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+        <div style="background:#EAF2FF;border-radius:999px;padding:4px 11px;font-size:12px;font-weight:700;color:#007AFF;">Tue</div>
+        <ion-icon name="play-circle-outline" style="font-size:30px;color:#007AFF;"></ion-icon></div></div>
+  <div style="background:#fff;border:1px solid #E5E5EA;border-radius:13px;padding:15px 16px;margin-bottom:11px;display:flex;align-items:center;justify-content:space-between;">
+      <div><div style="font-size:18px;font-weight:600;color:#1C1C1E;">Leg Day</div>
+        <div style="font-size:13px;color:#8E8E93;margin-top:4px;">Quads · Hamstrings · Glutes</div></div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+        <div style="background:#EAF2FF;border-radius:999px;padding:4px 11px;font-size:12px;font-weight:700;color:#007AFF;">Wed</div>
+        <ion-icon name="play-circle-outline" style="font-size:30px;color:#007AFF;"></ion-icon></div></div>
+  <div style="background:#fff;border:1px solid #E5E5EA;border-radius:13px;padding:15px 16px;margin-bottom:11px;display:flex;align-items:center;justify-content:space-between;">
+      <div><div style="font-size:18px;font-weight:600;color:#1C1C1E;">Long Run · 8 km</div>
+        <div style="font-size:13px;color:#8E8E93;margin-top:4px;">Zone 2 conditioning</div></div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+        <div style="background:#EAF2FF;border-radius:999px;padding:4px 11px;font-size:12px;font-weight:700;color:#007AFF;">Thu</div>
+        <ion-icon name="play-circle-outline" style="font-size:30px;color:#007AFF;"></ion-icon></div></div>
+  <div style="background:#fff;border:1px solid #E5E5EA;border-radius:13px;padding:15px 16px;margin-bottom:11px;display:flex;align-items:center;justify-content:space-between;">
+      <div><div style="font-size:18px;font-weight:600;color:#1C1C1E;">Push Day B</div>
+        <div style="font-size:13px;color:#8E8E93;margin-top:4px;">Chest · Shoulders · Triceps</div></div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+        <div style="background:#EAF2FF;border-radius:999px;padding:4px 11px;font-size:12px;font-weight:700;color:#007AFF;">Fri</div>
+        <ion-icon name="play-circle-outline" style="font-size:30px;color:#007AFF;"></ion-icon></div></div>
+  <div style="background:#fff;border:1px solid #E5E5EA;border-radius:13px;padding:15px 16px;margin-bottom:11px;display:flex;align-items:center;justify-content:space-between;">
+      <div><div style="font-size:18px;font-weight:600;color:#1C1C1E;">EMOM Conditioning</div>
+        <div style="font-size:13px;color:#8E8E93;margin-top:4px;">20 min · full body</div></div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+        <div style="background:#EAF2FF;border-radius:999px;padding:4px 11px;font-size:12px;font-weight:700;color:#007AFF;">Sat</div>
+        <ion-icon name="play-circle-outline" style="font-size:30px;color:#007AFF;"></ion-icon></div></div>
+  <div style="background:#fff;border:1px solid #E5E5EA;border-radius:13px;padding:15px 16px;margin-bottom:11px;display:flex;align-items:center;justify-content:space-between;">
+      <div><div style="font-size:18px;font-weight:600;color:#1C1C1E;">Mobility &amp; Recovery</div>
+        <div style="font-size:13px;color:#8E8E93;margin-top:4px;">15 min · active rest</div></div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+        <div style="background:#EAF2FF;border-radius:999px;padding:4px 11px;font-size:12px;font-weight:700;color:#007AFF;">Sun</div>
+        <ion-icon name="play-circle-outline" style="font-size:30px;color:#007AFF;"></ion-icon></div></div>
+</div>
+</div>
+</div></div>
+    <div class="island"></div>
+    <div class="bezelhi"></div>
+  </div>
+  <script type="module" src="https://cdn.jsdelivr.net/npm/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+  <script nomodule src="https://cdn.jsdelivr.net/npm/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+</body></html>

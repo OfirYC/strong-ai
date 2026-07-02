@@ -10,6 +10,7 @@ import { Plan } from "./planTemplate";
 const API = process.env.EXPO_PUBLIC_BACKEND_URL || "";
 const DEVICE_ID_KEY = storageKey("device_id");
 const DEVICE_TOKEN_KEY = storageKey("device_token");
+const DEVICE_USER_ID_KEY = storageKey("device_user_id");
 
 async function getDeviceId(): Promise<string> {
   let id = await AsyncStorage.getItem(DEVICE_ID_KEY);
@@ -34,7 +35,20 @@ export async function getDeviceToken(): Promise<string> {
   if (!res.ok) throw new Error(`device auth failed (${res.status})`);
   const data = await res.json();
   await AsyncStorage.setItem(DEVICE_TOKEN_KEY, data.token);
+  if (data.id) await AsyncStorage.setItem(DEVICE_USER_ID_KEY, String(data.id));
   return data.token as string;
+}
+
+/** The backend user_id of the anonymous device account — which becomes the account id on upgrade
+ *  (unchanged). Used to identify RevenueCat BEFORE purchase so the purchase, webhook and
+ *  entitlement all key off one real id (no fragile anonymous→account transfer). */
+export async function getDeviceUserId(): Promise<string | null> {
+  let id = await AsyncStorage.getItem(DEVICE_USER_ID_KEY);
+  if (!id) {
+    await getDeviceToken(); // mints + caches the id
+    id = await AsyncStorage.getItem(DEVICE_USER_ID_KEY);
+  }
+  return id;
 }
 
 export type AuthUser = { id: string; email: string; token: string; is_pro: boolean };

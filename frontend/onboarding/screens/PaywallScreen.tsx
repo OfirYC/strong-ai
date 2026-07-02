@@ -18,10 +18,13 @@ import {
   fetchPackages,
   purchasePackage,
   restorePurchases,
+  identifyUser,
 } from "../../utils/purchases";
 import Mascot from "../components/Mascot";
 import GlowCTA from "../components/GlowCTA";
 import { afterBody, genderFromSex, useOnboardingStore } from "../store";
+import { getDeviceUserId } from "../planService";
+import { useAuthStore } from "../../store/authStore";
 import { MOCK_PURCHASES } from "../../utils/devFlags";
 import { track } from "../../analytics";
 import { ob } from "../theme";
@@ -120,14 +123,24 @@ export default function PaywallScreen({
       setLoading(false);
       return;
     }
-    fetchPackages()
-      .then((pkgs) => {
-        setPackages(pkgs);
-        const annual = pkgs.find((p) => p.packageType === PACKAGE_TYPE.ANNUAL);
-        setSelected(annual ?? pkgs[0] ?? null);
-      })
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
+    (async () => {
+      // Identify RevenueCat with the REAL backend id BEFORE purchase — the signed-in account if
+      // there is one, else the anonymous device user (which becomes the account, unchanged, on
+      // upgrade). This means the purchase, the RC webhook and the entitlement all key off ONE id,
+      // instead of buying as an anonymous RC user and relying on a fragile login-time transfer.
+      try {
+        const uid = useAuthStore.getState().user?.id ?? (await getDeviceUserId());
+        if (uid) await identifyUser(uid);
+      } catch {}
+      fetchPackages()
+        .then((pkgs) => {
+          setPackages(pkgs);
+          const annual = pkgs.find((p) => p.packageType === PACKAGE_TYPE.ANNUAL);
+          setSelected(annual ?? pkgs[0] ?? null);
+        })
+        .catch(() => setError(true))
+        .finally(() => setLoading(false));
+    })();
   }, []);
   useEffect(load, [load]);
   useEffect(() => {

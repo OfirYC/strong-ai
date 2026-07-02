@@ -1,0 +1,111 @@
+<!doctype html><html><head><meta charset="utf-8">
+<style>
+@font-face { font-family:'SFBlack'; src:url('file:///Library/Fonts/SF-Pro-Display-Black.otf'); }
+* { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+html,body { width:1290px; height:2796px; overflow:hidden; }
+body { position:relative; background:#0B5FFF; font-family:system-ui,-apple-system,"Helvetica Neue",sans-serif; }
+
+/* headline */
+.headline { position:absolute; top:150px; left:0; width:1290px; text-align:center; padding:0 150px; z-index:5; }
+.verb { font-family:'SFBlack'; font-size:170px; line-height:0.92; color:#fff; text-transform:uppercase; letter-spacing:-4px; }
+.desc { font-family:'SFBlack'; font-size:74px; line-height:1.0; color:#fff; text-transform:uppercase; letter-spacing:-2px; margin-top:22px; opacity:.96; }
+
+/* phone */
+.phone { position:absolute; top:768px; left:185px; width:920px; height:2049px;
+  background:#0b0b0d; border-radius:84px; box-shadow:0 50px 110px rgba(0,0,40,.40), 0 8px 24px rgba(0,0,30,.25);
+  border:2px solid #2a2a30; }
+.bezelhi { position:absolute; inset:0; border-radius:84px; box-shadow:inset 0 2px 3px rgba(255,255,255,.18), inset 0 -2px 6px rgba(0,0,0,.5); pointer-events:none; z-index:30; }
+.screen { position:absolute; top:16px; left:16px; width:888px; height:2033px; border-radius:68px; overflow:hidden; background:#fff; }
+.island { position:absolute; top:34px; left:50%; transform:translateX(-50%); width:118px; height:35px; background:#000; border-radius:20px; z-index:20; }
+
+/* scaled app canvas: 393pt wide -> 888px screen => scale 2.2595; height 900pt -> 2033px */
+.app { position:absolute; top:0; left:0; width:393px; height:900px; transform:scale(2.2595); transform-origin:top left;
+  font-family:system-ui,-apple-system,"Helvetica Neue",sans-serif; color:#1C1C1E; background:#fff; }
+.col { height:100%; display:flex; flex-direction:column; }
+
+/* status bar */
+.sb { height:54px; display:flex; align-items:flex-end; justify-content:space-between; padding:0 30px 8px; }
+.sb .t { font-size:16px; font-weight:700; letter-spacing:.3px; }
+.sb .r { display:flex; align-items:center; gap:6px; }
+.sb ion-icon { font-size:17px; }
+
+ion-icon { color:inherit; }
+</style></head>
+<body>
+  <div class="headline"><div class="verb">TRACK</div><div class="desc">EVERY PR &amp; 1-REP MAX</div></div>
+  <div class="phone">
+    <div class="screen"><div class="app">
+<div class="col">
+<div class="sb" style="color:#1C1C1E"><div class="t">9:41</div>
+      <div class="r"><ion-icon name="cellular"></ion-icon><ion-icon name="wifi"></ion-icon><ion-icon name="battery-full"></ion-icon></div></div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #E5E5EA;">
+  <ion-icon name="chevron-back" style="font-size:26px;color:#007AFF;width:40px;"></ion-icon>
+  <div style="font-size:17px;font-weight:600;">Barbell Bench Press</div>
+  <ion-icon name="ellipsis-horizontal" style="font-size:22px;color:#1C1C1E;width:40px;text-align:right;"></ion-icon>
+</div>
+<div style="flex:1;overflow:hidden;">
+  <div style="padding:18px 20px 6px;">
+    <div style="font-size:12px;font-weight:700;letter-spacing:1px;color:#8E8E93;">ESTIMATED 1-REP MAX</div>
+    <div style="display:flex;align-items:flex-end;gap:10px;margin-top:4px;">
+      <div style="font-size:36px;font-weight:800;color:#1C1C1E;letter-spacing:-1px;">102.5<span style="font-size:20px;font-weight:700;color:#8E8E93;"> kg</span></div>
+      <div style="display:inline-flex;align-items:center;gap:3px;background:#EAF8EF;border-radius:999px;padding:4px 9px;margin-bottom:6px;">
+        <ion-icon name="trending-up" style="font-size:13px;color:#1F8A3B;"></ion-icon>
+        <span style="font-size:12px;font-weight:700;color:#1F8A3B;">+7.5 kg this month</span></div>
+    </div>
+  </div>
+  <div style="padding:6px 14px 4px;">
+    <svg viewBox="0 0 366 168" width="100%" style="display:block;">
+      <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#007AFF" stop-opacity="0.20"/><stop offset="1" stop-color="#007AFF" stop-opacity="0"/></linearGradient></defs>
+      <path d="M10,128 L58,118 L112,122 L165,96 L218,86 L286,58 L348,30 L348,150 L10,150 Z" fill="url(#g)"/>
+      <polyline points="10,128 58,118 112,122 165,96 218,86 286,58 348,30" fill="none" stroke="#007AFF" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="58" cy="118" r="3.5" fill="#fff" stroke="#007AFF" stroke-width="2.5"/>
+      <circle cx="165" cy="96" r="3.5" fill="#fff" stroke="#007AFF" stroke-width="2.5"/>
+      <circle cx="286" cy="58" r="3.5" fill="#fff" stroke="#007AFF" stroke-width="2.5"/>
+      <circle cx="348" cy="30" r="6" fill="#FFB800"/>
+      <circle cx="348" cy="30" r="11" fill="none" stroke="#FFB800" stroke-width="2" opacity="0.4"/>
+      <text x="10" y="164" font-size="11" fill="#C7C7CC" font-family="system-ui">Mar</text>
+      <text x="160" y="164" font-size="11" fill="#C7C7CC" font-family="system-ui">Apr</text>
+      <text x="300" y="164" font-size="11" fill="#C7C7CC" font-family="system-ui">May</text>
+    </svg>
+  </div>
+  <div style="font-size:13px;font-weight:700;letter-spacing:0.6px;color:#8E8E93;padding:10px 16px 8px;">PERSONAL RECORDS</div>
+  <div style="display:flex;align-items:center;padding:13px 16px;border-bottom:1px solid #F2F2F7;">
+      <div style="width:34px;height:34px;border-radius:9px;background:#FFF4D6;display:flex;align-items:center;justify-content:center;margin-right:12px;">
+        <ion-icon name="barbell" style="font-size:19px;color:#B8860B;"></ion-icon></div>
+      <div style="flex:1;font-size:15px;font-weight:500;color:#1C1C1E;">Heaviest Weight</div>
+      <div style="display:flex;align-items:center;"><div style="font-size:16px;font-weight:700;color:#1C1C1E;">100 kg × 1</div><div style="background:#FFF4D6;border-radius:6px;padding:2px 7px;font-size:11px;font-weight:800;color:#B8860B;margin-left:8px;">PR</div></div></div>
+  <div style="display:flex;align-items:center;padding:13px 16px;border-bottom:1px solid #F2F2F7;">
+      <div style="width:34px;height:34px;border-radius:9px;background:#EAF2FF;display:flex;align-items:center;justify-content:center;margin-right:12px;">
+        <ion-icon name="trending-up" style="font-size:19px;color:#007AFF;"></ion-icon></div>
+      <div style="flex:1;font-size:15px;font-weight:500;color:#1C1C1E;">Best Estimated 1RM</div>
+      <div style="display:flex;align-items:center;"><div style="font-size:16px;font-weight:700;color:#1C1C1E;">102.5 kg</div></div></div>
+  <div style="display:flex;align-items:center;padding:13px 16px;border-bottom:1px solid #F2F2F7;">
+      <div style="width:34px;height:34px;border-radius:9px;background:#FFF1E0;display:flex;align-items:center;justify-content:center;margin-right:12px;">
+        <ion-icon name="flame" style="font-size:19px;color:#FF9500;"></ion-icon></div>
+      <div style="flex:1;font-size:15px;font-weight:500;color:#1C1C1E;">Best Set Volume</div>
+      <div style="display:flex;align-items:center;"><div style="font-size:16px;font-weight:700;color:#1C1C1E;">1,840 kg</div></div></div>
+  <div style="display:flex;align-items:center;padding:13px 16px;border-bottom:1px solid #F2F2F7;">
+      <div style="width:34px;height:34px;border-radius:9px;background:#E7F8EC;display:flex;align-items:center;justify-content:center;margin-right:12px;">
+        <ion-icon name="repeat" style="font-size:19px;color:#34C759;"></ion-icon></div>
+      <div style="flex:1;font-size:15px;font-weight:500;color:#1C1C1E;">Most Reps @ 80 kg</div>
+      <div style="display:flex;align-items:center;"><div style="font-size:16px;font-weight:700;color:#1C1C1E;">12 reps</div></div></div>
+  <div style="font-size:13px;font-weight:700;letter-spacing:0.6px;color:#8E8E93;padding:16px 16px 8px;">RECENT SESSIONS</div>
+  <div style="display:flex;align-items:center;padding:13px 16px;border-bottom:1px solid #F2F2F7;">
+      <div style="width:54px;font-size:14px;font-weight:600;color:#1C1C1E;">Jun 24</div>
+      <div style="flex:1;font-size:14px;color:#8E8E93;">100 kg × 1 · 95 kg × 3</div><div style="display:inline-flex;align-items:center;gap:3px;background:#EAF8EF;border-radius:999px;padding:3px 8px;"><ion-icon name="arrow-up" style="font-size:11px;color:#1F8A3B;"></ion-icon><span style="font-size:12px;font-weight:700;color:#1F8A3B;">+2.5 kg</span></div></div>
+  <div style="display:flex;align-items:center;padding:13px 16px;border-bottom:1px solid #F2F2F7;">
+      <div style="width:54px;font-size:14px;font-weight:600;color:#1C1C1E;">Jun 17</div>
+      <div style="flex:1;font-size:14px;color:#8E8E93;">95 kg × 2 · 90 kg × 4</div><div style="display:inline-flex;align-items:center;gap:3px;background:#EAF8EF;border-radius:999px;padding:3px 8px;"><ion-icon name="arrow-up" style="font-size:11px;color:#1F8A3B;"></ion-icon><span style="font-size:12px;font-weight:700;color:#1F8A3B;">+5 kg</span></div></div>
+  <div style="display:flex;align-items:center;padding:13px 16px;border-bottom:1px solid #F2F2F7;">
+      <div style="width:54px;font-size:14px;font-weight:600;color:#1C1C1E;">Jun 10</div>
+      <div style="flex:1;font-size:14px;color:#8E8E93;">92.5 kg × 3</div></div>
+</div>
+</div>
+</div></div>
+    <div class="island"></div>
+    <div class="bezelhi"></div>
+  </div>
+  <script type="module" src="https://cdn.jsdelivr.net/npm/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+  <script nomodule src="https://cdn.jsdelivr.net/npm/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+</body></html>
