@@ -37,6 +37,9 @@ const INJURY_LABEL: Record<string, string> = {
   shoulders: "shoulders",
   wrists: "wrists",
   elbows: "elbows",
+  neck: "neck",
+  hips: "hips",
+  ankles: "ankles",
 };
 
 // ── Transformation copy (reviews screen) ─────────────────────────────
@@ -47,6 +50,7 @@ const SUBGOAL_HEADLINE: Record<string, string> = {
   shoulders: "built rounder shoulders",
   legs: "built stronger legs",
   glutes: "built the glutes they wanted",
+  hips: "built wider, curvier hips",
   abs: "finally saw their abs",
   bench: "smashed their bench",
   squat: "crushed their squat",
@@ -113,13 +117,44 @@ const INJURY_REASSURE: Record<string, Reassure> = {
     around: "Pressing and curling volume managed so they stay good.",
     solve: "And the moment an elbow flares, tell me — I'll find what's behind it and get rid of it for good.",
   },
+  neck: {
+    hook: "Neck? Handled.",
+    around: "No neck-straining loading — angles and positions that keep it relaxed.",
+    solve: "And the moment your neck tightens up, tell me — I'll find exactly what's triggering it and train it out for good.",
+  },
+  hips: {
+    hook: "Hips? I've got you.",
+    around: "Built around them — mobility-friendly patterns, nothing that cranks a tight hip.",
+    solve: "And the moment a hip nags, tell me — I'll pinpoint the real cause and fix it so it stops for good.",
+  },
+  ankles: {
+    hook: "Ankles? Covered.",
+    around: "Low-impact loading and smart progressions that keep them happy.",
+    solve: "And the moment an ankle flares, tell me — I'll get to the root of it and train it out for good.",
+  },
 };
 
-function reassurance(injuries: string[]): Reassure {
-  if (injuries.length === 1 && INJURY_REASSURE[injuries[0]]) return INJURY_REASSURE[injuries[0]];
+/** Human label for one limitation — resolves the custom "other" to what they actually typed. */
+function labelFor(v: string, custom?: string): string {
+  if (v === "other") return (custom || "").trim() || "that";
+  return INJURY_LABEL[v] ?? v.replace(/_/g, " ");
+}
+
+function reassurance(injuries: string[], custom?: string): Reassure {
+  if (injuries.length === 1) {
+    const only = injuries[0];
+    // Known injury with tailored copy — but custom "other" always uses the personalized fallback.
+    if (only !== "other" && INJURY_REASSURE[only]) return INJURY_REASSURE[only];
+    const l = labelFor(only, custom);
+    return {
+      hook: `Your ${l}? Covered.`,
+      around: `Your whole plan is built around your ${l} — nothing that aggravates it.`,
+      solve: `And the moment your ${l} acts up, tell me — I'll pinpoint the real cause and train it out for good.`,
+    };
+  }
   if (injuries.length === 2) {
-    const a = INJURY_LABEL[injuries[0]] ?? injuries[0];
-    const b = INJURY_LABEL[injuries[1]] ?? injuries[1];
+    const a = labelFor(injuries[0], custom);
+    const b = labelFor(injuries[1], custom);
     return {
       hook: "Both? Covered.",
       around: `Your whole plan built around your ${a} and ${b}.`,
@@ -166,7 +201,7 @@ export default function ProofInterstitial({
   // ── PROBLEM: the coach reassuring in its own voice (hook + detail) ──
   if (!isTransform) {
     const injuries = answers.limitations.filter((l) => l && l !== "none");
-    const { hook, around, solve } = reassurance(injuries);
+    const { hook, around, solve } = reassurance(injuries, answers.customLimitation);
     return (
       <View style={styles.root}>
         <View style={pageStyle}>
