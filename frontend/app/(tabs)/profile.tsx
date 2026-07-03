@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Linking } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -119,6 +119,20 @@ export default function ProfileScreen() {
         <TouchableOpacity style={styles.deleteAccountButton} onPress={handleDeleteAccount}>
           <Text style={styles.deleteAccountText}>Delete Account</Text>
         </TouchableOpacity>
+
+        <View style={styles.legalLinks}>
+          <TouchableOpacity onPress={() => Linking.openURL("https://strong-ai-production.up.railway.app/privacy")}>
+            <Text style={styles.legalLink}>Privacy Policy</Text>
+          </TouchableOpacity>
+          <Text style={styles.legalDot}>·</Text>
+          <TouchableOpacity onPress={() => Linking.openURL("https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")}>
+            <Text style={styles.legalLink}>Terms of Use</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.legalNote}>
+          Stronger provides general fitness guidance, not medical advice. Consult a physician before
+          starting any exercise program.
+        </Text>
       </ScrollView>
 
       <MuscleVolumeModal
@@ -133,6 +147,23 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F5F5F7",
+  },
+  legalLinks: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 20,
+  },
+  legalLink: { fontSize: 13, color: "#8E8E93", fontWeight: "600" },
+  legalDot: { fontSize: 13, color: "#C7C7CC" },
+  legalNote: {
+    fontSize: 11,
+    color: "#AEAEB2",
+    textAlign: "center",
+    marginTop: 12,
+    paddingHorizontal: 32,
+    lineHeight: 15,
   },
   header: {
     paddingHorizontal: 20,

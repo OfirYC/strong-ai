@@ -286,6 +286,12 @@ export default function PaywallScreen({
           <GlowCTA label={ctaLabel} onPress={buy} loading={purchasing} />
           {!!note && <Text style={styles.note}>{note}</Text>}
 
+          <Text style={styles.disclosure}>
+            Payment is charged to your Apple ID at confirmation. Your subscription auto-renews
+            unless canceled at least 24 hours before the period ends — manage or cancel anytime in
+            your App Store account settings.
+          </Text>
+
           <View style={styles.links}>
             <Pressable onPress={restore} hitSlop={8}>
               <Text style={styles.link}>{restoring ? "Restoring…" : "Restore"}</Text>
@@ -437,6 +443,7 @@ const styles = StyleSheet.create({
   planPrice: { fontSize: 14.5, fontWeight: "800", color: ob.ink },
 
   note: { fontSize: 12.5, color: ob.textSoft, textAlign: "center", marginTop: 10, fontWeight: "600" },
+  disclosure: { fontSize: 10.5, color: ob.textFaint, textAlign: "center", marginTop: 10, lineHeight: 14, paddingHorizontal: 6 },
 
   errorBox: { alignItems: "center", gap: 10, marginVertical: 6 },
   errorText: { fontSize: 13.5, color: ob.textSoft, textAlign: "center" },

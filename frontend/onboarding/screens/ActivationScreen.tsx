@@ -180,7 +180,8 @@ export default function ActivationScreen({ onActivated }: { onActivated: () => v
             )}
 
             <Text style={styles.legal}>
-              By continuing you agree to our Terms & Privacy Policy.
+              Stronger provides general fitness guidance, not medical advice — consult a physician
+              before starting any exercise program. By continuing you agree to our Terms & Privacy Policy.
             </Text>
           </View>
         </ScrollView>
