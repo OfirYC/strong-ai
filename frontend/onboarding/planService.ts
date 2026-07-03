@@ -69,7 +69,12 @@ export async function upgradeDeviceAccount(
   if (!res.ok) {
     let detail = `Something went wrong (${res.status})`;
     try {
-      detail = (await res.json())?.detail || detail;
+      const body = await res.json();
+      const d = body?.detail;
+      if (typeof d === "string") detail = d;
+      // FastAPI validation errors come back as an array of {loc,msg,type} objects.
+      else if (Array.isArray(d) && d[0]?.msg) detail = String(d[0].msg);
+      else if (res.status === 422) detail = "Please enter a valid email and password.";
     } catch {}
     throw new Error(detail);
   }

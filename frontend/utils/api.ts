@@ -211,7 +211,7 @@ axiosInstance.interceptors.response.use(
 
     // 402 = backend require_pro gate rejected a non-Pro user. Reflect it in the
     // subscription store so the paywall renders instead of a generic error.
-    if (status === 402) {
+  if (status === 402) {
       try {
         useSubscriptionStore.getState().setIsPro(false);
       } catch {

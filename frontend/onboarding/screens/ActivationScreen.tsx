@@ -67,7 +67,7 @@ export default function ActivationScreen({ onActivated }: { onActivated: () => v
   const createAccount = async () => {
     setError(null);
     const e = email.trim().toLowerCase();
-    if (!e || !e.includes("@")) return setError("Enter a valid email.");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return setError("Enter a valid email.");
     if (password.length < 6) return setError("Password must be at least 6 characters.");
     setBusy(true);
     try {
